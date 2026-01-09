@@ -1,5 +1,5 @@
 {
-    "fromTag": "8.45.0",
+    "fromTag": "8.45.1",
     "changelog": {
         "8.45.1": [
             {
@@ -68,6 +68,156 @@
                 },
                 "files": [
                     "packages/dev/core/src/Loading/Plugins/babylonFileLoader.ts"
+                ],
+                "tags": []
+            }
+        ],
+        "8.45.2": [
+            {
+                "pr": "17629",
+                "title": "Update WebXR controllers to use physics V2",
+                "description": "This PR updates the WebXR controllers classes to make them compatible with physics V2 implementation while keeping backwards compatibility.\r\n\r\nNeeds more tests.\r\n\r\nCloses #13852",
+                "author": {
+                    "name": "yuripourre",
+                    "url": "https://github.com/yuripourre"
+                },
+                "files": [
+                    "packages/dev/core/src/XR/features/WebXRControllerPhysics.ts",
+                    "packages/dev/core/src/XR/features/WebXRHandTracking.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "17637",
+                "title": "Engine: Fix crash when debug marker functions are not defined",
+                "description": "The debug marker functions may not be defined, because it's an optional engine extension. So, we must check if they exist before calling them.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/Extensions/engine.debugging.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/volumetricLightingTask.ts",
+                    "packages/dev/core/src/FrameGraph/frameGraphContext.ts",
+                    "packages/dev/core/src/FrameGraph/frameGraphTask.ts",
+                    "packages/dev/core/src/Lights/Shadows/cascadedShadowGenerator.ts",
+                    "packages/dev/core/src/Lights/Shadows/shadowGenerator.ts",
+                    "packages/dev/core/src/Lights/lightingVolume.ts",
+                    "packages/dev/core/src/Materials/Textures/Procedurals/proceduralTexture.ts",
+                    "packages/dev/core/src/Materials/Textures/renderTargetTexture.ts",
+                    "packages/dev/core/src/Misc/minMaxReducer.ts",
+                    "packages/dev/core/src/Probes/reflectionProbe.ts",
+                    "packages/dev/core/src/Rendering/depthRenderer.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "rendering engine"
+                ]
+            },
+            {
+                "pr": "17636",
+                "title": "Fix npe package dependencies",
+                "description": "There was a regression in a recent change that results in errors when you try to `npm install @babylonjs/node-particle-editor`:\r\n\r\nhttps://github.com/BabylonJS/Babylon.js/pull/17554/changes#diff-de4836ec4c38608ff991f28e6ba1b5b832e793e9fa6c96108ab1c7dadd8f4d6cR22\r\n\r\nTwo devDependencies were added to peerDependencies instead, and these are internal packages within our monorepo, so they cannot be resolved when installing the public package. This PR moves those two dependencies to devDependencies, and also cleans up some other incorrect (though non-breaking) dependency issues.",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/public/@babylonjs/node-particle-editor/package.json"
+                ],
+                "tags": [
+                    "bug",
+                    "tools",
+                    "npe"
+                ]
+            },
+            {
+                "pr": "17562",
+                "title": "Inspector V2: fully support PBR materials",
+                "description": "Also in this PR:\r\n* Support for editing stencil parameters completed\r\n* Support for editing standard materials completed\r\n* Fixed a bug where updating **useAlbedoToTintRefraction** and **useAlbedoToTintTranslucency** did not trigger the effect update\r\n* Fixed normal map parameter editing to work for both standard and PBR materials\r\n* Fixed `HexPropertyLine`\r\n* Added support for **onBlur** to `TextInput`\r\n\r\nNote that unlike Inspector v1, we don't have a special page for `PBRMetallicRoughnessMaterial` and `PBRSpecularGlossinessMaterial`. They now both use the same editing page as `PBRMaterial`.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/PBR/pbrBaseMaterial.ts",
+                    "packages/dev/core/src/Materials/PBR/pbrSubSurfaceConfiguration.ts",
+                    "packages/dev/inspector-v2/src/components/properties/materials/materialProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/normalMapProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/pbrBaseMaterialProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/pbrMaterialProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/standardMaterialProperties.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/properties/materialPropertiesService.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/hoc/propertyLines/hexPropertyLine.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/textInput.tsx"
+                ],
+                "tags": [
+                    "enhancement",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "17633",
+                "title": "Add support for remap color and alpha",
+                "description": "Adds a new UpdateRemap block to handle the update logic for each particle, and the code to port remaps to NPE.\r\n\r\nPG to test: #WIP4F3#3\r\n<img width=\"1195\" height=\"1751\" alt=\"image\" src=\"https://github.com/user-attachments/assets/50f55f2a-e98b-4ced-b44a-c7cbbcc3cd34\" />\r\n",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/core/src/Particles/Node/Blocks/Update/updateRemapBlock.ts",
+                    "packages/dev/core/src/Particles/Node/nodeParticleSystemSet.helper.ts",
+                    "packages/tools/nodeParticleEditor/src/components/nodeList/nodeListComponent.tsx",
+                    "packages/tools/nodeParticleEditor/src/graphSystem/registerToDisplayLedger.ts"
+                ],
+                "tags": [
+                    "enhancement",
+                    "npe"
+                ]
+            },
+            {
+                "pr": "17632",
+                "title": "Prevent ParticleCondition to use particle flow",
+                "description": null,
+                "author": {
+                    "name": "deltakosh",
+                    "url": "https://github.com/deltakosh"
+                },
+                "files": [
+                    "packages/dev/core/src/Particles/Node/Blocks/Conditions/particleConditionBlock.ts"
+                ],
+                "tags": [
+                    "skip changelog",
+                    "npe"
+                ]
+            },
+            {
+                "pr": "17631",
+                "title": "Export geospatialcamerakeyboardinput",
+                "description": null,
+                "author": {
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
+                },
+                "files": [
+                    "packages/dev/core/src/Cameras/Inputs/index.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "17611",
+                "title": "Remove concurrently package",
+                "description": "Replaces `concurrently` with `nx run-many` in npm scripts, and removes the concurrently package to improve security.\r\n\r\nNote that there is no `concurrently --kill-others` equivalent with `nx run-many`, so if one of the parallel processes fails, the others will now continue instead of being killed.",
+                "author": {
+                    "name": "docEdub",
+                    "url": "https://github.com/docEdub"
+                },
+                "files": [
+                    "package-lock.json",
+                    "package.json",
+                    "packages/dev/materials/package.json",
+                    "packages/dev/postProcesses/package.json",
+                    "packages/dev/proceduralTextures/package.json"
                 ],
                 "tags": []
             }
