@@ -4,6 +4,7 @@ import { GlobalState } from "./globalState";
 import { RenderingZone } from "./components/renderingZone";
 import { ReflectorZone } from "./components/reflectorZone";
 import { Footer } from "./components/footer";
+import { InfoDialog } from "./components/infoDialog";
 import { EnvironmentTools } from "./tools/environmentTools";
 import { Vector3 } from "core/Maths/math.vector";
 import { Deferred } from "core/Misc/deferred";
@@ -36,6 +37,10 @@ export class Sandbox extends React.Component<
          * error message
          */
         errorMessage: string;
+        /**
+         * show the from3DViewer info dialog
+         */
+        showFrom3DViewerDialog: boolean;
     }
 > {
     private _globalState: GlobalState;
@@ -53,7 +58,7 @@ export class Sandbox extends React.Component<
         this._dropTextRef = React.createRef();
         this._clickInterceptorRef = React.createRef();
 
-        this.state = { isFooterVisible: true, errorMessage: "" };
+        this.state = { isFooterVisible: true, errorMessage: "", showFrom3DViewerDialog: false };
 
         this.checkUrl();
 
@@ -201,6 +206,11 @@ export class Sandbox extends React.Component<
                         EnvironmentTools.SkyboxPath = value;
                         break;
                     }
+                    case "from3dviewer": {
+                        EnvironmentTools.SkyboxPath = EnvironmentTools.Skyboxes[EnvironmentTools.SkyboxesNames.indexOf("Studio")];
+                        this.state = { ...this.state, showFrom3DViewerDialog: true };
+                        break;
+                    }
                     case "kiosk": {
                         this.state = { isFooterVisible: value.toLowerCase() === "true" ? false : true, errorMessage: "" };
                         break;
@@ -280,6 +290,14 @@ export class Sandbox extends React.Component<
                             &times;
                         </button>
                     </div>
+                )}
+                {this.state.showFrom3DViewerDialog && (
+                    <InfoDialog
+                        title="Welcome from 3D Viewer"
+                        message="You have been redirected from the 3D Viewer. The Babylon.js Sandbox allows you to preview and interact with your 3D models in a feature-rich environment."
+                        imageUrl={fullScreenLogo}
+                        onClose={() => this.setState({ showFrom3DViewerDialog: false })}
+                    />
                 )}
             </div>
         );
