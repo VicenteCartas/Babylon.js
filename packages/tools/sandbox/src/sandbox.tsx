@@ -208,11 +208,12 @@ export class Sandbox extends React.Component<
                     }
                     case "from3dviewer": {
                         EnvironmentTools.SkyboxPath = EnvironmentTools.Skyboxes[EnvironmentTools.SkyboxesNames.indexOf("Studio")];
+                        this._globalState.assetUrl = "https://assets.babylonjs.com/meshes/alien.glb";
                         this.state = { ...this.state, showFrom3DViewerDialog: true };
                         break;
                     }
                     case "kiosk": {
-                        this.state = { isFooterVisible: value.toLowerCase() === "true" ? false : true, errorMessage: "" };
+                        this.state = { ...this.state, isFooterVisible: value.toLowerCase() === "true" ? false : true, errorMessage: "" };
                         break;
                     }
                     case "skybox": {
