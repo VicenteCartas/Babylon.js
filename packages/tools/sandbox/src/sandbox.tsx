@@ -54,6 +54,7 @@ export class Sandbox extends React.Component<
     public constructor(props: ISandboxProps) {
         super(props);
         this._globalState = new GlobalState({ version: props.version, bundles: props.bundles });
+        Sandbox._GlobalState = this._globalState;
         this._logoRef = React.createRef();
         this._dropTextRef = React.createRef();
         this._clickInterceptorRef = React.createRef();
@@ -262,6 +263,7 @@ export class Sandbox extends React.Component<
     public override render() {
         return (
             <div id="root">
+                <div className="pwa-titlebar"></div>
                 <span>
                     <p id="droptext" ref={this._dropTextRef}>
                         {this._globalState.reflector ? "" : "Drag and drop gltf, glb, obj, ply, splat, spz or babylon files to view them"}
@@ -295,9 +297,10 @@ export class Sandbox extends React.Component<
                 {this.state.showFrom3DViewerDialog && (
                     <InfoDialog
                         title="Welcome from 3D Viewer"
-                        message="You have been redirected from the 3D Viewer. The Babylon.js Sandbox allows you to preview and interact with your 3D models in a feature-rich environment."
+                        message="You have been redirected from the 3D Viewer. The Babylon.js Sandbox allows you to preview and interact with your 3D models in a feature-rich environment. Install the app to open 3D files directly from your device."
                         imageUrl={fullScreenLogo}
                         onClose={() => this.setState({ showFrom3DViewerDialog: false })}
+                        showInstallButton={true}
                     />
                 )}
             </div>
@@ -306,6 +309,7 @@ export class Sandbox extends React.Component<
 
     // Use the promise of this deferred to do something after the scene is loaded.
     private static _SceneLoadedDeferred = new Deferred<Scene>();
+    private static _GlobalState: GlobalState;
 
     public static Show(hostElement: HTMLElement, { version, bundles }: { version: string; bundles: string[] }): void {
         const sandbox = React.createElement(Sandbox, { version, bundles });
@@ -316,5 +320,20 @@ export class Sandbox extends React.Component<
     public static async CaptureScreenshotAsync(size: IScreenshotSize | number, mimeType?: string): Promise<string> {
         const scene = await this._SceneLoadedDeferred.promise;
         return await CreateScreenshotAsync(scene.getEngine(), scene.activeCamera!, size, mimeType);
+    }
+
+    /**
+     * Process files launched via PWA file handlers
+     * @param files Array of File objects to load
+     */
+    public static ProcessLaunchedFiles(files: File[]): void {
+        if (files.length > 0 && Sandbox._GlobalState && Sandbox._GlobalState.filesInput) {
+            // Create a DataTransfer-like object for the files
+            const dataTransfer = new DataTransfer();
+            for (const file of files) {
+                dataTransfer.items.add(file);
+            }
+            Sandbox._GlobalState.filesInput.loadFiles({ target: { files: dataTransfer.files } } as unknown as Event);
+        }
     }
 }

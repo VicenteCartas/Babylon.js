@@ -77,10 +77,10 @@
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: flex-end;
+    gap: 12px;
 }
 
 .info-dialog-button {
-    background-color: #bb464b;
     color: #fff;
     border: none;
     padding: 10px 24px;
@@ -88,8 +88,20 @@
     font-size: 1em;
     cursor: pointer;
     transition: background-color 0.2s ease;
+}
+
+.info-dialog-button-primary {
+    background-color: #bb464b;
 
     &:hover {
         background-color: #e0684b;
+    }
+}
+
+.info-dialog-button-secondary {
+    background-color: rgba(255, 255, 255, 0.15);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.25);
     }
 }

@@ -7,6 +7,12 @@ html {
     --button-hover-background: #162d3a;
     --font-size: 20px;
     --active-font-size: 22px;
+
+    /* PWA Window Controls Overlay support */
+    --titlebar-area-x: env(titlebar-area-x, 0px);
+    --titlebar-area-y: env(titlebar-area-y, 0px);
+    --titlebar-area-width: env(titlebar-area-width, 100%);
+    --titlebar-area-height: env(titlebar-area-height, 0px);
 }
 
 html,
@@ -21,6 +27,19 @@ body,
     background: var(--background);
     font-family: "acumin-pro-condensed";
     font-weight: normal;
+}
+
+/* PWA title bar drag region */
+.pwa-titlebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--titlebar-area-x);
+    height: var(--titlebar-area-height);
+    background: var(--background);
+    -webkit-app-region: drag;
+    app-region: drag;
+    z-index: 1001;
 }
 
 .hidden {
@@ -47,10 +66,10 @@ body,
 
 #logoContainer {
     position: absolute;
-    top: 0;
+    top: var(--titlebar-area-height);
     left: 0;
     width: 100%;
-    height: calc(100% - 70px);
+    height: calc(100% - 70px - var(--titlebar-area-height));
     pointer-events: none;
     display: grid;
     grid-template-rows: 100%;

@@ -4,6 +4,52 @@ var hostElement = document.getElementById("host-element");
 
 const fallbackUrl = "https://snapshots-cvgtc2eugrd3cgfd.z01.azurefd.net/refs/heads/master";
 
+// Store files from file_handlers or launchQueue for later processing
+var launchedFiles = [];
+
+// Register service worker for PWA support
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker
+            .register("sw.js")
+            .then((registration) => {
+                console.log("ServiceWorker registered: ", registration.scope);
+            })
+            .catch((error) => {
+                console.log("ServiceWorker registration failed: ", error);
+            });
+    });
+
+    // Listen for files sent from service worker
+    navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "file-handler" && event.data.file) {
+            launchedFiles.push(event.data.file);
+            // If sandbox is already loaded, process the file
+            if (window.BABYLON && window.BABYLON.Sandbox && window.BABYLON.Sandbox.processLaunchedFiles) {
+                window.BABYLON.Sandbox.processLaunchedFiles(launchedFiles);
+                launchedFiles = [];
+            }
+        }
+    });
+}
+
+// Handle File Handling API (launchQueue)
+if ("launchQueue" in window) {
+    window.launchQueue.setConsumer(async (launchParams) => {
+        if (launchParams.files && launchParams.files.length > 0) {
+            for (const fileHandle of launchParams.files) {
+                const file = await fileHandle.getFile();
+                launchedFiles.push(file);
+            }
+            // If sandbox is already loaded, process the files
+            if (window.BABYLON && window.BABYLON.Sandbox && window.BABYLON.Sandbox.processLaunchedFiles) {
+                window.BABYLON.Sandbox.processLaunchedFiles(launchedFiles);
+                launchedFiles = [];
+            }
+        }
+    });
+}
+
 let loadScriptAsync = function (url, instantResolve) {
     return new Promise((resolve) => {
         // eslint-disable-next-line no-undef
@@ -154,5 +200,11 @@ let checkBabylonVersionAsync = function () {
 checkBabylonVersionAsync().then((versionInfo) => {
     loadScriptAsync("babylon.sandbox.js").then(() => {
         BABYLON.Sandbox.Show(hostElement, versionInfo);
+
+        // Process any files that were launched before sandbox was ready
+        if (launchedFiles.length > 0 && window.BABYLON.Sandbox.processLaunchedFiles) {
+            window.BABYLON.Sandbox.processLaunchedFiles(launchedFiles);
+            launchedFiles = [];
+        }
     });
 });

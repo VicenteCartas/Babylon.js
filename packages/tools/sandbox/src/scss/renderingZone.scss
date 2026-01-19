@@ -5,10 +5,11 @@
     margin: 0;
     overflow: hidden;
     width: 100%;
-    height: calc(100% - var(--footer-height));
+    height: calc(100% - var(--footer-height) - var(--titlebar-area-height));
+    margin-top: var(--titlebar-area-height);
 
     &.expanded {
-        height: 100%;
+        height: calc(100% - var(--titlebar-area-height));
     }
 }
 
