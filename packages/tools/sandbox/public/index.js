@@ -10,14 +10,7 @@ var launchedFiles = [];
 // Register service worker for PWA support
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-        navigator.serviceWorker
-            .register("sw.js")
-            .then((registration) => {
-                console.log("ServiceWorker registered: ", registration.scope);
-            })
-            .catch((error) => {
-                console.log("ServiceWorker registration failed: ", error);
-            });
+        navigator.serviceWorker.register("sw.js");
     });
 
     // Listen for files sent from service worker
@@ -25,8 +18,8 @@ if ("serviceWorker" in navigator) {
         if (event.data && event.data.type === "file-handler" && event.data.file) {
             launchedFiles.push(event.data.file);
             // If sandbox is already loaded, process the file
-            if (window.BABYLON && window.BABYLON.Sandbox && window.BABYLON.Sandbox.processLaunchedFiles) {
-                window.BABYLON.Sandbox.processLaunchedFiles(launchedFiles);
+            if (window.BABYLON && window.BABYLON.Sandbox && window.BABYLON.Sandbox.ProcessLaunchedFiles) {
+                window.BABYLON.Sandbox.ProcessLaunchedFiles(launchedFiles);
                 launchedFiles = [];
             }
         }
@@ -42,8 +35,8 @@ if ("launchQueue" in window) {
                 launchedFiles.push(file);
             }
             // If sandbox is already loaded, process the files
-            if (window.BABYLON && window.BABYLON.Sandbox && window.BABYLON.Sandbox.processLaunchedFiles) {
-                window.BABYLON.Sandbox.processLaunchedFiles(launchedFiles);
+            if (window.BABYLON && window.BABYLON.Sandbox && window.BABYLON.Sandbox.ProcessLaunchedFiles) {
+                window.BABYLON.Sandbox.ProcessLaunchedFiles(launchedFiles);
                 launchedFiles = [];
             }
         }
@@ -52,7 +45,6 @@ if ("launchQueue" in window) {
 
 let loadScriptAsync = function (url, instantResolve) {
     return new Promise((resolve) => {
-        // eslint-disable-next-line no-undef
         let urlToLoad = typeof globalThis !== "undefined" && globalThis.__babylonSnapshotTimestamp__ ? url + "?t=" + globalThis.__babylonSnapshotTimestamp__ : url;
         const script = document.createElement("script");
         script.src = urlToLoad;
@@ -183,13 +175,10 @@ let checkBabylonVersionAsync = function () {
     }).then(() => {
         // if local, set the default base URL
         if (snapshot) {
-            // eslint-disable-next-line no-undef
             globalThis.BABYLON.Tools.ScriptBaseUrl = "https://snapshots-cvgtc2eugrd3cgfd.z01.azurefd.net/" + snapshot;
         } else if (version) {
-            // eslint-disable-next-line no-undef
             globalThis.BABYLON.Tools.ScriptBaseUrl = "https://cdn.babylonjs.com/v" + version;
         } else if (activeVersion === "local") {
-            // eslint-disable-next-line no-undef
             globalThis.BABYLON.Tools.ScriptBaseUrl = window.location.protocol + `//${window.location.hostname}:1337/`;
         }
 
@@ -202,9 +191,18 @@ checkBabylonVersionAsync().then((versionInfo) => {
         BABYLON.Sandbox.Show(hostElement, versionInfo);
 
         // Process any files that were launched before sandbox was ready
-        if (launchedFiles.length > 0 && window.BABYLON.Sandbox.processLaunchedFiles) {
-            window.BABYLON.Sandbox.processLaunchedFiles(launchedFiles);
-            launchedFiles = [];
+        // Use a delay to ensure filesInput is initialized
+        if (launchedFiles.length > 0) {
+            const tryProcessFiles = () => {
+                if (window.BABYLON.Sandbox.ProcessLaunchedFiles) {
+                    window.BABYLON.Sandbox.ProcessLaunchedFiles(launchedFiles);
+                    launchedFiles = [];
+                } else {
+                    setTimeout(tryProcessFiles, 100);
+                }
+            };
+            // Give the React components time to mount and initialize filesInput
+            setTimeout(tryProcessFiles, 500);
         }
     });
 });

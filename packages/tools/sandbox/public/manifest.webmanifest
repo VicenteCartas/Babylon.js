@@ -1,0 +1,57 @@
+{
+    "name": "Babylon.js Sandbox",
+    "short_name": "Sandbox",
+    "description": "View and interact with glTF, glb, obj, ply, splat and babylon 3D files",
+    "start_url": "/",
+    "display": "standalone",
+    "display_override": ["window-controls-overlay", "standalone"],
+    "background_color": "#2a2342",
+    "theme_color": "#2a2342",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "file_handlers": [
+        {
+            "action": "/",
+            "accept": {
+                "model/gltf-binary": [".glb"],
+                "model/gltf+json": [".gltf"],
+                "model/obj": [".obj"],
+                "application/x-ply": [".ply"],
+                "application/octet-stream": [".splat", ".babylon"]
+            }
+        }
+    ],
+    "launch_handler": {
+        "client_mode": ["navigate-existing", "auto"]
+    },
+    "share_target": {
+        "action": "/",
+        "method": "POST",
+        "enctype": "multipart/form-data",
+        "params": {
+            "files": [
+                {
+                    "name": "file",
+                    "accept": [".gltf", ".glb", ".obj", ".ply", ".splat", ".babylon"]
+                }
+            ]
+        }
+    },
+    "categories": ["utilities", "productivity"],
+    "screenshots": [],
+    "related_applications": [],
+    "prefer_related_applications": false
+}

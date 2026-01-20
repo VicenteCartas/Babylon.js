@@ -327,13 +327,24 @@ export class Sandbox extends React.Component<
      * @param files Array of File objects to load
      */
     public static ProcessLaunchedFiles(files: File[]): void {
-        if (files.length > 0 && Sandbox._GlobalState && Sandbox._GlobalState.filesInput) {
-            // Create a DataTransfer-like object for the files
-            const dataTransfer = new DataTransfer();
-            for (const file of files) {
-                dataTransfer.items.add(file);
-            }
-            Sandbox._GlobalState.filesInput.loadFiles({ target: { files: dataTransfer.files } } as unknown as Event);
+        if (files.length === 0) {
+            return;
         }
+
+        const tryLoad = () => {
+            if (Sandbox._GlobalState && Sandbox._GlobalState.filesInput) {
+                // Create a DataTransfer-like object for the files
+                const dataTransfer = new DataTransfer();
+                for (const file of files) {
+                    dataTransfer.items.add(file);
+                }
+                Sandbox._GlobalState.filesInput.loadFiles({ target: { files: dataTransfer.files } } as unknown as Event);
+            } else {
+                // filesInput not ready yet, retry
+                setTimeout(tryLoad, 100);
+            }
+        };
+
+        tryLoad();
     }
 }
