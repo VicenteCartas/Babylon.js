@@ -1,0 +1,9 @@
+{
+    "extends": "../../../tsconfig.test.json",
+    "compilerOptions": {
+        "paths": {
+            "core/*": ["dev/core/src/*"],
+            "2d/*": ["dev/2d/src/*"]
+        }
+    }
+}

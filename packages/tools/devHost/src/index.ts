@@ -15,6 +15,22 @@ switch (ExpQsp) {
         ImportPromise = import("./lottie/main");
         break;
     }
+    case "sidescroller": {
+        ImportPromise = import("./sideScroller/main");
+        break;
+    }
+    case "isometric": {
+        ImportPromise = import("./isometricDemo/main");
+        break;
+    }
+    case "tactics": {
+        ImportPromise = import("./tacticsDemo/main");
+        break;
+    }
+    case "test2d": {
+        ImportPromise = import("./test2d/main");
+        break;
+    }
     case "testscene":
     default: {
         ImportPromise = import("./testScene/main");

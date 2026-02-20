@@ -73,6 +73,7 @@ module.exports = (env) => {
                 "node-particle-editor": path.resolve(basePathForTools, "nodeRParticleEditor", outputDirectoryForAliases),
                 "gui-editor": path.resolve(basePathForTools, "guiEditor", outputDirectoryForAliases),
                 accessibility: path.resolve(basePathForTools, "accessibility", outputDirectoryForAliases),
+                "2d": path.resolve(basePathForSources, "2d", outputDirectoryForAliases),
                 "babylonjs-gltf2interface": path.resolve("./src", "babylon.glTF2Interface.ts"),
             },
             symlinks: false,
