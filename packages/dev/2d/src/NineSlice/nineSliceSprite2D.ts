@@ -1,5 +1,6 @@
 import type { BaseTexture } from "core/Materials/Textures/baseTexture";
 import type { ThinTexture } from "core/Materials/Textures/thinTexture";
+import { Texture } from "core/Materials/Textures/texture";
 
 import { Sprite2D } from "../Sprite2D/sprite2D";
 import { Matrix2D } from "../Math/matrix2D";
@@ -60,7 +61,10 @@ export class NineSliceSprite2D extends Sprite2D {
      * @param texture - The texture containing the 9-slice source graphic
      */
     constructor(name: string, texture?: BaseTexture) {
-        super(name, texture);
+        super(name);
+        if (texture) {
+            this.texture = texture;
+        }
     }
 
     /**
@@ -196,6 +200,7 @@ export class NineSliceSprite2D extends Sprite2D {
                     cellH,
                     flipX: this.flipX,
                     flipY: this.flipY,
+                    invertY: this.texture instanceof Texture ? this.texture.invertY : true,
                     texture: tex,
                     zIndex,
                     sortingLayer,

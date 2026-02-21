@@ -4,11 +4,13 @@ import type { DataBuffer } from "core/Buffers/dataBuffer";
 import { Buffer, VertexBuffer } from "core/Buffers/buffer";
 import { DrawWrapper } from "core/Materials/drawWrapper";
 import { Effect } from "core/Materials/effect";
+import { ShaderStore } from "core/Engines/shaderStore";
+import { ShaderLanguage } from "core/Materials/shaderLanguage";
 import { Constants } from "core/Engines/constants";
 
 import { Matrix2D } from "../Math/matrix2D";
 import type { LightingManager2D } from "../Lighting/light2D";
-import { MAX_FORWARD_LIGHTS } from "../Lighting/light2D";
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -332,6 +334,307 @@ Effect.ShadersStore["sprite2DLitInstancedVertexShader"] = _LIT_VERT_INSTANCED_SH
 Effect.ShadersStore["sprite2DLitInstancedFragmentShader"] = _LIT_FRAG_SHADER;
 
 // ---------------------------------------------------------------------------
+// WGSL shader variants (for WebGPU)
+// ---------------------------------------------------------------------------
+
+const _WGSL_FRAG_SHADER = `
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+
+var texture0Sampler: sampler;
+var texture0: texture_2d<f32>;
+var texture1Sampler: sampler;
+var texture1: texture_2d<f32>;
+var texture2Sampler: sampler;
+var texture2: texture_2d<f32>;
+var texture3Sampler: sampler;
+var texture3: texture_2d<f32>;
+var texture4Sampler: sampler;
+var texture4: texture_2d<f32>;
+var texture5Sampler: sampler;
+var texture5: texture_2d<f32>;
+var texture6Sampler: sampler;
+var texture6: texture_2d<f32>;
+var texture7Sampler: sampler;
+var texture7: texture_2d<f32>;
+
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+    var uv: vec2f = input.vUV;
+    var idx: i32 = i32(input.vTextureIndex + 0.5);
+    var texColor: vec4f;
+    if (idx < 4) {
+        if (idx < 2) {
+            if (idx == 0) { texColor = textureSampleLevel(texture0, texture0Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture1, texture1Sampler, uv, 0.0); }
+        } else {
+            if (idx == 2) { texColor = textureSampleLevel(texture2, texture2Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture3, texture3Sampler, uv, 0.0); }
+        }
+    } else {
+        if (idx < 6) {
+            if (idx == 4) { texColor = textureSampleLevel(texture4, texture4Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture5, texture5Sampler, uv, 0.0); }
+        } else {
+            if (idx == 6) { texColor = textureSampleLevel(texture6, texture6Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture7, texture7Sampler, uv, 0.0); }
+        }
+    }
+    var finalColor: vec4f = texColor * input.vColor;
+
+    if (finalColor.a < 0.01) {
+        discard;
+    }
+
+    fragmentOutputs.color = finalColor;
+}
+`;
+
+const _WGSL_VERT_SHADER = `
+attribute position: vec2f;
+attribute uv: vec2f;
+attribute color: vec4f;
+attribute cellInfo: vec4f;
+attribute transform0: vec4f;
+attribute transform1: vec2f;
+
+uniform projection: mat4x4f;
+
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+    var transformed: vec2f = vec2f(
+        input.transform0.x * input.position.x + input.transform0.z * input.position.y + input.transform1.x,
+        input.transform0.y * input.position.x + input.transform0.w * input.position.y + input.transform1.y
+    );
+    vertexOutputs.position = uniforms.projection * vec4f(transformed, 0.0, 1.0);
+    vertexOutputs.vUV = input.uv;
+    vertexOutputs.vColor = input.color;
+    vertexOutputs.vTextureIndex = input.cellInfo.x;
+}
+`;
+
+const _WGSL_VERT_INSTANCED_SHADER = `
+attribute corner: vec2f;
+
+attribute iTransform0: vec4f;
+attribute iTransform1: vec2f;
+attribute iSize: vec2f;
+attribute iColor: vec4f;
+attribute iCell: vec4f;
+attribute iTexIdx: f32;
+
+uniform projection: mat4x4f;
+
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+    var pos: vec2f = (input.corner - vec2f(0.5)) * input.iSize;
+    var transformed: vec2f = vec2f(
+        input.iTransform0.x * pos.x + input.iTransform0.z * pos.y + input.iTransform1.x,
+        input.iTransform0.y * pos.x + input.iTransform0.w * pos.y + input.iTransform1.y
+    );
+    vertexOutputs.position = uniforms.projection * vec4f(transformed, 0.0, 1.0);
+    vertexOutputs.vUV = mix(input.iCell.xy, input.iCell.zw, input.corner);
+    vertexOutputs.vColor = input.iColor;
+    vertexOutputs.vTextureIndex = input.iTexIdx;
+}
+`;
+
+// Lit WGSL variants
+
+const _WGSL_LIGHTING_FRAG_FN = `
+uniform lightCount: i32;
+uniform ambientLight: vec4f;
+uniform lightData: array<vec4f, ${16 * 4}>;
+
+fn computeLighting(worldPos: vec2f) -> vec3f {
+    var lit: vec3f = uniforms.ambientLight.rgb;
+    for (var i: i32 = 0; i < ${16}; i = i + 1) {
+        if (i >= uniforms.lightCount) { break; }
+        var base: i32 = i * 4;
+        var d0: vec4f = uniforms.lightData[base];
+        var d1: vec4f = uniforms.lightData[base + 1];
+        var d2: vec4f = uniforms.lightData[base + 2];
+        var d3: vec4f = uniforms.lightData[base + 3];
+
+        var lightType: f32 = d0.w;
+        var lColor: vec3f = d1.rgb;
+        var lIntensity: f32 = d1.w;
+
+        if (lightType > 1.5) {
+            lit = lit + lColor * lIntensity;
+            continue;
+        }
+
+        var lPos: vec2f = d0.xy;
+        var lRadius: f32 = d0.z;
+        var lFalloff: f32 = d3.x;
+
+        var delta: vec2f = worldPos - lPos;
+        var dist: f32 = length(delta);
+        if (dist >= lRadius) { continue; }
+
+        var t: f32 = dist / lRadius;
+        var atten: f32 = pow(1.0 - t, lFalloff);
+
+        if (lightType > 0.5) {
+            var lDir: vec2f = normalize(d2.xy);
+            var innerA: f32 = d2.z;
+            var outerA: f32 = d2.w;
+            var toFrag: vec2f = delta / max(dist, 0.001);
+            var cosAngle: f32 = dot(lDir, toFrag);
+            var angle: f32 = acos(clamp(cosAngle, -1.0, 1.0));
+            if (angle > outerA) { continue; }
+            if (angle > innerA) {
+                atten = atten * (1.0 - (angle - innerA) / (outerA - innerA));
+            }
+        }
+
+        lit = lit + lColor * lIntensity * atten;
+    }
+    return min(lit, vec3f(1.0));
+}`;
+
+const _WGSL_LIT_FRAG_SHADER = `
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+varying vWorldPos: vec2f;
+
+var texture0Sampler: sampler;
+var texture0: texture_2d<f32>;
+var texture1Sampler: sampler;
+var texture1: texture_2d<f32>;
+var texture2Sampler: sampler;
+var texture2: texture_2d<f32>;
+var texture3Sampler: sampler;
+var texture3: texture_2d<f32>;
+var texture4Sampler: sampler;
+var texture4: texture_2d<f32>;
+var texture5Sampler: sampler;
+var texture5: texture_2d<f32>;
+var texture6Sampler: sampler;
+var texture6: texture_2d<f32>;
+var texture7Sampler: sampler;
+var texture7: texture_2d<f32>;
+
+${_WGSL_LIGHTING_FRAG_FN}
+
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+    var uv: vec2f = input.vUV;
+    var idx: i32 = i32(input.vTextureIndex + 0.5);
+    var texColor: vec4f;
+    if (idx < 4) {
+        if (idx < 2) {
+            if (idx == 0) { texColor = textureSampleLevel(texture0, texture0Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture1, texture1Sampler, uv, 0.0); }
+        } else {
+            if (idx == 2) { texColor = textureSampleLevel(texture2, texture2Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture3, texture3Sampler, uv, 0.0); }
+        }
+    } else {
+        if (idx < 6) {
+            if (idx == 4) { texColor = textureSampleLevel(texture4, texture4Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture5, texture5Sampler, uv, 0.0); }
+        } else {
+            if (idx == 6) { texColor = textureSampleLevel(texture6, texture6Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture7, texture7Sampler, uv, 0.0); }
+        }
+    }
+    var finalColor: vec4f = texColor * input.vColor;
+
+    if (finalColor.a < 0.01) {
+        discard;
+    }
+
+    var lighting: vec3f = computeLighting(input.vWorldPos);
+    finalColor = vec4f(finalColor.rgb * lighting, finalColor.a);
+
+    fragmentOutputs.color = finalColor;
+}
+`;
+
+const _WGSL_LIT_VERT_SHADER = `
+attribute position: vec2f;
+attribute uv: vec2f;
+attribute color: vec4f;
+attribute cellInfo: vec4f;
+attribute transform0: vec4f;
+attribute transform1: vec2f;
+
+uniform projection: mat4x4f;
+
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+varying vWorldPos: vec2f;
+
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+    var transformed: vec2f = vec2f(
+        input.transform0.x * input.position.x + input.transform0.z * input.position.y + input.transform1.x,
+        input.transform0.y * input.position.x + input.transform0.w * input.position.y + input.transform1.y
+    );
+    vertexOutputs.position = uniforms.projection * vec4f(transformed, 0.0, 1.0);
+    vertexOutputs.vWorldPos = transformed;
+    vertexOutputs.vUV = input.uv;
+    vertexOutputs.vColor = input.color;
+    vertexOutputs.vTextureIndex = input.cellInfo.x;
+}
+`;
+
+const _WGSL_LIT_VERT_INSTANCED_SHADER = `
+attribute corner: vec2f;
+
+attribute iTransform0: vec4f;
+attribute iTransform1: vec2f;
+attribute iSize: vec2f;
+attribute iColor: vec4f;
+attribute iCell: vec4f;
+attribute iTexIdx: f32;
+
+uniform projection: mat4x4f;
+
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+varying vWorldPos: vec2f;
+
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+    var pos: vec2f = (input.corner - vec2f(0.5)) * input.iSize;
+    var transformed: vec2f = vec2f(
+        input.iTransform0.x * pos.x + input.iTransform0.z * pos.y + input.iTransform1.x,
+        input.iTransform0.y * pos.x + input.iTransform0.w * pos.y + input.iTransform1.y
+    );
+    vertexOutputs.position = uniforms.projection * vec4f(transformed, 0.0, 1.0);
+    vertexOutputs.vWorldPos = transformed;
+    vertexOutputs.vUV = mix(input.iCell.xy, input.iCell.zw, input.corner);
+    vertexOutputs.vColor = input.iColor;
+    vertexOutputs.vTextureIndex = input.iTexIdx;
+}
+`;
+
+// Register WGSL shaders
+ShaderStore.ShadersStoreWGSL["sprite2DVertexShader"] = _WGSL_VERT_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DFragmentShader"] = _WGSL_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DInstancedVertexShader"] = _WGSL_VERT_INSTANCED_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DInstancedFragmentShader"] = _WGSL_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DLitVertexShader"] = _WGSL_LIT_VERT_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DLitFragmentShader"] = _WGSL_LIT_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DLitInstancedVertexShader"] = _WGSL_LIT_VERT_INSTANCED_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DLitInstancedFragmentShader"] = _WGSL_LIT_FRAG_SHADER;
+
+// ---------------------------------------------------------------------------
 // ISprite2DRenderData
 // ---------------------------------------------------------------------------
 
@@ -392,6 +695,11 @@ export interface ISprite2DRenderData {
      */
     flipY: boolean;
     /**
+     * Whether the texture was loaded with invertY (v=0 at bottom).
+     * When true, the renderer flips V so the image appears right-side up.
+     */
+    invertY: boolean;
+    /**
      * The texture to render
      */
     texture: ThinTexture;
@@ -442,6 +750,7 @@ export class SpriteBatchRenderer {
     private _drawWrapper: DrawWrapper;
     private _effect: Effect;
     private _isReady: boolean = false;
+    private _shaderLanguage: ShaderLanguage;
 
     // Lit shader variant
     private _litDrawWrapper: DrawWrapper | null = null;
@@ -453,6 +762,12 @@ export class SpriteBatchRenderer {
      * The manager's packLightUniforms() is called automatically before each render.
      */
     public lightingManager: LightingManager2D | null = null;
+
+    /**
+     * Fallback texture used to fill unused texture slots on WebGPU.
+     * WebGPU requires all declared texture bindings to be bound.
+     */
+    public fallbackTexture: ThinTexture | null = null;
 
     // Persistent vertex buffers map (enables VAO caching)
     private _vertexBuffersMap: { [key: string]: VertexBuffer } = {};
@@ -493,6 +808,7 @@ export class SpriteBatchRenderer {
         this._engine = engine;
         this._capacity = capacity;
         this._useInstancing = engine.getCaps().instancedArrays;
+        this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
 
         const projData = this._projectionData;
         this._projectionMatrix = {
@@ -540,10 +856,15 @@ export class SpriteBatchRenderer {
             ["corner", "iTransform0", "iTransform1", "iSize", "iColor", "iCell", "iTexIdx"],
             ["projection"],
             _SAMPLER_NAMES,
-            defines
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
         );
 
         this._drawWrapper = new DrawWrapper(engine);
+        if (this._drawWrapper.drawContext) {
+            this._drawWrapper.drawContext.useInstancing = true;
+        }
         this._drawWrapper.effect = this._effect;
         this._effect.onCompiled = () => {
             this._isReady = true;
@@ -556,9 +877,14 @@ export class SpriteBatchRenderer {
             ["corner", "iTransform0", "iTransform1", "iSize", "iColor", "iCell", "iTexIdx"],
             litUniforms,
             _SAMPLER_NAMES,
-            defines
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
         );
         this._litDrawWrapper = new DrawWrapper(engine);
+        if (this._litDrawWrapper.drawContext) {
+            this._litDrawWrapper.drawContext.useInstancing = true;
+        }
         this._litDrawWrapper.effect = this._litEffect;
         this._litEffect.onCompiled = () => {
             this._isLitReady = true;
@@ -599,7 +925,9 @@ export class SpriteBatchRenderer {
             [VertexBuffer.PositionKind, VertexBuffer.UVKind, VertexBuffer.ColorKind, "cellInfo", "transform0", "transform1"],
             ["projection"],
             _SAMPLER_NAMES,
-            defines
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
         );
 
         this._drawWrapper = new DrawWrapper(engine);
@@ -615,7 +943,9 @@ export class SpriteBatchRenderer {
             [VertexBuffer.PositionKind, VertexBuffer.UVKind, VertexBuffer.ColorKind, "cellInfo", "transform0", "transform1"],
             litUniforms,
             _SAMPLER_NAMES,
-            defines
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
         );
         this._litDrawWrapper = new DrawWrapper(engine);
         this._litDrawWrapper.effect = this._litEffect;
@@ -668,6 +998,7 @@ export class SpriteBatchRenderer {
         const engine = this._engine;
         engine.setAlphaMode(Constants.ALPHA_COMBINE);
         engine.setDepthBuffer(false);
+        engine.setState(false); // Disable backface culling for 2D quads
         engine.enableEffect(activeWrapper);
 
         // Update orthographic projection (Y-down, top-left origin)
@@ -749,6 +1080,12 @@ export class SpriteBatchRenderer {
         for (let i = 0; i < this._textureSlotCount; i++) {
             this._activeEffect.setTexture(`texture${i}`, this._textureSlots[i]);
         }
+        // WebGPU requires all declared texture bindings to be bound
+        if (this._engine.isWebGPU && this.fallbackTexture) {
+            for (let i = this._textureSlotCount; i < _MAX_TEXTURES; i++) {
+                this._activeEffect.setTexture(`texture${i}`, this.fallbackTexture);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -781,10 +1118,12 @@ export class SpriteBatchRenderer {
             const cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
 
             // UV corners (pre-baked with flip)
+            // Babylon textures default to invertY=true, so v=0 is bottom of image.
+            // Flip V so the top of the quad samples the top of the source rect.
             let u0 = sprite.cellU;
-            let v0 = sprite.cellV;
+            let v0 = sprite.invertY ? 1.0 - sprite.cellV : sprite.cellV;
             let u1 = sprite.cellU + sprite.cellW;
-            let v1 = sprite.cellV + sprite.cellH;
+            let v1 = sprite.invertY ? 1.0 - sprite.cellV - sprite.cellH : sprite.cellV + sprite.cellH;
             if (sprite.flipX) {
                 const t = u0;
                 u0 = u1;
@@ -866,10 +1205,12 @@ export class SpriteBatchRenderer {
             const h = sprite.height;
 
             // UV corners (pre-baked with flip)
+            // Babylon textures default to invertY=true, so v=0 is bottom of image.
+            // Flip V so the top of the quad samples the top of the source rect.
             let u0 = sprite.cellU;
-            let v0 = sprite.cellV;
+            let v0 = sprite.invertY ? 1.0 - sprite.cellV : sprite.cellV;
             let u1 = sprite.cellU + sprite.cellW;
-            let v1 = sprite.cellV + sprite.cellH;
+            let v1 = sprite.invertY ? 1.0 - sprite.cellV - sprite.cellH : sprite.cellV + sprite.cellH;
             if (sprite.flipX) {
                 const t = u0;
                 u0 = u1;

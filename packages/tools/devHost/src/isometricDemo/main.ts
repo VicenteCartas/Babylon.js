@@ -207,7 +207,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     const DESIGN_H = 360;
     const TEXT_SCALE = 0.5;
 
-    const hoverText = new Text2D("hoverText", engine, "", {
+    const hoverText = new Text2D("hoverText", "", {
         font: "12px monospace",
         color: "#ffffff",
         textAlign: "center",

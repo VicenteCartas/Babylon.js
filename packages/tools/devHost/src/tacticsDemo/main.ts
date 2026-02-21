@@ -178,7 +178,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     statusPanel.zIndex = 0;
     scene.addNode(statusPanel);
 
-    const statusText = new Text2D("statusText", engine, "", {
+    const statusText = new Text2D("statusText", "", {
         font: "11px monospace",
         color: "#88ff88",
         textAlign: "center",
@@ -196,7 +196,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     turnPanel.zIndex = 0;
     scene.addNode(turnPanel);
 
-    const turnText = new Text2D("turnText", engine, "", {
+    const turnText = new Text2D("turnText", "", {
         font: "12px monospace",
         color: "#ffffff",
         textAlign: "center",

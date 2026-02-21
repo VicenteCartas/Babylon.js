@@ -15,6 +15,7 @@ var Versions = {
         { url: "https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js", instantResolve: true },
         { url: "https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js", instantResolve: true },
         { url: "https://preview.babylonjs.com/accessibility/babylon.accessibility.js", instantResolve: true },
+        { url: "https://preview.babylonjs.com/2d/babylon.2d.min.js", instantResolve: true },
         // Allow an "inspectorv1" query param to force loading Inspector v1.
         ...(window.location.search.toLocaleLowerCase().includes("inspectorv1")
             ? [{ url: "https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js", instantResolve: true }]
@@ -39,6 +40,7 @@ var Versions = {
         { url: `//${window.location.hostname}:1337/loaders/babylonjs.loaders.min.js`, instantResolve: false },
         { url: `//${window.location.hostname}:1337/serializers/babylonjs.serializers.min.js`, instantResolve: false },
         { url: `//${window.location.hostname}:1337/accessibility/babylon.accessibility.js`, instantResolve: false },
+        { url: `//${window.location.hostname}:1337/2d/babylon.2d.min.js`, instantResolve: false },
         // { url: `//${window.location.hostname}:1337/inspector/babylon.inspector.bundle.js`, instantResolve: false },
         { url: `//${window.location.hostname}:1337/inspector/babylon.inspector-v2.bundle.js`, instantResolve: false },
         { url: "https://rawcdn.githack.com/BabylonJS/Extensions/f43ab677b4bca0a6ab77132d3f785be300382760/ClonerSystem/src/babylonx.cloner.js", instantResolve: false },

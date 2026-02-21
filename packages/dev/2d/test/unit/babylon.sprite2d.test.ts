@@ -15,7 +15,8 @@ describe("Sprite2D", () => {
 
         it("should accept an optional texture", () => {
             const tex = mockTexture(64, 64);
-            const s = new Sprite2D("hero", tex);
+            const s = new Sprite2D("hero");
+            s.texture = tex;
             expect(s.texture).toBe(tex);
         });
     });
@@ -66,7 +67,8 @@ describe("Sprite2D", () => {
         });
 
         it("should fall back to texture size", () => {
-            const s = new Sprite2D("s", mockTexture(128, 256));
+            const s = new Sprite2D("s");
+            s.texture = mockTexture(128, 256);
             expect(s.getDisplayWidth()).toBe(128);
             expect(s.getDisplayHeight()).toBe(256);
         });
@@ -78,7 +80,8 @@ describe("Sprite2D", () => {
         });
 
         it("should prioritize explicit width over sourceRect and texture", () => {
-            const s = new Sprite2D("s", mockTexture(128, 128));
+            const s = new Sprite2D("s");
+            s.texture = mockTexture(128, 128);
             s.sourceRect = new Rectangle2D(0, 0, 64, 64);
             s.width = 32;
             s.height = 16;
@@ -100,7 +103,8 @@ describe("Sprite2D", () => {
         });
 
         it("should compute normalized UVs from sourceRect and texture size", () => {
-            const s = new Sprite2D("s", mockTexture(128, 64));
+            const s = new Sprite2D("s");
+            s.texture = mockTexture(128, 64);
             s.sourceRect = new Rectangle2D(32, 16, 64, 32);
             const uv = s.getSourceUV();
             expect(uv[0]).toBeCloseTo(32 / 128); // u
@@ -110,7 +114,8 @@ describe("Sprite2D", () => {
         });
 
         it("should return full UV for zero-size texture", () => {
-            const s = new Sprite2D("s", mockTexture(0, 0));
+            const s = new Sprite2D("s");
+            s.texture = mockTexture(0, 0);
             s.sourceRect = new Rectangle2D(0, 0, 32, 32);
             expect(s.getSourceUV()).toEqual([0, 0, 1, 1]);
         });

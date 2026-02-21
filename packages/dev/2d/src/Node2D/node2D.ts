@@ -2,6 +2,8 @@ import { Vector2 } from "core/Maths/math.vector";
 import { Observable } from "core/Misc/observable";
 
 import { Matrix2D } from "../Math/matrix2D";
+import { Scene2DStore } from "../Scene2D/scene2DStore";
+import type { Scene2D } from "../Scene2D/scene2D";
 
 /**
  * Base class for all 2D entities in a Scene2D.
@@ -78,13 +80,38 @@ export class Node2D {
     private _snapshotPivotY: number = 0;
 
     /**
+     * The Scene2D this node belongs to (null if not added to any scene)
+     */
+    private _scene: Scene2D | null = null;
+
+    /**
+     * Gets the Scene2D this node belongs to
+     */
+    public get scene(): Scene2D | null {
+        return this._scene;
+    }
+
+    /**
+     * @internal
+     * Sets the scene reference. Called by Scene2D.addNode/removeNode.
+     */
+    public _setScene(scene: Scene2D | null): void {
+        this._scene = scene;
+    }
+
+    /**
      * Creates a new Node2D
      * @param name - Name of the node
-     * @param id - Optional unique identifier (defaults to name)
+     * @param scene - Optional Scene2D to add this node to. If omitted, uses the last created Scene2D.
      */
-    constructor(name: string, id?: string) {
+    constructor(name: string, scene?: Scene2D | null) {
         this.name = name;
-        this.id = id ?? name;
+        this.id = name;
+        const targetScene = scene !== undefined ? scene : Scene2DStore._LastCreatedScene;
+        if (targetScene) {
+            this._scene = targetScene;
+            targetScene.addNode(this);
+        }
     }
 
     // ─── Scalar properties with dirty-flagging setters ───────────────

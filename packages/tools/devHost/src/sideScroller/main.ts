@@ -188,7 +188,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
 
     // Score text using Text2D — render at 2× then scale 0.5 for crisp text
     const TEXT_SCALE = 0.5;
-    const scoreText = new Text2D("scoreText", engine, "Score: 0 / 17", {
+    const scoreText = new Text2D("scoreText", "Score: 0 / 17", {
         font: "bold 14px monospace",
         color: "#ffffff",
         textAlign: "center",
@@ -200,7 +200,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     scene.addNode(scoreText);
 
     // Debug text using Text2D (replaces HTML debug overlay)
-    const debugText = new Text2D("debugText", engine, "", {
+    const debugText = new Text2D("debugText", "", {
         font: "12px monospace",
         color: "#00ff66",
     });

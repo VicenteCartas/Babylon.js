@@ -41,7 +41,8 @@ export class AnimatedSprite2D extends Sprite2D {
      * @param spriteSheet - The sprite sheet containing frames and animations
      */
     constructor(name: string, spriteSheet: SpriteSheet) {
-        super(name, spriteSheet.texture as BaseTexture);
+        super(name);
+        this.texture = spriteSheet.texture as BaseTexture;
         this.spriteSheet = spriteSheet;
     }
 

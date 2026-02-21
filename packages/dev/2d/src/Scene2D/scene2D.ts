@@ -1,9 +1,11 @@
 import type { AbstractEngine } from "core/Engines/abstractEngine";
+import type { Scene } from "core/scene";
 import { Color4 } from "core/Maths/math.color";
 import { Observable } from "core/Misc/observable";
 import { RawTexture } from "core/Materials/Textures/rawTexture";
 import type { ThinTexture } from "core/Materials/Textures/thinTexture";
 import { Constants } from "core/Engines/constants";
+import type { Nullable } from "core/types";
 
 import { Node2D } from "../Node2D/node2D";
 import { Sprite2D } from "../Sprite2D/sprite2D";
@@ -12,6 +14,7 @@ import { Matrix2D } from "../Math/matrix2D";
 import { SpriteBatchRenderer } from "../Rendering/spriteBatchRenderer";
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
 import type { LightingManager2D } from "../Lighting/light2D";
+import { Scene2DStore } from "./scene2DStore";
 
 /**
  * Represents a 2D scene that manages a hierarchy of Node2D entities.
@@ -55,19 +58,40 @@ export class Scene2D {
      */
     public onDispose: Observable<Scene2D> = new Observable<Scene2D>();
 
+    /**
+     * Observable triggered when the scene becomes ready (all shaders compiled)
+     */
+    public onReadyObservable: Observable<Scene2D> = new Observable<Scene2D>();
+
     private _rootNodes: Node2D[] = [];
     private _allNodes: Map<string, Node2D> = new Map();
     private _isDisposed: boolean = false;
     private _batchRenderer: SpriteBatchRenderer | null = null;
     private _whiteTexture: RawTexture | null = null;
     private _spriteDataPool: ISprite2DRenderData[] = [];
+    private _executeWhenReadyTimeoutId: Nullable<ReturnType<typeof setTimeout>> = null;
 
     /**
      * Creates a new Scene2D
      * @param engine - The Babylon.js engine instance to use for rendering
+     * @param linkedScene - Optional core Scene to link readiness with.
+     *   When provided, the 3D scene's `isReady()` will return false until the
+     *   2D scene's shaders are compiled, so `scene.executeWhenReady()` waits
+     *   for both scenes automatically.
      */
-    constructor(engine: AbstractEngine) {
+    constructor(engine: AbstractEngine, linkedScene?: Scene) {
         this.engine = engine;
+        Scene2DStore._LastCreatedScene = this;
+        // Eagerly create the batch renderer so shader compilation starts immediately
+        this._batchRenderer = new SpriteBatchRenderer(engine);
+
+        // Link readiness to the 3D scene if provided
+        if (linkedScene) {
+            linkedScene.addPendingData(this);
+            this.executeWhenReady(() => {
+                linkedScene.removePendingData(this);
+            });
+        }
     }
 
     /**
@@ -85,6 +109,59 @@ export class Scene2D {
     }
 
     /**
+     * Whether the scene is ready to render (all shaders compiled).
+     * @returns true when the batch renderer's effects are compiled
+     */
+    public isReady(): boolean {
+        return this._getBatchRenderer().isReady;
+    }
+
+    /**
+     * Registers a callback to execute as soon as the scene is ready.
+     * If the scene is already ready, the callback fires on the next check cycle.
+     * @param func - The callback to execute when ready
+     */
+    public executeWhenReady(func: () => void): void {
+        this.onReadyObservable.addOnce(func);
+
+        if (this._executeWhenReadyTimeoutId !== null) {
+            return;
+        }
+
+        this._checkIsReady();
+    }
+
+    /**
+     * Returns a promise that resolves when the scene is ready to render.
+     * @returns A promise that resolves when all shaders are compiled
+     */
+    public whenReadyAsync(): Promise<void> {
+        return new Promise((resolve) => {
+            this.executeWhenReady(() => {
+                resolve();
+            });
+        });
+    }
+
+    private _checkIsReady(): void {
+        if (this._isDisposed) {
+            this._executeWhenReadyTimeoutId = null;
+            return;
+        }
+
+        if (this.isReady()) {
+            this.onReadyObservable.notifyObservers(this);
+            this.onReadyObservable.clear();
+            this._executeWhenReadyTimeoutId = null;
+            return;
+        }
+
+        this._executeWhenReadyTimeoutId = setTimeout(() => {
+            this._checkIsReady();
+        }, 16);
+    }
+
+    /**
      * Adds a root node to the scene
      * @param node - The node to add
      */
@@ -93,9 +170,15 @@ export class Scene2D {
             return;
         }
 
+        // Remove from previous scene if different
+        if (node.scene && node.scene !== this) {
+            node.scene.removeNode(node);
+        }
+
         if (this._rootNodes.indexOf(node) === -1) {
             this._rootNodes.push(node);
         }
+        node._setScene(this);
         this._registerNode(node);
     }
 
@@ -108,6 +191,7 @@ export class Scene2D {
         if (index !== -1) {
             this._rootNodes.splice(index, 1);
         }
+        node._setScene(null);
         this._unregisterNode(node);
     }
 
@@ -171,13 +255,10 @@ export class Scene2D {
     }
 
     /**
-     * Gets or creates the batch renderer
+     * Gets the batch renderer (always initialized in constructor)
      */
     private _getBatchRenderer(): SpriteBatchRenderer {
-        if (!this._batchRenderer) {
-            this._batchRenderer = new SpriteBatchRenderer(this.engine);
-        }
-        return this._batchRenderer;
+        return this._batchRenderer!;
     }
 
     /**
@@ -230,6 +311,9 @@ export class Scene2D {
         }
 
         if (renderer.isReady) {
+            // Provide fallback texture for unused WebGPU texture slots
+            renderer.fallbackTexture = this._getWhiteTexture();
+
             // Collect visible sprites
             this._spriteDataPool.length = 0;
             for (const root of this._rootNodes) {
@@ -273,6 +357,12 @@ export class Scene2D {
             return;
         }
 
+        // Clear readiness polling
+        if (this._executeWhenReadyTimeoutId !== null) {
+            clearTimeout(this._executeWhenReadyTimeoutId);
+            this._executeWhenReadyTimeoutId = null;
+        }
+
         // Dispose all root nodes (which will recursively dispose children)
         const rootsCopy = [...this._rootNodes];
         for (const node of rootsCopy) {
@@ -296,6 +386,7 @@ export class Scene2D {
         this.onBeforeRender.clear();
         this.onAfterRender.clear();
         this.onDispose.clear();
+        this.onReadyObservable.clear();
 
         this._isDisposed = true;
     }

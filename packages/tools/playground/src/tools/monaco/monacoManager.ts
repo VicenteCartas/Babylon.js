@@ -553,6 +553,7 @@ export class MonacoManager {
             "https://preview.babylonjs.com/inspector/babylon.inspector.d.ts",
             "https://preview.babylonjs.com/accessibility/babylon.accessibility.d.ts",
             "https://preview.babylonjs.com/addons/babylonjs.addons.d.ts",
+            "https://preview.babylonjs.com/2d/babylon.2d.d.ts",
             "https://preview.babylonjs.com/glTF2Interface/babylon.glTF2Interface.d.ts",
             "https://assets.babylonjs.com/generated/Assets.d.ts",
         ];

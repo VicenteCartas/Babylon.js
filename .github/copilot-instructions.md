@@ -1,14 +1,8 @@
-# Babylon.js Copilot Instructions
+# Babylon.js 2D Package — Copilot Instructions
 
-## Repository Overview
-
-This is the **Babylon.js monorepo** (`@babylonjs/root`), a 3D rendering engine written in TypeScript. It uses **npm workspaces** with **Lerna** and **Nx** for orchestration. The repo contains the engine source, editor tools, and published packages.
-
-Alongside it, the `BabylonDocumentation` directory contains the documentation website (Next.js/MDX).
+This session is focused on **`@babylonjs/2d`**, a 2D game engine package within the Babylon.js monorepo. See `.github/instructions/2d-engine-plan.instructions.md` for the full design plan, API reference, implementation history, and roadmap.
 
 ## Golden Rules
-
-All contributions must follow these inviolable rules:
 
 1. **Never break backward compatibility** — existing APIs must continue to work
 2. **Never degrade rendering performance** — every code path is performance-critical
@@ -16,159 +10,139 @@ All contributions must follow these inviolable rules:
 
 ## Build & Test Commands
 
-### Build
-
 ```bash
-npm run build:dev          # Build dev packages (most common during development)
-npm run build:source       # TypeScript compilation only (faster, no assets)
-npm run build:es6          # Build ES6 packages (libs + tools)
-npm run build:umd          # Build UMD packages
-```
+# From repo root:
+npm run build:dev                                    # Build all dev packages (includes 2d)
+npm run build:source                                 # TypeScript only (faster, no assets)
 
-### Test
+# From packages/dev/2d/:
+npm run build                                        # Build 2d package only
+npm run watch                                        # Watch mode for 2d package
 
-```bash
-# Unit tests (Jest)
+# Unit tests (from repo root):
 npm run test:unit                                    # All unit tests
-npx jest --selectProjects=unit -- --testPathPattern="babylon.mesh"  # Single test file pattern
+npx jest --selectProjects=unit -- --testPathPattern="babylon.scene2d"  # Single 2D test
 
-# Visualization tests (Playwright)
-npm run test:visualization                           # All visualization tests
-npx playwright test -c ./playwright.config.ts --grep "TestName"  # Single visualization test
+# Dev server with demos:
+npm run start:devhost                                # Then visit ?exp=sidescroller, ?exp=isometric, ?exp=tactics, ?exp=test2d
 
-# Integration tests
-npm run test:integration
+# Lint & format:
+npm run lint:check && npm run format:check
+npm run format:fix                                   # Auto-fix formatting
 ```
 
-### Lint & Format
+## Package Layout
 
-```bash
-npm run lint:check         # ESLint (uses flat config)
-npm run format:check       # Prettier check
-npm run format:fix         # Prettier auto-fix
+```
+packages/dev/2d/                    ← Source (edit here)
+  src/
+    Scene2D/                        ← Root scene, render loop, node registry
+    Node2D/                         ← Base entity class (transform, hierarchy, dirty tracking)
+    Sprite2D/                       ← Static sprite rendering
+    AnimatedSprite2D/               ← Spritesheet-driven animation
+    SpriteSheet/                    ← Frame definitions (grid + JSON atlas)
+    Camera2D/                       ← Viewport, follow, zoom, shake, design resolution
+    Tilemap/                        ← Tiled .tmj loader, layers, animated tiles
+    Collision/                      ← Box/Circle/Polygon colliders, SpatialGrid
+    Physics/                        ← IPhysicsEngine2D interface + PlanckPhysicsEngine
+    Input/                          ← InputMap2D (action bindings via DeviceSourceManager)
+    Rendering/                      ← SpriteBatchRenderer (GPU instancing, multi-texture)
+    Lighting/                       ← Light2D + LightingManager2D
+    Particles/                      ← ParticleHelper2D (bridge to core ParticleSystem)
+    Pathfinding/                    ← AStarPathfinder (A*, line-of-sight, reachable cells)
+    Grid/                           ← Grid2D (square + hex), coordinate conversion
+    Isometric/                      ← IsometricGrid (diamond + staggered)
+    Tween/                          ← Tween, TweenManager, Easing (16 curves)
+    StateMachine/                   ← Generic FSM for AI and animation
+    Text2D/                         ← Canvas-rasterized in-world text
+    NineSlice/                      ← NineSliceSprite2D with border insets
+    Transition/                     ← SceneTransition2D (fade, slide)
+    Math/                           ← Matrix2D, Rectangle2D, Vector2 utilities
+  test/unit/                        ← 15+ test suites, 315 tests
+
+packages/public/@babylonjs/2d/      ← Published npm package (generated, do not edit)
 ```
 
-### Dev Server
+## Architecture
 
-```bash
-npm run start              # Watch mode + dev server (babylon-server)
-npm run start:devhost      # Alternative dev host
-```
+- **Coordinate system**: Y-down, top-left origin, pixel units. Matches Phaser/PixiJS convention (differs from Babylon 3D's Y-up).
+- **Scene graph**: `Scene2D` → `Node2D` tree. Independent from core's `Scene`/`TransformNode`. Does NOT extend core classes.
+- **Engine sharing**: Reuses `@babylonjs/core`'s `AbstractEngine` for WebGL/WebGPU rendering and GPU resources. The 2D package depends on core but not vice versa.
+- **Render pipeline**: `Scene2D.render()` → collects `Sprite2D` instances → `SpriteBatchRenderer` (GPU instancing, multi-texture batching up to 8 textures/draw call, pixel-perfect mode).
+- **Physics**: Plugin pattern via `IPhysicsEngine2D` interface. Default backend: **Planck.js** (Box2D port). Bodies centered at sprite position.
+- **Transform dirty tracking**: Node2D uses setter-based dirty flagging for scalars (`rotation`, `alpha`, `zIndex`) and snapshot comparison for Vector2 fields (`position`, `scale`, `pivot`). Static nodes skip recomputation.
 
-## Monorepo Package Structure
+## Naming Conventions
 
-Source code lives in `packages/` with three tiers:
-
-- **`packages/dev/`** — Primary source packages (edit code here)
-  - `core` — The engine: scene graph, rendering, math, physics, XR, etc.
-  - `gui` — 2D GUI system
-  - `loaders` — File format loaders (glTF, OBJ, STL, etc.)
-  - `materials` — Material library
-  - `serializers` — Scene serialization
-  - `inspector` / `inspector-v2` — Debugging tools
-  - `sharedUiComponents` — Shared React components for editors
-  - `smartFilters` / `smartFilterBlocks` — Smart filter system
-
-- **`packages/public/`** — Generated ES6 packages published to npm as `@babylonjs/*` (do not edit directly)
-
-- **`packages/lts/`** — LTS versions of core packages (generated, do not edit directly)
-
-- **`packages/tools/`** — Editor tools, test utilities, build plugins
-  - `nodeEditor`, `guiEditor`, etc. — Visual editors
-  - `tests` — Playwright visualization test infrastructure
-  - `testTools` — Shared test utilities
-  - `eslintBabylonPlugin` — Custom ESLint rules
-  - `babylonServer` — Dev server for testing
-
-## Import Conventions
-
-### In source code (`packages/dev/`)
-
-Use **relative imports** within the same package:
-
-```typescript
-import type { Nullable } from "../types";
-import { Observable } from "../Misc/observable";
-import { Vector3 } from "../Maths/math.vector";
-```
-
-Side-effect imports for extensions:
-
-```typescript
-import "./Extensions/engine.alpha";
-```
-
-### In test code
-
-Use **path-alias imports** (mapped in tsconfig.json):
-
-```typescript
-import { NullEngine } from "core/Engines";
-import { Scene } from "core/scene";
-import { MeshBuilder } from "core/Meshes";
-```
-
-### Import rules (enforced by ESLint)
-
-- **Never import from index files** — import from the specific module file
-- **No cross-package relative imports** — use package aliases
-- **No directory barrel imports** in dev packages — import specific files
-- **Use `import type` for type-only imports** (enforced: `consistent-type-imports` with `separate-type-imports`)
-
-## Naming Conventions (ESLint-enforced)
+Follow standard Babylon.js conventions (ESLint-enforced):
 
 | Element | Convention | Example |
 |---|---|---|
-| Classes | `StrictPascalCase` | `class MeshBuilder` |
-| Interfaces | `StrictPascalCase` with `I` prefix | `interface IMeshOptions` |
-| Public members | `strictCamelCase` | `mesh.position` |
-| Private/protected members | `strictCamelCase` with `_` prefix | `private _engine` |
-| Public static members | `StrictPascalCase` or `UPPER_CASE` | `Mesh.FRONTSIDE` |
-| Private static members | `StrictPascalCase`/`UPPER_CASE` with `_` prefix | `private static _DefaultValue` |
-| Async functions/methods | Must end with `Async` suffix | `loadSceneAsync()` |
-| Exported global const/function | `StrictPascalCase` | `export const CreateBox = ...` |
-| Enum members | `StrictPascalCase` or `UPPER_CASE` | `TextureFormat.RGBA` |
+| Classes | `StrictPascalCase` | `class Sprite2D` |
+| Interfaces | `I` prefix | `interface IPhysicsEngine2D` |
+| Public members | `strictCamelCase` | `node.position` |
+| Private/protected | `_` prefix | `private _engine` |
+| Async methods | `Async` suffix | `loadTiledMapAsync()` |
+| Enum members | `StrictPascalCase` or `UPPER_CASE` | `ScaleMode.FIT` |
 
-Domain abbreviations (XR, PBR, HDR, GLSL, WGSL, GPU, LOD, etc.) are exempt from strict casing rules.
+## Import Conventions
 
-## Shader Files
+Within `packages/dev/2d/src/`, use **relative imports**:
 
-- GLSL shaders: `packages/dev/core/src/Shaders/` (`.fragment.ts`, `.vertex.ts`)
-- WGSL shaders: `packages/dev/core/src/ShadersWGSL/`
-- Shader files are **auto-generated** from `.fx` source files — do not edit the `.ts` outputs directly
-- Build shaders: `npm run build:shaders`
+```typescript
+import type { IDisposable } from "../interfaces";
+import { Node2D } from "../Node2D/node2D";
+import { SpriteBatchRenderer } from "../Rendering/spriteBatchRenderer";
+```
 
-## Test Structure
+For core engine types, import from `@dev/core`:
 
-### Unit tests (Jest)
+```typescript
+import type { AbstractEngine } from "@dev/core";
+import { Color4 } from "@dev/core";
+```
 
-- Location: `packages/dev/<package>/test/unit/`
-- Naming: `babylon.<feature>.test.ts` (e.g., `babylon.mesh.bake.test.ts`)
-- Tests mirror the source directory structure
+In test files, use **path aliases**:
+
+```typescript
+import { Scene2D } from "2d/Scene2D/scene2D";
+import { Node2D } from "2d/Node2D/node2D";
+```
+
+Rules: **No index file imports**, **no cross-package relative imports**, **use `import type` for type-only imports**.
+
+## Test Patterns
+
+- Location: `packages/dev/2d/test/unit/`
+- Naming: `babylon.<feature>.test.ts` (e.g., `babylon.scene2d.test.ts`)
+- Use a **mock engine object** `{}` — no NullEngine needed for most 2D tests since rendering is mocked
+- `describe()` / `it()` blocks with Arrange-Act-Assert
 - Test file pattern: `/test/unit/.*test\.[tj]sx?$/`
 
-### Visualization tests (Playwright)
+## Documentation
 
-- Test configs: `packages/tools/tests/test/playwright/`
-- Reference images: `packages/tools/tests/test/visualization/ReferenceImages/`
-- Tests use minimal wrapper files that delegate to shared utility functions
+- All public classes/methods **must** have JSDoc comments with `@param` and `@returns`
+- Use `@internal` for non-public APIs
+- Every new 2D feature gets a doc page in `BabylonDocumentation/content/features/featuresDeepDive/2d/`
+- `console.log` is forbidden — use `console.time`/`console.timeEnd`/`console.trace` only
+- No `.then()` — use `async`/`await`
+- Curly braces always required for control flow
 
-## Documentation (JSDoc/TSDoc)
+## Demos
 
-- All public classes, interfaces, methods, and properties **must** have JSDoc comments
-- `@param` tags are required for function parameters
-- `@returns` tags are required for functions with return values
-- Getters don't need `@returns`; constructors don't need `@returns`
+Three demo games are hosted from the dev server (`npm run start:devhost`):
 
-## GUI Controls
+| Demo | URL param | Features demonstrated |
+|---|---|---|
+| Side-scroller | `?exp=sidescroller` | Sprites, animation, camera follow, physics, tilemaps, parallax, input |
+| Isometric | `?exp=isometric` | Isometric grid, pathfinding, z-sorting, camera pan/zoom |
+| Turn-based tactics | `?exp=tactics` | Grid2D, turn management, A* pathfinding, tweened movement |
+| Test scene | `?exp=test2d` | Basic rendering validation |
 
-In `packages/dev/gui/src/2D/controls/`, `context.save()` must be called before `_applyStates()` (enforced by custom ESLint rule).
+## Roadmap (Next Steps)
 
-## Key Technical Details
-
-- **Node.js**: >=20.11.0, <23.0.0
-- **TypeScript**: ~5.9.x with strict settings (`strictNullChecks`, `noImplicitAny`, `noImplicitOverride`)
-- **Prettier**: 4-space tabs, 180 char print width, ES5 trailing commas
-- **`console.log` is forbidden** — only `console.time`, `console.timeEnd`, `console.trace` are allowed
-- **No `.then()` on promises** — use `async`/`await` (enforced by `github/no-then`)
-- **Curly braces always required** for control flow statements
+See the plan file for the full roadmap. High-priority remaining items:
+- **Debug Rendering** — Wireframe overlays for collision shapes, physics bodies, pathfinding grids
+- **Sprite Atlas Builder** — Auto-pack textures at load time
+- **Object Pooling** — Generic pool to avoid GC spikes
+- **Shader Effects** — Outline, glow, dissolve, palette swap for sprites

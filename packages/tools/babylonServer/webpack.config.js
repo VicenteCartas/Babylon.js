@@ -102,6 +102,7 @@ module.exports = (env) => {
             "guiEditor/babylon.guiEditor.min": `./src/guiEditor/index.ts`,
             "addons/babylonjs.addons.min": `./src/addons/index.ts`,
             "accessibility/babylon.accessibility.min": `./src/accessibility/index.ts`,
+            "2d/babylon.2d.min": `./src/2d/index-${source}.ts`,
             "babylon.ktx2Decoder": `./src/ktx2Decoder/index.ts`,
         },
         resolve: {
@@ -123,6 +124,7 @@ module.exports = (env) => {
                 "gui-editor": path.resolve(basePathForTools, "guiEditor", outputDirectoryForAliases),
                 accessibility: path.resolve(basePathForTools, "accessibility", outputDirectoryForAliases),
                 addons: path.resolve(basePathForSources, "addons", outputDirectoryForAliases),
+                "2d": path.resolve(basePathForSources, "2d", outputDirectoryForAliases),
             },
             symlinks: false,
             // modules: [path.resolve(__dirname, "../../dev/"), 'node_modules'],
@@ -279,6 +281,10 @@ module.exports = (env) => {
         {
             from: "/addons/babylonjs.addons.d.ts",
             to: "/addons.d.ts",
+        },
+        {
+            from: "/2d/babylon.2d.d.ts",
+            to: "/2d.d.ts",
         },
     ];
     commonConfig.devServer.historyApiFallback = {

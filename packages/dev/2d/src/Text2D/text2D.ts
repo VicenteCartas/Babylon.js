@@ -1,8 +1,8 @@
-import type { AbstractEngine } from "core/Engines/abstractEngine";
 import { DynamicTexture } from "core/Materials/Textures/dynamicTexture";
 import { Constants } from "core/Engines/constants";
 
 import { Sprite2D } from "../Sprite2D/sprite2D";
+import type { Scene2D } from "../Scene2D/scene2D";
 
 /**
  * Options for configuring a Text2D node
@@ -44,12 +44,8 @@ export interface IText2DOptions {
  *
  * @example
  * ```typescript
- * const label = new Text2D("score", engine, "Score: 0", { font: "24px Arial", color: "#fff" });
+ * const label = new Text2D("score", "Score: 0", { font: "24px Arial", color: "#fff" });
  * label.position = new Vector2(10, 10);
- * scene.addNode(label);
- *
- * // Update text later — texture is re-rendered automatically
- * label.text = "Score: 100";
  * ```
  */
 export class Text2D extends Sprite2D {
@@ -59,20 +55,18 @@ export class Text2D extends Sprite2D {
     private _textAlign: CanvasTextAlign;
     private _textBaseline: CanvasTextBaseline;
     private _padding: number;
-    private _engine: AbstractEngine;
     private _dynamicTexture: DynamicTexture | null = null;
     private _needsRedraw: boolean = true;
 
     /**
      * Creates a new Text2D node
      * @param name - Node name / identifier
-     * @param engine - The Babylon.js engine instance (for texture creation)
      * @param text - The text string to display
      * @param options - Optional styling configuration
+     * @param scene - Optional Scene2D. If omitted, uses the last created Scene2D.
      */
-    constructor(name: string, engine: AbstractEngine, text: string = "", options?: IText2DOptions) {
-        super(name);
-        this._engine = engine;
+    constructor(name: string, text: string = "", options?: IText2DOptions, scene?: Scene2D | null) {
+        super(name, scene);
         this._text = text;
         this._font = options?.font ?? "16px sans-serif";
         this._color = options?.color ?? "#ffffff";
@@ -263,8 +257,9 @@ export class Text2D extends Sprite2D {
             Constants.TEXTUREFORMAT_RGBA,
             false
         );
-        this._dynamicTexture._texture = this._engine.createDynamicTexture(texWidth, texHeight, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
-        (this._engine as any).updateDynamicTexture(this._dynamicTexture._texture, drawCanvas, false);
+        const engine = this.scene!.engine;
+        this._dynamicTexture._texture = engine.createDynamicTexture(texWidth, texHeight, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+        (engine as any).updateDynamicTexture(this._dynamicTexture._texture, drawCanvas, false);
 
         // Assign to Sprite2D
         this.texture = this._dynamicTexture;

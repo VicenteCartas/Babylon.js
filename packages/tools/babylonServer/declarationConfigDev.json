@@ -94,5 +94,11 @@
         "devPackageName": "procedural-textures",
         "filename": "procedural-textures.d.ts",
         "outputDirectory": "./declarations"
+    },
+    {
+        "declarationLibs": ["@dev/2d"],
+        "devPackageName": "2d",
+        "filename": "2d.d.ts",
+        "outputDirectory": "./declarations"
     }
 ]

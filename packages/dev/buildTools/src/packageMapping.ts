@@ -40,7 +40,8 @@ export type DevPackageName =
     | "shared-ui-components"
     | "babylonjs-gltf2interface"
     | "addons"
-    | "smart-filters";
+    | "smart-filters"
+    | "2d";
 export type UMDPackageName =
     | "babylonjs"
     | "babylonjs-gui"
@@ -62,7 +63,8 @@ export type UMDPackageName =
     | "babylonjs-shared-ui-components"
     | "babylonjs-gltf2interface"
     | "babylonjs-addons"
-    | "babylonjs-smart-filters";
+    | "babylonjs-smart-filters"
+    | "babylonjs-2d";
 export type NamespacePackageName =
     | "BABYLON"
     | "BABYLON.GUI"
@@ -88,7 +90,8 @@ export type NamespacePackageName =
     | "BABYLON.NodeRenderGraphEditor.SharedUIComponents"
     | "BABYLON.NodeParticleEditor.SharedUIComponents"
     | "BABYLON.GuiEditor.SharedUIComponents"
-    | "BABYLON.SmartFilters";
+    | "BABYLON.SmartFilters"
+    | "BABYLON.Game2D";
 export type ES6PackageName =
     | "@babylonjs/core"
     | "@babylonjs/gui"
@@ -110,7 +113,8 @@ export type ES6PackageName =
     | "@babylonjs/shared-ui-components"
     | "@babylonjs/addons"
     | "babylonjs-gltf2interface"
-    | "@babylonjs/smart-filters";
+    | "@babylonjs/smart-filters"
+    | "@babylonjs/2d";
 
 export const umdPackageMapping: { [key in UMDPackageName]: { sourceDir?: string; baseDir: string; baseFilename: string; isBundle?: boolean } } = {
     babylonjs: {
@@ -203,6 +207,10 @@ export const umdPackageMapping: { [key in UMDPackageName]: { sourceDir?: string;
         baseDir: "smart-filters",
         baseFilename: "babylonjs.smartFilters",
     },
+    "babylonjs-2d": {
+        baseDir: "2d",
+        baseFilename: "babylon.2d",
+    },
 };
 export type ESMPackageName = "@babylonjs/esm";
 
@@ -264,6 +272,7 @@ const packageMapping: {
         "babylonjs-gltf2interface": "babylonjs-gltf2interface",
         addons: "babylonjs-addons",
         "smart-filters": "babylonjs-smart-filters",
+        "2d": "babylonjs-2d",
     },
     es6: {
         core: "@babylonjs/core",
@@ -287,6 +296,7 @@ const packageMapping: {
         "babylonjs-gltf2interface": "babylonjs-gltf2interface",
         addons: "@babylonjs/addons",
         "smart-filters": "@babylonjs/smart-filters",
+        "2d": "@babylonjs/2d",
     },
     esm: {
         core: "@babylonjs/esm",
@@ -310,6 +320,7 @@ const packageMapping: {
         "shared-ui-components": "@babylonjs/esm",
         "babylonjs-gltf2interface": "babylonjs-gltf2interface",
         "smart-filters": "@babylonjs/smart-filters",
+        "2d": "@babylonjs/esm",
     },
     // lts: {
     //     core: "@babylonjs/esm",
@@ -444,6 +455,7 @@ const packageMapping: {
         "shared-ui-components": "BABYLON.SharedUIComponents",
         "babylonjs-gltf2interface": "BABYLON.GLTF2",
         "smart-filters": "BABYLON.SmartFilters",
+        "2d": "BABYLON.Game2D",
     },
 };
 

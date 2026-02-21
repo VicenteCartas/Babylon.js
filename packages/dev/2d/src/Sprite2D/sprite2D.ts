@@ -1,11 +1,13 @@
 import type { BaseTexture } from "core/Materials/Textures/baseTexture";
 import type { ThinTexture } from "core/Materials/Textures/thinTexture";
+import { Texture } from "core/Materials/Textures/texture";
 import { Color4 } from "core/Maths/math.color";
 import { Constants } from "core/Engines/constants";
 
 import { Node2D } from "../Node2D/node2D";
 import { Rectangle2D } from "../Math/rectangle2D";
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
+import type { Scene2D } from "../Scene2D/scene2D";
 
 /**
  * A 2D sprite that renders a textured quad.
@@ -59,13 +61,10 @@ export class Sprite2D extends Node2D {
     /**
      * Creates a new Sprite2D
      * @param name - Name of the sprite
-     * @param texture - Optional texture to render
+     * @param scene - Optional Scene2D. If omitted, uses the last created Scene2D.
      */
-    constructor(name: string, texture?: BaseTexture) {
-        super(name);
-        if (texture) {
-            this.texture = texture;
-        }
+    constructor(name: string, scene?: Scene2D | null) {
+        super(name, scene);
     }
 
     /**
@@ -148,6 +147,7 @@ export class Sprite2D extends Node2D {
             cellH: uv[3],
             flipX: this.flipX,
             flipY: this.flipY,
+            invertY: this.texture instanceof Texture ? this.texture.invertY : true,
             texture: this.texture ?? fallbackTexture,
             zIndex: this.worldZIndex,
             sortingLayer: this.sortingLayer,

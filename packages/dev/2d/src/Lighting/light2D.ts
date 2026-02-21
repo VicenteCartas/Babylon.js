@@ -1,4 +1,3 @@
-import type { AbstractEngine } from "core/Engines/abstractEngine";
 import type { Effect } from "core/Materials/effect";
 import { Vector2 } from "core/Maths/math.vector";
 import { Color4 } from "core/Maths/math.color";

@@ -45,7 +45,6 @@ DPR: ${window.devicePixelRatio}`;
     red.height = 200;
     red.position = new Vector2(100, 100);
     red.tint = new Color4(1, 0, 0, 1);
-    scene.addNode(red);
 
     // Green square: center of screen
     const green = new Sprite2D("green");
@@ -53,7 +52,6 @@ DPR: ${window.devicePixelRatio}`;
     green.height = 200;
     green.position = new Vector2(W / 2 - 100, H / 2 - 100);
     green.tint = new Color4(0, 1, 0, 1);
-    scene.addNode(green);
 
     // Blue square: bottom-right quadrant
     const blue = new Sprite2D("blue");
@@ -61,7 +59,6 @@ DPR: ${window.devicePixelRatio}`;
     blue.height = 200;
     blue.position = new Vector2(W - 300, H - 300);
     blue.tint = new Color4(0, 0, 1, 1);
-    scene.addNode(blue);
 
     // Yellow small square: exact center pixel
     const yellow = new Sprite2D("yellow");
@@ -70,7 +67,6 @@ DPR: ${window.devicePixelRatio}`;
     yellow.position = new Vector2(W / 2 - 25, H / 2 - 25);
     yellow.tint = new Color4(1, 1, 0, 1);
     yellow.zIndex = 1;
-    scene.addNode(yellow);
 
     engine.runRenderLoop(() => {
         scene.render();
