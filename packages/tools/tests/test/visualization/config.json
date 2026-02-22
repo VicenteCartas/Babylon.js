@@ -3799,6 +3799,11 @@
             "playgroundId": "#T6Q16K",
             "renderCount": 30,
             "referenceImage": "2d-animated-sprites.png"
+        },
+        {
+            "title": "2D - Source Rectangles",
+            "playgroundId": "#JHCZ8B#1",
+            "referenceImage": "2d-source-rectangles.png"
         }
     ]
 }
