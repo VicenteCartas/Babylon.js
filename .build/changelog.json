@@ -1,71 +1,304 @@
 {
-    "fromTag": "8.51.1",
+    "fromTag": "8.51.2",
     "changelog": {
-        "8.51.1": [
+        "8.52.0": [
             {
-                "pr": "17892",
-                "title": "Havok + FloatingOrigin: Dynamic re-regioning",
-                "description": "Currently if two objects are positioned far away from one another and are in separate regions, they cannot collide even if manually changing their positions or physics causes them to drift towards eachother. \r\n\r\nThis change solves both cases -- whether an object is 'teleported' to a new location (note that in order for this to work the user would have to enablePrestep, move body, then re-disablePreStep) or if the physics simulation causes them to drift towards one another \r\n\r\nNote that this implementation cleans up empty regions so we dont have unnecessarily large number of regions\r\n\r\nTested via /#7N17MT#20 -- launch ball tests the physics drift collision while move box swaps the boxes and tests the 'teleport' scenario\r\n\r\n#17451 ",
+                "pr": "17921",
+                "title": "Fix spinbutton regression and precision bug",
+                "description": "- Fix bug where the step precision was overwriting the value precision -- now even if step is '1', if user enters '4.5' and then uses the step button, it will go to 5.5\r\n- If user enters a value in spin button that is greater than the defined precision, the underlying value will be persisted and when you copy the value (using copy property) you will still get precise value (even if displayvalue caps to 4)\r\n- Fix bug where a spinbutton with a unit ('rad' or 'deg') would cause submission to revert value to prevously committed value (needed to remove the unit when doing the evaluation logic)\r\n\r\n<img width=\"1203\" height=\"348\" alt=\"image\" src=\"https://github.com/user-attachments/assets/9687b65b-a460-4f66-a5ef-48e8d2a9ad97\" />\r\n\r\n",
                 "author": {
                     "name": "georginahalpern",
                     "url": "https://github.com/georginahalpern"
                 },
                 "files": [
-                    "packages/dev/core/src/Physics/v2/Plugins/havokPlugin.ts"
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/spinButton.tsx"
                 ],
                 "tags": [
-                    "rendering engine",
-                    "physics",
-                    "new feature"
+                    "bug",
+                    "inspector"
                 ]
             },
             {
-                "pr": "17885",
-                "title": "Animations: add support for animation retargeting",
-                "description": "Also in this PR:\r\n* added the possibility to clone animation keys when cloning an animation\r\n* added helper methods adding to the `Skeleton` class (`findBoneFromLinkedTransformNode`, `findBoneFromLinkedTransformNodeName` and `CreateSkeletonFromTransformNodeHierarchy`)\r\n* fixed local axes not showing up when enabling the option in the skeleton viewer debug component\r\n* fixed DISPLAY_SPHERES mode not working in skeleton viewer\r\n* added the possibility to choose which camera to use with the gizmo manager in Inspector V2\r\n\r\nWriting the documentation is the next step on my list!\r\n\r\nHere's a screenshot of the change to Inspector v2:\r\n<img width=\"584\" height=\"300\" alt=\"image\" src=\"https://github.com/user-attachments/assets/411641b4-a638-40c4-98c7-ef59f3cfc0eb\" />\r\n\r\nAutomatic is the default (existing) behavior, which is to use the value of `scene.activeCamera` at the time the gizmos need to use a camera.\r\n",
+                "pr": "17924",
+                "title": "Fix code simplification agent",
+                "description": "This required installing the agentic-workflow agent to help debug. This change includes that configuration in the .github folder so we don't have to keep reinstalling it.",
+                "author": {
+                    "name": "AmoebaChant",
+                    "url": "https://github.com/AmoebaChant"
+                },
+                "files": [
+                    ".github/agents/agentic-workflows.agent.md",
+                    ".github/aw/actions-lock.json",
+                    ".github/aw/imports/.gitattributes",
+                    ".github/aw/imports/github/gh-aw/f88ec26c65cc20ebb8ceabe809c9153385945bfe/.github_workflows_shared_mood.md",
+                    ".github/aw/imports/github/gh-aw/f88ec26c65cc20ebb8ceabe809c9153385945bfe/.github_workflows_shared_reporting.md",
+                    ".github/aw/logs/.gitignore",
+                    ".github/workflows/code-simplifier.lock.yml",
+                    ".github/workflows/code-simplifier.md",
+                    ".github/workflows/copilot-setup-steps.yml",
+                    ".vscode/mcp.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "17915",
+                "title": "Textures: Fix parsing of texture",
+                "description": "See https://forum.babylonjs.com/t/texture-parse-not-parsing-usesrgbbuffer-flag/62473\r\n\r\nThe `creationFlags` and `useSRGBBuffer` properties were not correctly parsed.",
                 "author": {
                     "name": "Popov72",
                     "url": "https://github.com/Popov72"
                 },
                 "files": [
-                    "packages/dev/core/src/Animations/animation.ts",
-                    "packages/dev/core/src/Animations/animationGroup.ts",
-                    "packages/dev/core/src/Animations/animatorAvatar.ts",
-                    "packages/dev/core/src/Animations/index.ts",
-                    "packages/dev/core/src/Bones/index.ts",
-                    "packages/dev/core/src/Bones/skeleton.functions.ts",
-                    "packages/dev/core/src/Bones/skeleton.ts",
-                    "packages/dev/core/src/Debug/skeletonViewer.ts",
-                    "packages/dev/core/src/Morph/morphTarget.ts",
-                    "packages/dev/core/src/Morph/morphTargetManager.ts",
-                    "packages/dev/inspector-v2/src/components/gizmoToolbar.tsx",
-                    "packages/dev/inspector-v2/src/services/gizmoService.ts",
-                    "packages/dev/inspector-v2/src/services/gizmoToolbarService.tsx"
+                    "packages/dev/core/src/Materials/Textures/texture.ts"
                 ],
                 "tags": [
-                    "inspector",
-                    "animations",
-                    "new feature"
+                    "bug",
+                    "texture"
                 ]
             },
             {
-                "pr": "17887",
-                "title": "Gaussian Splatting GPU Picking",
-                "description": "<img width=\"1318\" height=\"1392\" alt=\"image\" src=\"https://github.com/user-attachments/assets/fcc5b17a-0341-4649-97a5-13aafc9b80dd\" />\r\n\r\nhttps://playground.babylonjs.com/?snapshot=refs/pull/17887/merge#3LNCE6#36",
+                "pr": "17916",
+                "title": "Fix various ACE bugs",
+                "description": "This PR fixes various bugs in the new ACE, and fills in some  behavior gaps that were missed with initial implementation. \r\n\r\n**Bug Fixes**\r\n- TopBar frame/value inputs are now properly synced with the keypoint (updating topbar will update curve and vice versa) `(topbar.tsx)`\r\n- Correct animation count, quaternion disable, reset values on deselect `(topbar.tsx)`\r\n- Curve redraws after tangent flattening, and extractSlope uses refs instead of state to avoid stale closures during drag`  (curve.tsx)`\r\n- When manually adding new keyframe, ensure diamond keyframe indicator appears `(graph.tsx)`\r\n- Add missing logic to keep curve shape when adding new keyframe` (graph.tsx)`\r\n- Selection logic rewritten to match v1 (single click, Ctrl+click toggle, main key point promotion)` (keypoint.tsx)`\r\n\r\n**Missing behaviors when porting from V1**\r\n- Sibling frame sync (dragging X key also moves Y/Z keys' frames) `(curveData.ts)`\r\n- Selecting multiple keys and dragging moves them all together `(curveEditorContext.tsx)`\r\n- Click/drag on bottom timeline bar moves the playhead `(rangeFrameBar.tsx)`\r\n- Add new keyframe if clip length exceeds current length `(bottomBar.tsx)`\r\n- Avoid deletion of first or last key `(graph.tsx)`\r\n- Adding new animation auto-selects animation after creation` (addAnimationPanel.tsx)`\r\n\r\nVarious code cleanup suchas extracting code into helper functions and using shared components rather than fluent  `(graph.tsx, addAnimationPanel.tsx)\r\n`",
                 "author": {
-                    "name": "spsDrop",
-                    "url": "https://github.com/spsDrop"
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
                 },
                 "files": [
-                    "packages/dev/core/src/Collisions/gpuPicker.ts",
-                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingGpuPickingMaterialPlugin.ts",
-                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts",
-                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingSolidColorMaterialPlugin.ts",
-                    "packages/dev/core/src/Materials/index.ts",
-                    "packages/dev/core/src/Meshes/GaussianSplatting/gaussianSplattingMesh.ts"
+                    "packages/dev/inspector-v2/src/components/curveEditor/bottomBar.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/canvas/curve.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/canvas/curveData.ts",
+                    "packages/dev/inspector-v2/src/components/curveEditor/canvas/graph.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/canvas/keyPoint.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/canvas/rangeFrameBar.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/curveEditorContext.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/sideBar/addAnimationPanel.tsx",
+                    "packages/dev/inspector-v2/src/components/curveEditor/topBar.tsx"
                 ],
                 "tags": [
-                    "Gaussian Splatting"
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "17917",
+                "title": "Fix errors in console",
+                "description": "<img width=\"913\" height=\"17\" alt=\"image\" src=\"https://github.com/user-attachments/assets/2888a41b-270d-4f1e-8094-7450f9ae20da\" />\r\n<img width=\"1201\" height=\"74\" alt=\"image\" src=\"https://github.com/user-attachments/assets/1d34d935-bccb-4d6f-a8fc-01c5bd243c38\" />\r\n",
+                "author": {
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/accordion.contexts.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/toggleButton.tsx"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector",
+                    "skip changelog"
+                ]
+            },
+            {
+                "pr": "17920",
+                "title": "Changing overflow to wrap",
+                "description": "The documentation for NGE says that comments must wrap instead of overflow, so updating NPE block and frame comments to behave the same way.\r\n\r\n<img width=\"815\" height=\"645\" alt=\"image\" src=\"https://github.com/user-attachments/assets/62e4b4cd-08e2-4c25-8af8-22b51359bb5f\" />\r\n",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/nodeGraphSystem/graphFrame.module.scss",
+                    "packages/dev/sharedUiComponents/src/nodeGraphSystem/graphNode.module.scss"
+                ],
+                "tags": [
+                    "bug",
+                    "npe"
+                ]
+            },
+            {
+                "pr": "17914",
+                "title": "Using Lerp instead of Random for initial color",
+                "description": "User reported bug: https://forum.babylonjs.com/t/different-color-of-particles-when-creating-particle-via-code-and-node-particle-editor/62429\r\n\r\nThe issue was that the converter was using random between two colors, which randoms all color components and can generate colors that are outside of the gradient between the start and end color. But the original particles Lerp, which just generates a gradient between the two colors.\r\n\r\nIn the example from the user, we have light blue to darker blue, and random can generate violets, which was not expected.\r\n\r\nOld using random:\r\n<img width=\"452\" height=\"299\" alt=\"image\" src=\"https://github.com/user-attachments/assets/95c487e1-b040-47e3-9115-eb7cc39916b9\" />\r\n\r\nNew using Lerp:\r\n<img width=\"892\" height=\"599\" alt=\"image\" src=\"https://github.com/user-attachments/assets/aa89105c-7db5-4649-a616-64767d1d91d8\" />\r\n",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/core/src/Particles/Node/nodeParticleSystemSet.helper.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-angular-speed-rotation.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-angular-speed.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-change-angular-speed-2.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-change-angular-speed.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-change-lifetime.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-change-size-2.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-change-size.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-color.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-direction.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-emit-rate-fast.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-scale.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-size.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-basic-speed.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-billboard-false.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-effects.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-box.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-cone.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-cylinder.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-directed-cone.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-directed-sphere.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-hemisphere.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-point.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-emitters-sphere.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particles-flowmaps-2.png"
+                ],
+                "tags": [
+                    "bug",
+                    "npe"
+                ]
+            },
+            {
+                "pr": "17912",
+                "title": "Inspector v2: Entity as object (instead of unknown)",
+                "description": "This change fixes an API bug that can lead to an unhandled runtime error. Currently, \"entities\" (Nodes, Textures, Materials, etc.) are typed as `unknown`, but Scene Explorer actually requires entities to be an object (they must either have a `uniqueId` property (and therefore an object), or an object that can be inserted into a `WeakMap` so we can associate a \"synthetic\" unique id. If you tried to have an entity that is not an object (e.g. a string or a number etc.), the API would allow it, but you would get an unhandled runtime error. This issue was obscured by an unsafe cast in Scene Explorer (casting `unknown` to `Partial<EntityBase>`). The fix is just to replace all the `unknown` entity related typings to `object` (or often `Nullable<object>` for selected entity).",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/inspector-v2/src/components/pickingToolbar.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/pbrBaseMaterialProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/standardMaterialProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/properties/particles/systemProperties.tsx",
+                    "packages/dev/inspector-v2/src/components/scene/sceneExplorer.tsx",
+                    "packages/dev/inspector-v2/src/components/scene/sceneExplorerDragDrop.ts",
+                    "packages/dev/inspector-v2/src/legacy/inspector.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/sceneExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/pickingService.tsx",
+                    "packages/dev/inspector-v2/src/services/selectionService.tsx"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "17913",
+                "title": "Add agentic workflow code-simplifier",
+                "description": "Add agentic workflow code-simplifier",
+                "author": {
+                    "name": "AmoebaChant",
+                    "url": "https://github.com/AmoebaChant"
+                },
+                "files": [
+                    ".gitattributes",
+                    ".github/workflows/code-simplifier.lock.yml",
+                    ".github/workflows/code-simplifier.md"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "17911",
+                "title": "Bump ajv from 8.12.0 to 8.18.0",
+                "description": "Bumps [ajv](https://github.com/ajv-validator/ajv) from 8.12.0 to 8.18.0.\n<details>\n<summary>Release notes</summary>\n<p><em>Sourced from <a href=\"https://github.com/ajv-validator/ajv/releases\">ajv's releases</a>.</em></p>\n<blockquote>\n<h2>v8.18.0</h2>\n<h2>What's Changed</h2>\n<ul>\n<li>feat: allow tree-shaking by adding <code>&quot;sideEffects&quot;: false</code> to <code>package.json</code> by <a href=\"https://github.com/josdejong\"><code>@​josdejong</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2480\">ajv-validator/ajv#2480</a></li>\n<li>fix: <a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2482\">#2482</a> Infinity and NaN serialise to null by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2487\">ajv-validator/ajv#2487</a></li>\n<li>fix: small grammatical error in managing-schemas.md by <a href=\"https://github.com/monteiro-renato\"><code>@​monteiro-renato</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2508\">ajv-validator/ajv#2508</a></li>\n<li>fix: typos in schema-language.md by <a href=\"https://github.com/monteiro-renato\"><code>@​monteiro-renato</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2507\">ajv-validator/ajv#2507</a></li>\n<li>fix(pattern): use configured RegExp engine with $data keyword to mitigate ReDoS attacks (CVE-2025-69873) by <a href=\"https://github.com/epoberezkin\"><code>@​epoberezkin</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2586\">ajv-validator/ajv#2586</a></li>\n</ul>\n<h2>New Contributors</h2>\n<ul>\n<li><a href=\"https://github.com/josdejong\"><code>@​josdejong</code></a> made their first contribution in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2480\">ajv-validator/ajv#2480</a></li>\n<li><a href=\"https://github.com/monteiro-renato\"><code>@​monteiro-renato</code></a> made their first contribution in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2508\">ajv-validator/ajv#2508</a></li>\n</ul>\n<p><strong>Full Changelog</strong>: <a href=\"https://github.com/ajv-validator/ajv/compare/v8.17.1...v8.18.0\">https://github.com/ajv-validator/ajv/compare/v8.17.1...v8.18.0</a></p>\n<h2>v8.17.1</h2>\n<h2>What's Changed</h2>\n<ul>\n<li>bump version to 8.17.1 by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2472\">ajv-validator/ajv#2472</a></li>\n</ul>\n<p><strong>Full Changelog</strong>: <a href=\"https://github.com/ajv-validator/ajv/compare/v8.17.0...v8.17.1\">https://github.com/ajv-validator/ajv/compare/v8.17.0...v8.17.1</a></p>\n<h2>Plus everything in 8.17.0 which failed to release</h2>\n<p>The only functional change is to switch from uri-js (which is no longer supported), to fast-uri. This is the second attempt and the team on fast-uri have been really helpful addressing the issues we found last time.</p>\n<p>Revert &quot;Revert fast-uri change (<a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2444\">ajv-validator/ajv#2444</a>)&quot; by <a href=\"https://github.com/gurgunday\"><code>@​gurgunday</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2448\">ajv-validator/ajv#2448</a>\nfix: ignore new eslint error for <code>@​typescript-eslint/no-extraneous-class</code> by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2455\">ajv-validator/ajv#2455</a>\ndocs: clarify behaviour of addVocabulary by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2454\">ajv-validator/ajv#2454</a>\ndocs: refactor to improve legibility by <a href=\"https://github.com/blottn\"><code>@​blottn</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2432\">ajv-validator/ajv#2432</a>\nFix grammatical typo in managing-schemas.md by <a href=\"https://github.com/wetneb\"><code>@​wetneb</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2305\">ajv-validator/ajv#2305</a>\ndocs: Fix broken strict-mode link by <a href=\"https://github.com/alexanderjsx\"><code>@​alexanderjsx</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2459\">ajv-validator/ajv#2459</a>\nfeat: add test for encoded refs and bump fast-uri by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2449\">ajv-validator/ajv#2449</a>\nfix: changes for <code>@​typescript-eslint/array-type</code> rule by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2467\">ajv-validator/ajv#2467</a>\nfixes <a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2217\">ajv-validator/ajv#2217</a> - clarify custom keyword naming by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2457\">ajv-validator/ajv#2457</a></p>\n<h2>v8.17.0</h2>\n<h2>What's Changed</h2>\n<p>The only functional change is to switch from uri-js (which is no longer supported), to fast-uri. This is the second attempt and the team on fast-uri have been really helpful addressing the issues we found last time.</p>\n<ul>\n<li>Revert &quot;Revert fast-uri change (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2444\">#2444</a>)&quot; by <a href=\"https://github.com/gurgunday\"><code>@​gurgunday</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2448\">ajv-validator/ajv#2448</a></li>\n<li>fix: ignore new eslint error for <code>@​typescript-eslint/no-extraneous-class</code> by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2455\">ajv-validator/ajv#2455</a></li>\n<li>docs: clarify behaviour of addVocabulary by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2454\">ajv-validator/ajv#2454</a></li>\n<li>docs: refactor to improve legibility by <a href=\"https://github.com/blottn\"><code>@​blottn</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2432\">ajv-validator/ajv#2432</a></li>\n<li>Fix grammatical typo in managing-schemas.md by <a href=\"https://github.com/wetneb\"><code>@​wetneb</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2305\">ajv-validator/ajv#2305</a></li>\n<li>docs: Fix broken strict-mode link by <a href=\"https://github.com/alexanderjsx\"><code>@​alexanderjsx</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2459\">ajv-validator/ajv#2459</a></li>\n<li>feat: add test for encoded refs and bump fast-uri by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2449\">ajv-validator/ajv#2449</a></li>\n<li>fix: changes for <code>@​typescript-eslint/array-type</code> rule by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2467\">ajv-validator/ajv#2467</a></li>\n<li>fixes <a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2217\">#2217</a> - clarify custom keyword naming by <a href=\"https://github.com/jasoniangreen\"><code>@​jasoniangreen</code></a> in <a href=\"https://redirect.github.com/ajv-validator/ajv/pull/2457\">ajv-validator/ajv#2457</a></li>\n</ul>\n<!-- raw HTML omitted -->\n</blockquote>\n<p>... (truncated)</p>\n</details>\n<details>\n<summary>Commits</summary>\n<ul>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/142ce84b807c4fe66e619c22480a28d0e4bd50fa\"><code>142ce84</code></a> 8.18.0</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/720a23fa453ffae8340e92c9b0fe886c54cfe0d5\"><code>720a23f</code></a> fix(pattern): use configured RegExp engine with $data keyword to mitigate ReD...</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/82735a15826a30cc51e97a1bbfb59b3d388e4b98\"><code>82735a1</code></a> fix: typos in schema-language.md (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2507\">#2507</a>)</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/b17ec32cd97542e90ae27231d8a8bce88b9e53b6\"><code>b17ec32</code></a> fix: small grammatical error in managing-schemas.md (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2508\">#2508</a>)</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/69568d08564303e2c32a2de61feb833b41075f96\"><code>69568d0</code></a> fix: <a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2482\">#2482</a> Infinity and NaN serialise to null (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2487\">#2487</a>)</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/f06766f33ed7291f84c19f22a1286a34475fbdaf\"><code>f06766f</code></a> feat: allow tree-shaking by adding ``&quot;sideEffects&quot;: false<code>to</code>package.json` ...</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/9050ba1359fb87cd7c143f3c79513ea7624ea443\"><code>9050ba1</code></a> bump version to 8.17.1 (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2472\">#2472</a>)</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/f7831b41c3a27064c6219f51a1e7371ffb582dfe\"><code>f7831b4</code></a> fixes <a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2217\">#2217</a> - clarify custom keyword naming (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2457\">#2457</a>)</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/a523784388a79ce65e42caf4d2731da36a94b386\"><code>a523784</code></a> fix: changes for <code>@​typescript-eslint/array-type</code> rule (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2467\">#2467</a>)</li>\n<li><a href=\"https://github.com/ajv-validator/ajv/commit/595fe58e64e8d5fb8a50fd7a58f9e7f3bcca0bac\"><code>595fe58</code></a> feat: add test for encoded refs and bump fast-uri (<a href=\"https://redirect.github.com/ajv-validator/ajv/issues/2449\">#2449</a>)</li>\n<li>Additional commits viewable in <a href=\"https://github.com/ajv-validator/ajv/compare/v8.12.0...v8.18.0\">compare view</a></li>\n</ul>\n</details>\n<br />\n\n\n[![Dependabot compatibility score](https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=ajv&package-manager=npm_and_yarn&previous-version=8.12.0&new-version=8.18.0)](https://docs.github.com/en/github/managing-security-vulnerabilities/about-dependabot-security-updates#about-compatibility-scores)\n\nDependabot will resolve any conflicts with this PR as long as you don't alter it yourself. You can also trigger a rebase manually by commenting `@dependabot rebase`.\n\n[//]: # (dependabot-automerge-start)\n[//]: # (dependabot-automerge-end)\n\n---\n\n<details>\n<summary>Dependabot commands and options</summary>\n<br />\n\nYou can trigger Dependabot actions by commenting on this PR:\n- `@dependabot rebase` will rebase this PR\n- `@dependabot recreate` will recreate this PR, overwriting any edits that have been made to it\n- `@dependabot show <dependency name> ignore conditions` will show all of the ignore conditions of the specified dependency\n- `@dependabot ignore this major version` will close this PR and stop Dependabot creating any more for this major version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this minor version` will close this PR and stop Dependabot creating any more for this minor version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this dependency` will close this PR and stop Dependabot creating any more for this dependency (unless you reopen the PR or upgrade to it yourself)\nYou can disable automated security fix PRs for this repo from the [Security Alerts page](https://github.com/BabylonJS/Babylon.js/network/alerts).\n\n</details>",
+                "author": {
+                    "name": "dependabot[bot]",
+                    "url": "https://github.com/apps/dependabot"
+                },
+                "files": [
+                    "package-lock.json",
+                    "package.json"
+                ],
+                "tags": [
+                    "dependencies",
+                    "javascript"
+                ]
+            },
+            {
+                "pr": "17909",
+                "title": "Fix focus mode for framge in node graphs",
+                "description": null,
+                "author": {
+                    "name": "deltakosh",
+                    "url": "https://github.com/deltakosh"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/nodeGraphSystem/graphFrame.module.scss",
+                    "packages/dev/sharedUiComponents/src/nodeGraphSystem/graphFrame.ts"
+                ],
+                "tags": [
+                    "bug"
+                ]
+            },
+            {
+                "pr": "17907",
+                "title": "Mesh: Optimize instance data access in WebGL",
+                "description": "See https://forum.babylonjs.com/t/10-fps-drop-between-big-babylon-versions/62428/10",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Meshes/instancedMesh.ts",
+                    "packages/dev/core/src/Meshes/mesh.ts"
+                ],
+                "tags": [
+                    "rendering engine",
+                    "optimizations"
+                ]
+            },
+            {
+                "pr": "17864",
+                "title": "fix (xr): Avoid tainting the mono scene UBO with stereo and vice versa",
+                "description": "This fixes visual artifact regressions in our WebXR app on multiples devices, it supercedes #17385 by @docEdub .\r\n\r\nScene UBOs could get the wrong layout (mono vs multiview) because createSceneUniformBuffer() is monkey-patched to return multiview UBOs whenever _multiviewSceneUbo exists. RTTs like shadow maps, reflection probes, and mirrors always render mono but were receiving multiview UBOs during XR sessions, causing visual artifacts in stereo.\r\n\r\nAdded a TODO comment for multiview-aware depth peeling, which I'm pretty sure it the cause of the transparency artifacts in our WebXR app. It's not technically part of the original forum post report, so I'm leaving it for a separate PR.",
+                "author": {
+                    "name": "matthargett",
+                    "url": "https://github.com/matthargett"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/Extensions/engine.multiview.ts",
+                    "packages/dev/core/src/Lights/Shadows/cascadedShadowGenerator.ts",
+                    "packages/dev/core/src/Lights/Shadows/shadowGenerator.ts",
+                    "packages/dev/core/src/Materials/Textures/mirrorTexture.ts",
+                    "packages/dev/core/src/Probes/reflectionProbe.ts",
+                    "packages/dev/core/src/Rendering/objectRenderer.ts",
+                    "packages/dev/core/src/Rendering/reflectiveShadowMap.ts",
+                    "packages/dev/core/src/Rendering/thinDepthPeelingRenderer.ts",
+                    "packages/dev/core/src/scene.ts"
+                ],
+                "tags": [
+                    "enhancement",
+                    "rendering engine"
+                ]
+            },
+            {
+                "pr": "17906",
+                "title": "Update gaussianSplattingMaterial",
+                "description": "Set GaussianSplattingMaxPart to 128 instead of 256 so Mac can compile shaders.",
+                "author": {
+                    "name": "petermart",
+                    "url": "https://github.com/petermart"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts"
+                ],
+                "tags": [
+                    "skip changelog"
+                ]
+            },
+            {
+                "pr": "17908",
+                "title": "Inspector v2: Fix child window on Firefox (and other non-chromium browsers)",
+                "description": "This change fixes child windows on Firefox (and probably other non-Chromium browsers). https://forum.babylonjs.com/t/introducing-inspector-v2/60937/157\r\n\r\nThe fix is simply to remove some unnecessary code. Previously we were trying to wait for `document.readyState === \"complete\"`, but this is not correct and not needed. You would do this if you were actually loading a url in the child window and needing to wait for it to load, but in our case we are creating a child window and directly rendering content to it from the client side. So waiting for `document.readyState === \"complete\"` is not necessary, and in fact doesn't even work on some browsers (like Firefox), where the readyState is \"uninitialized\" and stays in that state until a page is loaded. So simply remove this code fixes the issue. Tested in Edge, Chrome, Firefox, Opera, and Safari.\r\n\r\nAlso included one tiny fix for a regression in the Inspector v2 test app (type only import when in fact the enum is needed at runtime).",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/inspector-v2/test/app/index.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/hoc/childWindow.tsx"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
                 ]
             }
         ],
@@ -220,6 +453,74 @@
                 "tags": [
                     "bug",
                     "inspector"
+                ]
+            }
+        ],
+        "8.51.1": [
+            {
+                "pr": "17892",
+                "title": "Havok + FloatingOrigin: Dynamic re-regioning",
+                "description": "Currently if two objects are positioned far away from one another and are in separate regions, they cannot collide even if manually changing their positions or physics causes them to drift towards eachother. \r\n\r\nThis change solves both cases -- whether an object is 'teleported' to a new location (note that in order for this to work the user would have to enablePrestep, move body, then re-disablePreStep) or if the physics simulation causes them to drift towards one another \r\n\r\nNote that this implementation cleans up empty regions so we dont have unnecessarily large number of regions\r\n\r\nTested via /#7N17MT#20 -- launch ball tests the physics drift collision while move box swaps the boxes and tests the 'teleport' scenario\r\n\r\n#17451 ",
+                "author": {
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
+                },
+                "files": [
+                    "packages/dev/core/src/Physics/v2/Plugins/havokPlugin.ts"
+                ],
+                "tags": [
+                    "rendering engine",
+                    "physics",
+                    "new feature"
+                ]
+            },
+            {
+                "pr": "17885",
+                "title": "Animations: add support for animation retargeting",
+                "description": "Also in this PR:\r\n* added the possibility to clone animation keys when cloning an animation\r\n* added helper methods adding to the `Skeleton` class (`findBoneFromLinkedTransformNode`, `findBoneFromLinkedTransformNodeName` and `CreateSkeletonFromTransformNodeHierarchy`)\r\n* fixed local axes not showing up when enabling the option in the skeleton viewer debug component\r\n* fixed DISPLAY_SPHERES mode not working in skeleton viewer\r\n* added the possibility to choose which camera to use with the gizmo manager in Inspector V2\r\n\r\nWriting the documentation is the next step on my list!\r\n\r\nHere's a screenshot of the change to Inspector v2:\r\n<img width=\"584\" height=\"300\" alt=\"image\" src=\"https://github.com/user-attachments/assets/411641b4-a638-40c4-98c7-ef59f3cfc0eb\" />\r\n\r\nAutomatic is the default (existing) behavior, which is to use the value of `scene.activeCamera` at the time the gizmos need to use a camera.\r\n",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Animations/animation.ts",
+                    "packages/dev/core/src/Animations/animationGroup.ts",
+                    "packages/dev/core/src/Animations/animatorAvatar.ts",
+                    "packages/dev/core/src/Animations/index.ts",
+                    "packages/dev/core/src/Bones/index.ts",
+                    "packages/dev/core/src/Bones/skeleton.functions.ts",
+                    "packages/dev/core/src/Bones/skeleton.ts",
+                    "packages/dev/core/src/Debug/skeletonViewer.ts",
+                    "packages/dev/core/src/Morph/morphTarget.ts",
+                    "packages/dev/core/src/Morph/morphTargetManager.ts",
+                    "packages/dev/inspector-v2/src/components/gizmoToolbar.tsx",
+                    "packages/dev/inspector-v2/src/services/gizmoService.ts",
+                    "packages/dev/inspector-v2/src/services/gizmoToolbarService.tsx"
+                ],
+                "tags": [
+                    "inspector",
+                    "animations",
+                    "new feature"
+                ]
+            },
+            {
+                "pr": "17887",
+                "title": "Gaussian Splatting GPU Picking",
+                "description": "<img width=\"1318\" height=\"1392\" alt=\"image\" src=\"https://github.com/user-attachments/assets/fcc5b17a-0341-4649-97a5-13aafc9b80dd\" />\r\n\r\nhttps://playground.babylonjs.com/?snapshot=refs/pull/17887/merge#3LNCE6#36",
+                "author": {
+                    "name": "spsDrop",
+                    "url": "https://github.com/spsDrop"
+                },
+                "files": [
+                    "packages/dev/core/src/Collisions/gpuPicker.ts",
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingGpuPickingMaterialPlugin.ts",
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts",
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingSolidColorMaterialPlugin.ts",
+                    "packages/dev/core/src/Materials/index.ts",
+                    "packages/dev/core/src/Meshes/GaussianSplatting/gaussianSplattingMesh.ts"
+                ],
+                "tags": [
+                    "Gaussian Splatting"
                 ]
             }
         ],
