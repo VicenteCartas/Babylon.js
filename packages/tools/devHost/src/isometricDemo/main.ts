@@ -10,6 +10,7 @@ import { Tilemap2D } from "2d/Tilemap/tilemap2D";
 import { Tween, TweenManager } from "2d/Tween/tween";
 import { Easing } from "2d/Tween/easing";
 import { Text2D } from "2d/Text2D/text2D";
+import { DebugRenderer2D } from "2d/Debug/debugRenderer2D";
 import { Vector2 } from "core/Maths/math.vector";
 import { Color4 } from "core/Maths/math.color";
 
@@ -44,11 +45,12 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
 
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:absolute;top:10px;left:10px;color:#fff;font-family:monospace;font-size:13px;z-index:10;pointer-events:none;background:rgba(0,0,0,0.5);padding:8px;border-radius:4px;";
-    overlay.innerHTML = "WASD/Arrows Pan &nbsp; Click to move unit<br>Babylon.js 2D Isometric Demo" +
+    overlay.innerHTML = "WASD/Arrows Pan &nbsp; Click to move unit &nbsp; <b>F3 Debug</b><br>Babylon.js 2D Isometric Demo" +
         `<br><br><b>Features:</b> IsometricGrid, AStarPathfinder, Camera2D (pan + design resolution), InputMap2D, Sprite2D,` +
-        `<br>&nbsp;&nbsp;Tilemap2D (animated water tiles), Tween (smooth path movement), Text2D (hover info)` +
+        `<br>&nbsp;&nbsp;Tilemap2D (animated water tiles), Tween (smooth path movement), Text2D (hover info),` +
+        `<br>&nbsp;&nbsp;<b>DebugRenderer2D</b> (pathfinding grid overlay)` +
         `<br><b>Sources:</b> Isometric/isometricGrid.ts · Pathfinding/aStarPathfinder.ts · Tilemap/tilemap2D.ts` +
-        `<br>&nbsp;&nbsp;Tween/tween.ts · Text2D/text2D.ts · Camera2D/camera2D.ts · Input/inputMap2D.ts`;
+        `<br>&nbsp;&nbsp;Tween/tween.ts · Text2D/text2D.ts · Camera2D/camera2D.ts · Input/inputMap2D.ts · <b>Debug/debugRenderer2D.ts</b>`;
     mainDiv.appendChild(overlay);
 
     const engine = new Engine(canvas, true);
@@ -71,6 +73,23 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     input.defineAction("panLeft", { type: "key", key: "ArrowLeft" }, { type: "key", key: "KeyA" });
     input.defineAction("panRight", { type: "key", key: "ArrowRight" }, { type: "key", key: "KeyD" });
     input.defineAction("click", { type: "mouseButton", button: 0 });
+
+    // ─── DebugRenderer2D ─────────────────────────────────────────────
+    const debugRenderer = new DebugRenderer2D(engine);
+    debugRenderer.pathfinder = pathfinder;
+    debugRenderer.pathfinderGrid = isoGrid;
+    debugRenderer.enabled = false;
+    let debugMode = false;
+
+    // Toggle debug mode with F3
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "F3") {
+            e.preventDefault();
+            debugMode = !debugMode;
+            debugRenderer.enabled = debugMode;
+            debugRenderer.showPathfindingGrid = debugMode;
+        }
+    });
 
     // Terrain — procedural, stored in Tilemap2D for animated tile support
     const terrainGids: number[] = [];
@@ -217,6 +236,17 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     hoverText.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
     scene.addNode(hoverText);
 
+    // Debug mode indicator
+    const debugIndicator = new Text2D("debugIndicator", "", {
+        font: "bold 14px monospace",
+        color: "#ff0000",
+        textAlign: "left",
+        textBaseline: "top",
+    });
+    debugIndicator.sortingLayer = 1001;
+    debugIndicator.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
+    scene.addNode(debugIndicator);
+
     // Game loop
     let lastTime = performance.now();
 
@@ -254,6 +284,15 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         hoverText.position.x = cx;
         hoverText.position.y = cy + DESIGN_H / 2 - 10;
 
+        // Debug mode indicator: top-left
+        if (debugMode) {
+            debugIndicator.text = "[F3] DEBUG";
+            debugIndicator.position.x = cx - DESIGN_W / 2 + 4;
+            debugIndicator.position.y = cy - DESIGN_H / 2 + 4;
+        } else {
+            debugIndicator.text = "";
+        }
+
         // Click → pathfind and move (using Tween)
         if (input.isActionPressed("click") && !isMoving) {
             if (isoGrid.inBounds(hoverTile.col, hoverTile.row) && getBaseGid(hoverTile.col, hoverTile.row) === 3) {
@@ -288,6 +327,14 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         scene.update(dt);
         camera.update(dt);
         scene.render();
+
+        // ── DebugRenderer2D ──
+        if (debugMode && debugRenderer.isReady) {
+            const viewTransform = camera.getViewTransform();
+            const vpWidth = engine.getRenderWidth();
+            const vpHeight = engine.getRenderHeight();
+            debugRenderer.render(viewTransform, vpWidth, vpHeight);
+        }
     });
 
     window.addEventListener("resize", () => {

@@ -13,6 +13,7 @@ import { Easing } from "2d/Tween/easing";
 import { Text2D } from "2d/Text2D/text2D";
 import { NineSliceSprite2D } from "2d/NineSlice/nineSliceSprite2D";
 import { StateMachine2D } from "2d/StateMachine/stateMachine";
+import { DebugRenderer2D } from "2d/Debug/debugRenderer2D";
 import { Vector2 } from "core/Maths/math.vector";
 import { Color4 } from "core/Maths/math.color";
 
@@ -68,6 +69,22 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     const input = new InputMap2D(engine, camera);
     input.defineAction("click", { type: "mouseButton", button: 0 });
     input.defineAction("endTurn", { type: "key", key: "KeyE" }, { type: "key", key: "Enter" });
+
+    // ─── DebugRenderer2D ─────────────────────────────────────────────
+    const debugRenderer = new DebugRenderer2D(engine);
+    debugRenderer.pathfinderGrid = grid;
+    debugRenderer.enabled = false;
+    let debugMode = false;
+
+    // Toggle debug mode with F3
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "F3") {
+            e.preventDefault();
+            debugMode = !debugMode;
+            debugRenderer.enabled = debugMode;
+            debugRenderer.showPathfindingGrid = debugMode;
+        }
+    });
 
     // Terrain: 0=grass, 1=wall
     const terrain: number[][] = [];
@@ -207,6 +224,18 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     turnText.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
     scene.addNode(turnText);
 
+    // Debug mode indicator
+    const debugIndicator = new Text2D("debugIndicator", "", {
+        font: "bold 14px monospace",
+        color: "#ff0000",
+        textAlign: "right",
+        textBaseline: "top",
+    });
+    debugIndicator.sortingLayer = 101;
+    debugIndicator.zIndex = 2;
+    debugIndicator.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
+    scene.addNode(debugIndicator);
+
     function updateHUD(): void {
         const cx = camera.position.x;
         const cy = camera.position.y;
@@ -238,6 +267,15 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         statusPanel.position.y = cy + DESIGN_H / 2 - 16;
         statusPanel.width = (statusText.width * TEXT_SCALE) + 16;
         statusPanel.height = (statusText.height * TEXT_SCALE) + 8;
+
+        // Debug mode indicator: top-right
+        if (debugMode) {
+            debugIndicator.text = "[F3] DEBUG";
+            debugIndicator.position.x = cx + DESIGN_W / 2 - 4;
+            debugIndicator.position.y = cy - DESIGN_H / 2 + 4;
+        } else {
+            debugIndicator.text = "";
+        }
     }
 
     // ─── StateMachine2D — enemy AI ───────────────────────────────────
@@ -482,11 +520,12 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
 
     function updateOverlay(): void {
         const teamName = currentTeam === 0 ? "Player (Blue)" : "Enemy (Red)";
-        overlay.innerHTML = `Turn ${turnNumber} — ${teamName} &nbsp; Click unit → move → attack &nbsp; Press E to end turn` +
+        overlay.innerHTML = `Turn ${turnNumber} — ${teamName} &nbsp; Click unit → move → attack &nbsp; Press E to end turn &nbsp; <b>F3 Debug</b>` +
             `<br><br><b>Features:</b> Grid2D (square), AStarPathfinder (reachable cells), Tween/Easing,` +
-            `<br>&nbsp;&nbsp;NineSliceSprite2D (UI panels), Text2D (HUD), StateMachine2D (enemy AI), InputMap2D, Camera2D` +
+            `<br>&nbsp;&nbsp;NineSliceSprite2D (UI panels), Text2D (HUD), StateMachine2D (enemy AI), InputMap2D, Camera2D,` +
+            `<br>&nbsp;&nbsp;<b>DebugRenderer2D</b> (pathfinding grid overlay)` +
             `<br><b>Sources:</b> Grid/grid2D.ts · Pathfinding/aStarPathfinder.ts · Tween/tween.ts · NineSlice/nineSliceSprite2D.ts` +
-            `<br>&nbsp;&nbsp;Text2D/text2D.ts · StateMachine/stateMachine.ts · Input/inputMap2D.ts`;
+            `<br>&nbsp;&nbsp;Text2D/text2D.ts · StateMachine/stateMachine.ts · Input/inputMap2D.ts · <b>Debug/debugRenderer2D.ts</b>`;
     }
 
     // Game loop
@@ -621,6 +660,16 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         scene.update(dt);
         camera.update(dt);
         scene.render();
+
+        // ── DebugRenderer2D ──
+        if (debugMode && debugRenderer.isReady) {
+            // Update pathfinder reference with current state
+            debugRenderer.pathfinder = buildPathfinder();
+            const viewTransform = camera.getViewTransform();
+            const vpWidth = engine.getRenderWidth();
+            const vpHeight = engine.getRenderHeight();
+            debugRenderer.render(viewTransform, vpWidth, vpHeight);
+        }
     });
 
     window.addEventListener("resize", () => {

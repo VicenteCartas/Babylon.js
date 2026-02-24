@@ -22,3 +22,5 @@ export * from "./Text2D/index";
 export * from "./NineSlice/index";
 export * from "./Transition/index";
 export * from "./Debug/index";
+export * from "./ObjectPool/index";
+export * from "./SpriteAtlas/index";

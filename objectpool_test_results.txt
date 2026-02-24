@@ -1,0 +1,73 @@
+Running one project: unit
+  console.log
+    BJS - [19:10:40]: Babylon.js v8.52.0 - Null engine
+
+      at Function._LogEnabled (packages/dev/core/src/Misc/logger.ts:107:30)
+
+PASS unit packages/dev/2d/test/unit/babylon.objectpool.test.ts
+  ObjectPool
+    Basic Operations
+      ΓêÜ should create a pool with factory and reset functions (16 ms)
+      ΓêÜ should acquire a new object when pool is empty (10 ms)
+      ΓêÜ should release an object back to the pool (11 ms)
+      ΓêÜ should reuse released objects (5 ms)
+      ΓêÜ should handle multiple acquire and release cycles (17 ms)
+    Prewarm
+      ΓêÜ should prewarm the pool with specified number of objects (6 ms)
+      ΓêÜ should respect maxPoolSize during prewarm (4 ms)
+      ΓêÜ should throw when trying to prewarm a disposed pool (10 ms)
+    Pool Capacity
+      ΓêÜ should enforce maxPoolSize (3 ms)
+      ΓêÜ should allow unlimited pool size when maxPoolSize is undefined (2 ms)
+    IPoolable Interface
+      ΓêÜ should call onAcquire when object is acquired (1 ms)
+      ΓêÜ should call onRelease when object is released (1 ms)
+    Node2D Integration
+      ΓêÜ should remove Node2D from parent when released (32 ms)
+    Clear and Dispose
+      ΓêÜ should clear all free objects (4 ms)
+      ΓêÜ should not affect active objects when clearing (8 ms)
+      ΓêÜ should dispose the pool (11 ms)
+      ΓêÜ should throw when acquiring from disposed pool (2 ms)
+      ΓêÜ should silently ignore release to disposed pool (2 ms)
+      ΓêÜ should handle multiple dispose calls gracefully (2 ms)
+    Stats and Debugging
+      ΓêÜ should track activeCount correctly (10 ms)
+      ΓêÜ should track freeCount correctly (10 ms)
+      ΓêÜ should track totalCreated correctly (12 ms)
+      ΓêÜ should have a readable name (3 ms)
+      ΓêÜ should have a default name when not specified (2 ms)
+    Edge Cases
+      ΓêÜ should handle releasing the same object twice gracefully (4 ms)
+      ΓêÜ should handle releasing an object not from the pool (4 ms)
+      ΓêÜ should handle empty pool operations (3 ms)
+      ΓêÜ should handle releasing objects from a different pool (7 ms)
+      ΓêÜ should handle maxPoolSize of 0 (5 ms)
+      ΓêÜ should handle maxPoolSize of 1 (2 ms)
+      ΓêÜ should handle clear on disposed pool (4 ms)
+      ΓêÜ should handle very large prewarm values (7 ms)
+      ΓêÜ should handle very large prewarm with maxPoolSize (4 ms)
+      ΓêÜ should handle reset function that throws errors (2 ms)
+      ΓêÜ should handle factory that throws errors (5 ms)
+    Stress Testing
+      ΓêÜ should handle rapid acquire/release cycles (5 ms)
+      ΓêÜ should handle interleaved acquire/release patterns (5 ms)
+      ΓêÜ should maintain stats consistency under stress (402 ms)
+      ΓêÜ should handle high churn rate efficiently (5 ms)
+    Lifecycle Hooks
+      ΓêÜ should call onAcquire and onRelease in correct order (5 ms)
+      ΓêÜ should handle onAcquire throwing errors (3 ms)
+      ΓêÜ should handle onRelease throwing errors (3 ms)
+      ΓêÜ should not call lifecycle hooks for objects without IPoolable (2 ms)
+    Memory Management
+      ΓêÜ should properly discard objects exceeding maxPoolSize (8 ms)
+      ΓêÜ should properly clean up on dispose (10 ms)
+    Concurrency Simulation
+      ΓêÜ should handle stats counters correctly with multiple operations (14 ms)
+      ΓêÜ should handle rapid state changes correctly (289 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       47 passed, 47 total
+Snapshots:   0 total
+Time:        1.835 s, estimated 3 s
+Ran all test suites matching /babylon\.objectpool\.test/i.
