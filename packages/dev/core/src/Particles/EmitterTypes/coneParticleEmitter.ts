@@ -224,11 +224,17 @@ export class ConeParticleEmitter implements IParticleEmitterType {
         this.angle = serializationObject.angle;
         this.directionRandomizer = serializationObject.directionRandomizer;
 
-        this.radiusRange = serializationObject.radiusRange !== undefined ? serializationObject.radiusRange : 1;
-        this.heightRange = serializationObject.heightRange !== undefined ? serializationObject.heightRange : 1;
-        this.emitFromSpawnPointOnly = serializationObject.emitFromSpawnPointOnly !== undefined ? serializationObject.emitFromSpawnPointOnly : false;
+        this.radiusRange = serializationObject.radiusRange ?? 1;
+        this.heightRange = serializationObject.heightRange ?? 1;
+        this.emitFromSpawnPointOnly = serializationObject.emitFromSpawnPointOnly ?? false;
     }
 }
+
+/**
+ * Particle emitter emitting particles from the inside of a cone.
+ * It emits the particles alongside the cone volume from the base to the particle.
+ * The emission direction is defined by the direction1 and direction2 properties.
+ */
 export class ConeDirectedParticleEmitter extends ConeParticleEmitter {
     constructor(
         radius = 1,
