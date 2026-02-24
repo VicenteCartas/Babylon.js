@@ -6,6 +6,7 @@ import { Vector3 } from "core/Maths/math.vector";
 import { ParticleSystem } from "core/Particles/particleSystem";
 import type { IParticleSystem } from "core/Particles/IParticleSystem";
 import type { AbstractMesh } from "core/Meshes/abstractMesh";
+import { Logger } from "core/Misc/logger";
 
 import type { Camera2D } from "../Camera2D/camera2D";
 
@@ -142,8 +143,7 @@ export class ParticleHelper2D {
         // ParticleSystem.parse() creates it in a scene; re-assigning is tricky.
         // This method is for documentation guidance — users should pass this.scene
         // when calling ParticleSystem.Parse() directly.
-        // eslint-disable-next-line no-console
-        console.warn("ParticleHelper2D.addParticleSystem: For best results, use ParticleSystem.Parse(data, this.scene) to create the system directly in the helper's scene.");
+        Logger.Warn("ParticleHelper2D.addParticleSystem: For best results, use ParticleSystem.Parse(data, this.scene) to create the system directly in the helper's scene.");
         void particleSystem;
     }
 

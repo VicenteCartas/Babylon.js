@@ -21,3 +21,4 @@ export * from "./Tween/index";
 export * from "./Text2D/index";
 export * from "./NineSlice/index";
 export * from "./Transition/index";
+export * from "./Debug/index";

@@ -98,6 +98,33 @@ export class Grid2D {
     }
 
     /**
+     * Converts a grid coordinate to world pixel position, writing the result into an existing Vector2.
+     * This avoids allocating a new Vector2 per call and is preferred in hot loops.
+     * @param col - Column
+     * @param row - Row
+     * @param result - The Vector2 to write the result into
+     * @returns The `result` vector, for chaining
+     */
+    public cellToWorldToRef(col: number, row: number, result: Vector2): Vector2 {
+        switch (this.topology) {
+            case GridTopology.Square:
+                result.x = col * this.cellSize + this.cellSize / 2;
+                result.y = row * this.cellSize + this.cellSize / 2;
+                return result;
+
+            case GridTopology.HexFlatTop:
+                result.x = this.cellSize * 1.5 * col;
+                result.y = this.cellSize * Math.sqrt(3) * (row + (col % 2 === 1 ? 0.5 : 0));
+                return result;
+
+            case GridTopology.HexPointyTop:
+                result.x = this.cellSize * Math.sqrt(3) * (col + (row % 2 === 1 ? 0.5 : 0));
+                result.y = this.cellSize * 1.5 * row;
+                return result;
+        }
+    }
+
+    /**
      * Converts a world pixel position to the nearest grid coordinate
      * @param worldX - World X position
      * @param worldY - World Y position

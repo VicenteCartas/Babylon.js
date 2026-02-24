@@ -79,6 +79,8 @@ export class Camera2D {
     private _shakeDuration: number = 0;
     private _shakeElapsed: number = 0;
     private _shakeOffset: Vector2 = Vector2.Zero();
+    private _viewTransform: Matrix2D = Matrix2D.Identity();
+    private _invertedViewTransform: Matrix2D = Matrix2D.Identity();
 
     /**
      * The viewport width in pixels (set by Scene2D from engine)
@@ -251,6 +253,7 @@ export class Camera2D {
     /**
      * Gets the camera's view transform matrix (world → view space).
      * This is the inverse of the camera's world position/rotation/zoom, used by the renderer.
+     * Returns a cached Matrix2D — do not store this reference across frames.
      * @returns The view Matrix2D
      */
     public getViewTransform(): Matrix2D {
@@ -271,7 +274,15 @@ export class Camera2D {
         const offsetX = this._viewportWidth / 2;
         const offsetY = this._viewportHeight / 2;
 
-        return new Matrix2D(a, b, c, d, -cx * a + cy * -c + offsetX, -cx * b + cy * -d + offsetY);
+        const m = this._viewTransform.m;
+        m[0] = a;
+        m[1] = b;
+        m[2] = c;
+        m[3] = d;
+        m[4] = -cx * a + cy * -c + offsetX;
+        m[5] = -cx * b + cy * -d + offsetY;
+
+        return this._viewTransform;
     }
 
     /**
@@ -280,7 +291,7 @@ export class Camera2D {
      * @returns The corresponding world position
      */
     public screenToWorld(screenPos: Vector2): Vector2 {
-        const inv = this.getViewTransform().invert();
+        const inv = this.getViewTransform().invertToRef(this._invertedViewTransform);
         return inv.transformPoint(screenPos);
     }
 

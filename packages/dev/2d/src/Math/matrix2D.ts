@@ -83,16 +83,36 @@ export class Matrix2D {
      * @returns A new composed Matrix2D
      */
     public static Compose(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2, skewX: number = 0, skewY: number = 0): Matrix2D {
+        return Matrix2D.ComposeToRef(position, rotation, scale, pivot, skewX, skewY, new Matrix2D());
+    }
+
+    /**
+     * Composes a matrix from translation, rotation, scale, and pivot, storing the result in ref
+     * @param position - Translation
+     * @param rotation - Rotation angle in radians
+     * @param scale - Scale factors
+     * @param pivot - Pivot point (rotation/scale center relative to self)
+     * @param skewX - Skew along X axis in radians
+     * @param skewY - Skew along Y axis in radians
+     * @param ref - The matrix to store the result in
+     * @returns The ref matrix for chaining
+     */
+    public static ComposeToRef(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2, skewX: number, skewY: number, ref: Matrix2D): Matrix2D {
         const a = Math.cos(rotation + skewY) * scale.x;
         const b = Math.sin(rotation + skewY) * scale.x;
         const c = -Math.sin(rotation + skewX) * scale.y;
         const d = Math.cos(rotation + skewX) * scale.y;
         const px = pivot.x;
         const py = pivot.y;
-        const tx = position.x - px * a - py * c;
-        const ty = position.y - px * b - py * d;
 
-        return new Matrix2D(a, b, c, d, tx, ty);
+        ref.m[0] = a;
+        ref.m[1] = b;
+        ref.m[2] = c;
+        ref.m[3] = d;
+        ref.m[4] = position.x - px * a - py * c;
+        ref.m[5] = position.y - px * b - py * d;
+
+        return ref;
     }
 
     /**
@@ -101,17 +121,34 @@ export class Matrix2D {
      * @returns A new Matrix2D containing the result
      */
     public multiply(other: Matrix2D): Matrix2D {
+        return this.multiplyToRef(other, new Matrix2D());
+    }
+
+    /**
+     * Multiplies two matrices (this * other) and stores the result in ref
+     * @param other - The matrix to multiply with
+     * @param ref - The matrix to store the result in
+     * @returns The ref matrix for chaining
+     */
+    public multiplyToRef(other: Matrix2D, ref: Matrix2D): Matrix2D {
         const a = this.m;
         const b = other.m;
 
-        return new Matrix2D(
-            a[0] * b[0] + a[2] * b[1],
-            a[1] * b[0] + a[3] * b[1],
-            a[0] * b[2] + a[2] * b[3],
-            a[1] * b[2] + a[3] * b[3],
-            a[0] * b[4] + a[2] * b[5] + a[4],
-            a[1] * b[4] + a[3] * b[5] + a[5]
-        );
+        const r0 = a[0] * b[0] + a[2] * b[1];
+        const r1 = a[1] * b[0] + a[3] * b[1];
+        const r2 = a[0] * b[2] + a[2] * b[3];
+        const r3 = a[1] * b[2] + a[3] * b[3];
+        const r4 = a[0] * b[4] + a[2] * b[5] + a[4];
+        const r5 = a[1] * b[4] + a[3] * b[5] + a[5];
+
+        ref.m[0] = r0;
+        ref.m[1] = r1;
+        ref.m[2] = r2;
+        ref.m[3] = r3;
+        ref.m[4] = r4;
+        ref.m[5] = r5;
+
+        return ref;
     }
 
     /**
@@ -153,15 +190,31 @@ export class Matrix2D {
      * @returns A new inverted Matrix2D, or identity if not invertible
      */
     public invert(): Matrix2D {
+        return this.invertToRef(new Matrix2D());
+    }
+
+    /**
+     * Computes the inverse of this matrix and stores the result in ref
+     * @param ref - The matrix to store the result in
+     * @returns The ref matrix, or identity if not invertible
+     */
+    public invertToRef(ref: Matrix2D): Matrix2D {
         const m = this.m;
         const det = m[0] * m[3] - m[1] * m[2];
 
         if (Math.abs(det) < 1e-10) {
-            return Matrix2D.Identity();
+            return ref.reset();
         }
 
         const invDet = 1.0 / det;
-        return new Matrix2D(m[3] * invDet, -m[1] * invDet, -m[2] * invDet, m[0] * invDet, (m[2] * m[5] - m[3] * m[4]) * invDet, (m[1] * m[4] - m[0] * m[5]) * invDet);
+        ref.m[0] = m[3] * invDet;
+        ref.m[1] = -m[1] * invDet;
+        ref.m[2] = -m[2] * invDet;
+        ref.m[3] = m[0] * invDet;
+        ref.m[4] = (m[2] * m[5] - m[3] * m[4]) * invDet;
+        ref.m[5] = (m[1] * m[4] - m[0] * m[5]) * invDet;
+
+        return ref;
     }
 
     /**

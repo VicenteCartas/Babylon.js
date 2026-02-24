@@ -3,7 +3,7 @@ import * as planck from "planck";
 
 import type { Node2D } from "../Node2D/node2D";
 import type { IRaycastHit2D } from "../Collision/collisionShapes";
-import type { IPhysicsEngine2D, IPhysicsBody2D, IPhysicsBody2DOptions, PhysicsContactCallback } from "./physicsEngine2D";
+import type { IPhysicsEngine2D, IPhysicsBody2D, IPhysicsBody2DOptions, PhysicsContactCallback, PhysicsShape2DOptions } from "./physicsEngine2D";
 import { PhysicsBodyType2D } from "./physicsEngine2D";
 
 /**
@@ -45,13 +45,27 @@ class PlanckBody2D implements IPhysicsBody2D {
     public readonly planckBody: planck.Body;
 
     /**
+     * The body type (static, dynamic, kinematic)
+     */
+    public readonly bodyType: PhysicsBodyType2D;
+
+    /**
+     * The shape options used to create this body
+     */
+    public readonly shapeOptions: PhysicsShape2DOptions;
+
+    /**
      * Creates a new PlanckBody2D wrapper
      * @param node - The Node2D
      * @param body - The Planck body
+     * @param bodyType - The body type
+     * @param shapeOptions - The shape configuration
      */
-    constructor(node: Node2D, body: planck.Body) {
+    constructor(node: Node2D, body: planck.Body, bodyType: PhysicsBodyType2D, shapeOptions: PhysicsShape2DOptions) {
         this.node = node;
         this.planckBody = body;
+        this.bodyType = bodyType;
+        this.shapeOptions = shapeOptions;
     }
 
     /** @inheritdoc */
@@ -185,7 +199,7 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
             filterMaskBits: options.mask ?? 0xffff,
         });
 
-        const wrapper = new PlanckBody2D(node, body);
+        const wrapper = new PlanckBody2D(node, body, options.bodyType, options.shape);
         this._bodies.push(wrapper);
         this._bodyMap.set(body, wrapper);
 
@@ -268,5 +282,10 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
         this._bodyMap.clear();
         this._beginContactCallbacks.length = 0;
         this._endContactCallbacks.length = 0;
+    }
+
+    /** @inheritdoc */
+    public getAllBodies(): IPhysicsBody2D[] {
+        return this._bodies.slice();
     }
 }

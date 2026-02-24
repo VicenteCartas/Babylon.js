@@ -95,11 +95,11 @@ import { Node2D } from "../Node2D/node2D";
 import { SpriteBatchRenderer } from "../Rendering/spriteBatchRenderer";
 ```
 
-For core engine types, import from `@dev/core`:
+For core engine types, import from `"core/..."` with the full subpath:
 
 ```typescript
-import type { AbstractEngine } from "@dev/core";
-import { Color4 } from "@dev/core";
+import type { AbstractEngine } from "core/Engines/abstractEngine";
+import { Color4 } from "core/Maths/math.color";
 ```
 
 In test files, use **path aliases**:

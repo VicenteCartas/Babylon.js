@@ -81,6 +81,14 @@ export interface IPhysicsBody2D {
      */
     readonly node: Node2D;
     /**
+     * The body type (static, dynamic, kinematic)
+     */
+    readonly bodyType: PhysicsBodyType2D;
+    /**
+     * The shape options used to create this body (for debug rendering)
+     */
+    readonly shapeOptions: PhysicsShape2DOptions;
+    /**
      * Sets the linear velocity
      * @param velocity - Velocity in pixels/second
      */
@@ -168,4 +176,10 @@ export interface IPhysicsEngine2D {
      * Disposes the physics engine and all bodies
      */
     dispose(): void;
+    /**
+     * Gets all physics bodies currently in the simulation.
+     * Primarily used for debug rendering.
+     * @returns An array of all physics bodies
+     */
+    getAllBodies(): IPhysicsBody2D[];
 }

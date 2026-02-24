@@ -50,6 +50,39 @@ export class SpatialGrid {
     }
 
     /**
+     * Gets the cell size in pixels
+     */
+    public get cellSize(): number {
+        return this._cellSize;
+    }
+
+    /**
+     * Gets all collision entries currently stored in the grid
+     */
+    public get allEntries(): readonly ICollisionEntry[] {
+        return this._allEntries;
+    }
+
+    /**
+     * Gets the keys of all occupied cells.
+     * Each key encodes a cell coordinate as `row * 100000 + col`.
+     */
+    public get occupiedCellKeys(): IterableIterator<number> {
+        return this._cells.keys();
+    }
+
+    /**
+     * Decodes a cell key into its row and column components.
+     * @param key - The encoded cell key (`row * 100000 + col`)
+     * @returns An object with the decoded `row` and `col`
+     */
+    public static decodeCellKey(key: number): { row: number; col: number } {
+        const row = Math.floor(key / 100000);
+        const col = key - row * 100000;
+        return { row, col };
+    }
+
+    /**
      * Clears all entries from the grid
      */
     public clear(): void {

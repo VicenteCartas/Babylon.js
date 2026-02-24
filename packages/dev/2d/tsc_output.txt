@@ -1,0 +1,798 @@
+src/Physics/planckPhysicsEngine.ts(2,25): error TS2307: Cannot find module 'planck' or its corresponding type declarations.
+test/unit/babylon.debug-renderer2d.test.ts(301,19): error TS2339: Property 'drawFilledRect' does not exist on type 'DebugRenderer2D'.
+test/unit/babylon.lighting-particles-iso.test.ts(1,51): error TS6133: 'LightingMode2D' is declared but its value is never read.
+test/unit/babylon.nine-slice.test.ts(2,1): error TS6133: 'Matrix2D' is declared but its value is never read.
+test/unit/babylon.nine-slice.test.ts(247,19): error TS6133: '_' is declared but its value is never read.
+test/unit/babylon.scene-transition.test.ts(4,1): error TS6133: 'Easing' is declared but its value is never read.
+../core/src/Behaviors/Meshes/handConstraintBehavior.ts(133,24): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/Engines/abstractEngine.functions.ts(139,42): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number | ArrayBufferLike' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'number' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+../core/src/Engines/abstractEngine.functions.ts(146,43): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number | ArrayBufferLike' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'number' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+../core/src/Engines/abstractEngine.functions.ts(198,35): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number | ArrayBufferLike' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'number' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+../core/src/Engines/engineCapabilities.ts(90,18): error TS2304: Cannot find name 'EXT_disjoint_timer_query'.
+../core/src/Engines/Extensions/engine.query.ts(97,25): error TS2304: Cannot find name 'EXT_disjoint_timer_query'.
+../core/src/Engines/Extensions/engine.query.ts(107,25): error TS2304: Cannot find name 'EXT_disjoint_timer_query'.
+../core/src/Engines/Extensions/engine.query.ts(118,25): error TS2304: Cannot find name 'EXT_disjoint_timer_query'.
+../core/src/Engines/Extensions/engine.query.ts(127,25): error TS2304: Cannot find name 'EXT_disjoint_timer_query'.
+../core/src/Engines/Extensions/engine.rawTexture.ts(310,41): error TS2551: Property 'HALF_FLOAT_OES' does not exist on type 'WebGL2RenderingContext'. Did you mean 'HALF_FLOAT'?
+../core/src/Engines/IDrawContext.ts(20,26): error TS2552: Cannot find name 'GPUBuffer'. Did you mean 'Buffer'?
+../core/src/Engines/thinEngine.functions.ts(320,33): error TS2339: Property '__SPECTOR_rebuildProgram' does not exist on type 'WebGLProgram'.
+../core/src/Engines/thinEngine.ts(589,22): error TS2551: Property 'HALF_FLOAT_OES' does not exist on type 'WebGL2RenderingContext'. Did you mean 'HALF_FLOAT'?
+../core/src/Engines/thinEngine.ts(590,22): error TS2551: Property 'HALF_FLOAT_OES' does not exist on type 'WebGL2RenderingContext'. Did you mean 'HALF_FLOAT'?
+../core/src/Engines/thinEngine.ts(593,22): error TS2540: Cannot assign to 'RGBA16F' because it is a read-only property.
+../core/src/Engines/thinEngine.ts(596,22): error TS2540: Cannot assign to 'RGBA32F' because it is a read-only property.
+../core/src/Engines/thinEngine.ts(599,22): error TS2540: Cannot assign to 'DEPTH24_STENCIL8' because it is a read-only property.
+../core/src/Engines/thinEngine.ts(620,22): error TS2339: Property 'R16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(621,22): error TS2339: Property 'RG16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(622,22): error TS2339: Property 'RGB16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(623,22): error TS2339: Property 'RGBA16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(624,22): error TS2339: Property 'R16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(625,22): error TS2339: Property 'RG16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(626,22): error TS2339: Property 'RGB16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(627,22): error TS2339: Property 'RGBA16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(636,22): error TS2551: Property 'blendEquationSeparateIndexed' does not exist on type 'WebGL2RenderingContext'. Did you mean 'blendEquationSeparate'?
+../core/src/Engines/thinEngine.ts(637,22): error TS2339: Property 'blendEquationIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(638,22): error TS2551: Property 'blendFuncSeparateIndexed' does not exist on type 'WebGL2RenderingContext'. Did you mean 'blendFuncSeparate'?
+../core/src/Engines/thinEngine.ts(639,22): error TS2339: Property 'blendFuncIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(640,22): error TS2339: Property 'colorMaskIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(641,22): error TS2339: Property 'disableIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(642,22): error TS2339: Property 'enableIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(649,22): error TS2339: Property 'COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(652,22): error TS2339: Property 'COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(655,22): error TS2339: Property 'COMPRESSED_SRGB_S3TC_DXT1_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(656,22): error TS2339: Property 'COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(657,22): error TS2339: Property 'COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(660,22): error TS2339: Property 'COMPRESSED_SRGB8_ETC2' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(661,22): error TS2339: Property 'COMPRESSED_SRGB8_ALPHA8_ETC2_EAC' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(666,26): error TS2551: Property 'HALF_FLOAT_OES' does not exist on type 'WebGL2RenderingContext'. Did you mean 'HALF_FLOAT'?
+../core/src/Engines/thinEngine.ts(667,26): error TS2551: Property 'HALF_FLOAT_OES' does not exist on type 'WebGL2RenderingContext'. Did you mean 'HALF_FLOAT'?
+../core/src/Engines/thinEngine.ts(699,26): error TS2540: Cannot assign to 'UNSIGNED_INT_24_8' because it is a read-only property.
+../core/src/Engines/thinEngine.ts(763,26): error TS2540: Cannot assign to 'MAX' because it is a read-only property.
+../core/src/Engines/thinEngine.ts(764,26): error TS2540: Cannot assign to 'MIN' because it is a read-only property.
+../core/src/Engines/thinEngine.ts(1982,42): error TS2339: Property '__SPECTOR_rebuildProgram' does not exist on type 'WebGLProgram'.
+../core/src/Engines/thinEngine.ts(3377,45): error TS2339: Property 'COMPRESSED_SRGB8_ETC2' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3384,45): error TS2339: Property 'COMPRESSED_SRGB8_ALPHA8_ETC2_EAC' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3390,41): error TS2339: Property 'COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3393,41): error TS2339: Property 'COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3397,45): error TS2339: Property 'COMPRESSED_SRGB_S3TC_DXT1_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3405,45): error TS2339: Property 'COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3413,45): error TS2339: Property 'COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(3914,33): error TS2339: Property '_currentState' does not exist on type 'WebGLUniformLocation'.
+../core/src/Engines/thinEngine.ts(3918,17): error TS2339: Property '_currentState' does not exist on type 'WebGLUniformLocation'.
+../core/src/Engines/thinEngine.ts(4271,37): error TS2551: Property 'HALF_FLOAT_OES' does not exist on type 'WebGL2RenderingContext'. Did you mean 'HALF_FLOAT'?
+../core/src/Engines/thinEngine.ts(4452,41): error TS2339: Property 'R16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4454,41): error TS2339: Property 'RG16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4456,41): error TS2339: Property 'RGB16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4458,41): error TS2339: Property 'RGBA16_SNORM_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4473,41): error TS2339: Property 'R16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4475,41): error TS2339: Property 'RG16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4477,41): error TS2339: Property 'RGB16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinEngine.ts(4479,41): error TS2339: Property 'RGBA16_EXT' does not exist on type 'WebGL2RenderingContext'.
+../core/src/Engines/thinNativeEngine.ts(593,81): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number[] | ArrayBufferLike' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+        Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+          Types of property '[Symbol.toStringTag]' are incompatible.
+            Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+../core/src/Engines/thinWebGPUEngine.ts(45,28): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/thinWebGPUEngine.ts(47,28): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/thinWebGPUEngine.ts(50,41): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/thinWebGPUEngine.ts(138,72): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/Extensions/engine.computeShader.ts(19,118): error TS2304: Cannot find name 'GPUProgrammableStage'.
+../core/src/Engines/WebGPU/Extensions/engine.computeShader.ts(38,30): error TS2304: Cannot find name 'GPUComputePassDescriptor'.
+../core/src/Engines/WebGPU/Extensions/engine.computeShader.ts(213,62): error TS7006: Parameter 'info' implicitly has an 'any' type.
+../core/src/Engines/WebGPU/Extensions/engine.computeShader.ts(242,145): error TS2304: Cannot find name 'GPUProgrammableStage'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(15,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(16,44): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(18,54): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(18,76): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(22,42): error TS2304: Cannot find name 'GPUBufferUsageFlags'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(37,47): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(42,73): error TS2304: Cannot find name 'GPUBufferUsageFlags'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(42,137): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(54,70): error TS2304: Cannot find name 'GPUBufferUsageFlags'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(72,31): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(81,57): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(128,20): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(215,18): error TS7006: Parameter 'reason' implicitly has an 'any' type.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(228,47): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBufferManager.ts(237,76): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(6,21): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(24,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(42,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(55,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(68,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(69,51): error TS2304: Cannot find name 'GPUColor'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(81,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(94,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(104,21): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(110,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(123,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(124,29): error TS2304: Cannot find name 'GPURenderBundleEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(130,33): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(134,32): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(140,31): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(167,44): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(167,92): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(167,144): error TS2304: Cannot find name 'GPURenderBundleEncoder'.
+../core/src/Engines/WebGPU/webgpuBundleList.ts(183,28): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(28,24): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(48,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(74,25): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(98,145): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(99,25): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(275,79): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(276,49): error TS2304: Cannot find name 'GPUBufferBinding'.
+../core/src/Engines/WebGPU/webgpuCacheBindGroups.ts(277,49): error TS2304: Cannot find name 'GPUBufferBinding'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(99,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(102,58): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(116,34): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(118,27): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(126,40): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(147,25): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(183,83): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(184,83): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(189,33): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(197,104): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(325,35): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(395,42): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(506,52): error TS2304: Cannot find name 'GPUPrimitiveTopology'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(539,73): error TS2304: Cannot find name 'GPUBlendOperation'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(556,67): error TS2304: Cannot find name 'GPUBlendFactor'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(599,66): error TS2304: Cannot find name 'GPUCompareFunction'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(621,62): error TS2304: Cannot find name 'GPUStencilOperation'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(643,81): error TS2304: Cannot find name 'GPUVertexFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(730,63): error TS2304: Cannot find name 'GPUBlendComponent'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(742,64): error TS2304: Cannot find name 'GPUBlendComponent'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(924,82): error TS2304: Cannot find name 'GPUPipelineLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(929,33): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(945,98): error TS2304: Cannot find name 'GPUPipelineLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(985,33): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(998,56): error TS2304: Cannot find name 'GPUVertexBufferLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(999,28): error TS2304: Cannot find name 'GPUVertexBufferLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1005,35): error TS2304: Cannot find name 'GPUVertexAttribute'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1021,47): error TS2304: Cannot find name 'GPUVertexBufferLayout'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1035,13): error TS18048: 'currentGPUAttributes' is possibly 'undefined'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1047,61): error TS2304: Cannot find name 'GPUPrimitiveTopology'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1047,105): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1052,34): error TS2304: Cannot find name 'GPUColorTargetState'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1062,34): error TS2304: Cannot find name 'GPUColorTargetState'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1082,30): error TS2304: Cannot find name 'GPUColorTargetState'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1101,29): error TS2304: Cannot find name 'GPUStencilFaceState'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1108,28): error TS2304: Cannot find name 'GPUStencilFaceState'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipeline.ts(1117,31): error TS2304: Cannot find name 'GPUIndexFormat'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipelineTree.ts(8,22): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipelineTree.ts(69,74): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheRenderPipelineTree.ts(85,80): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(60,42): error TS2304: Cannot find name 'GPUSampler'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(61,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(65,25): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(90,20): error TS2304: Cannot find name 'GPUFilterMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(91,20): error TS2304: Cannot find name 'GPUFilterMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(92,23): error TS2304: Cannot find name 'GPUFilterMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(97,24): error TS2304: Cannot find name 'GPUFilterMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(97,50): error TS2304: Cannot find name 'GPUFilterMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(97,79): error TS2304: Cannot find name 'GPUFilterMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(230,52): error TS2304: Cannot find name 'GPUAddressMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(243,23): error TS2304: Cannot find name 'GPUAddressMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(244,23): error TS2304: Cannot find name 'GPUAddressMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(245,23): error TS2304: Cannot find name 'GPUAddressMode'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(254,84): error TS2304: Cannot find name 'GPUSamplerDescriptor'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(278,74): error TS2304: Cannot find name 'GPUCompareFunction'.
+../core/src/Engines/WebGPU/webgpuCacheSampler.ts(301,96): error TS2304: Cannot find name 'GPUSampler'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(22,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(26,42): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(27,34): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(28,44): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(31,42): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(36,35): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(45,25): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(57,30): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(62,17): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(63,26): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(63,49): error TS2304: Cannot find name 'GPURenderBundleEncoder'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(64,30): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuClearQuad.ts(180,38): error TS2304: Cannot find name 'GPURenderBundleEncoder'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(22,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(24,26): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(25,32): error TS2304: Cannot find name 'GPUBindGroupEntry'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(27,73): error TS2304: Cannot find name 'GPUComputePipeline'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(27,135): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(144,79): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(146,71): error TS2304: Cannot find name 'GPUBufferBinding'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(147,71): error TS2304: Cannot find name 'GPUBufferBinding'.
+../core/src/Engines/WebGPU/webgpuComputeContext.ts(182,25): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuComputePipelineContext.ts(14,28): error TS2304: Cannot find name 'GPUProgrammableStage'.
+../core/src/Engines/WebGPU/webgpuComputePipelineContext.ts(16,29): error TS2304: Cannot find name 'GPUComputePipeline'.
+../core/src/Engines/WebGPU/webgpuDrawContext.ts(20,25): error TS2304: Cannot find name 'GPURenderBundle'.
+../core/src/Engines/WebGPU/webgpuDrawContext.ts(24,25): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuDrawContext.ts(40,33): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(16,39): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(18,33): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(24,38): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(26,41): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(28,35): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(30,43): error TS2304: Cannot find name 'GPUBindGroup'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(35,38): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(38,33): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(40,47): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(46,60): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(63,27): error TS2304: Cannot find name 'GPUTextureView'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(64,37): error TS2304: Cannot find name 'GPUTextureView'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(65,20): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(68,28): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(74,35): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(82,33): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(87,28): error TS2304: Cannot find name 'GPUTextureViewDimension'.
+../core/src/Engines/WebGPU/webgpuHardwareTexture.ts(117,36): error TS2304: Cannot find name 'GPUTextureViewDescriptor'.
+../core/src/Engines/WebGPU/webgpuOcclusionQuery.ts(10,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuOcclusionQuery.ts(22,28): error TS2304: Cannot find name 'GPUQuerySet'.
+../core/src/Engines/WebGPU/webgpuOcclusionQuery.ts(44,47): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuPipelineContext.ts(15,18): error TS2304: Cannot find name 'GPUProgrammableStage'.
+../core/src/Engines/WebGPU/webgpuPipelineContext.ts(16,21): error TS2304: Cannot find name 'GPUProgrammableStage'.
+../core/src/Engines/WebGPU/webgpuPipelineContext.ts(40,56): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(11,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(16,24): error TS2304: Cannot find name 'GPUQuerySet'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(17,27): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(18,26): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(20,28): error TS2304: Cannot find name 'GPUQuerySet'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(24,79): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(51,65): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuQuerySet.ts(58,21): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuShaderProcessingContext.ts(35,18): error TS2304: Cannot find name 'GPUTextureSampleType'.
+../core/src/Engines/WebGPU/webgpuShaderProcessingContext.ts(41,11): error TS2304: Cannot find name 'GPUSamplerBindingType'.
+../core/src/Engines/WebGPU/webgpuShaderProcessingContext.ts(163,36): error TS2304: Cannot find name 'GPUBindGroupLayoutEntry'.
+../core/src/Engines/WebGPU/webgpuShaderProcessingContext.ts(165,30): error TS2304: Cannot find name 'GPUBindGroupEntry'.
+../core/src/Engines/WebGPU/webgpuShaderProcessor.ts(78,84): error TS2304: Cannot find name 'GPUTextureViewDimension'.
+../core/src/Engines/WebGPU/webgpuShaderProcessor.ts(174,28): error TS2304: Cannot find name 'GPUBindGroupEntry'.
+../core/src/Engines/WebGPU/webgpuShaderProcessor.ts(203,29): error TS2304: Cannot find name 'GPUTextureViewDimension'.
+../core/src/Engines/WebGPU/webgpuShaderProcessor.ts(204,26): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuShaderProcessor.ts(280,114): error TS2304: Cannot find name 'GPUBufferBindingType'.
+../core/src/Engines/WebGPU/webgpuShaderProcessorsWGSL.ts(31,81): error TS2304: Cannot find name 'GPUTextureViewDimension'.
+../core/src/Engines/WebGPU/webgpuShaderProcessorsWGSL.ts(198,127): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuSnapshotRendering.ts(65,45): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(15,52): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(144,57): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(306,72): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(310,64): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(322,46): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(382,96): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(602,65): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(718,44): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(729,42): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(742,53): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(752,46): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureHelper.ts(752,65): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(335,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(337,29): error TS2304: Cannot find name 'GPUSampler'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(338,28): error TS2304: Cannot find name 'GPUSampler'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(339,30): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(340,52): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(340,71): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(341,31): error TS2304: Cannot find name 'GPUShaderModule'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(342,57): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(342,76): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(343,36): error TS2304: Cannot find name 'GPUShaderModule'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(344,81): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(345,41): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(351,47): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(351,113): error TS2304: Cannot find name 'GPUFeatureName'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(373,34): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(373,126): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(373,145): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(493,39): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(493,116): error TS2304: Cannot find name 'GPURenderPipeline'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(493,135): error TS2304: Cannot find name 'GPUBindGroupLayout'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(543,39): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(547,89): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(547,141): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(559,37): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(579,27): error TS2304: Cannot find name 'GPUBindGroupDescriptor'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(611,26): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(614,17): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(624,26): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(641,34): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(704,31): error TS2304: Cannot find name 'GPUBindGroupDescriptor'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(787,17): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(789,26): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(794,8): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(846,17): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(848,26): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(852,8): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(898,49): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(898,125): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(900,143): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(920,45): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(920,136): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(929,34): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(932,29): error TS2339: Property '_mipmapGenRenderPassDescr' does not exist on type 'IHardwareTextureWrapper'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(932,73): error TS2339: Property '_mipmapGenRenderPassDescr' does not exist on type 'IHardwareTextureWrapper'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(933,29): error TS2339: Property '_mipmapGenBindGroup' does not exist on type 'IHardwareTextureWrapper'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(933,67): error TS2339: Property '_mipmapGenBindGroup' does not exist on type 'IHardwareTextureWrapper'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1153,42): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1153,62): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1170,49): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1170,76): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1170,105): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1182,37): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1194,27): error TS2304: Cannot find name 'GPUBindGroupDescriptor'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1233,21): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1236,17): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1254,18): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1258,17): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1271,32): error TS2304: Cannot find name 'GPUCopyExternalImageDestInfo'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1382,18): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1387,17): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/WebGPU/webgpuTextureManager.ts(1453,54): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(14,22): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(26,47): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(56,39): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(63,37): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(77,34): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(77,60): error TS2304: Cannot find name 'GPUComputePassDescriptor'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(108,47): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(113,27): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(117,32): error TS2304: Cannot find name 'GPUCommandEncoder'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(123,34): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/WebGPU/webgpuTimestampQuery.ts(123,60): error TS2304: Cannot find name 'GPUComputePassDescriptor'.
+../core/src/Engines/webgpuEngine.ts(104,44): error TS2304: Cannot find name 'GPUTextureViewDescriptor'.
+../core/src/Engines/webgpuEngine.ts(112,32): error TS2304: Cannot find name 'GPUTextureViewDescriptor'.
+../core/src/Engines/webgpuEngine.ts(123,36): error TS2304: Cannot find name 'GPURenderPassDescriptor'.
+../core/src/Engines/webgpuEngine.ts(125,45): error TS2304: Cannot find name 'GPUTextureViewDescriptor'.
+../core/src/Engines/webgpuEngine.ts(126,45): error TS2304: Cannot find name 'GPUTextureViewDescriptor'.
+../core/src/Engines/webgpuEngine.ts(128,25): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/webgpuEngine.ts(154,69): error TS2304: Cannot find name 'GPURequestAdapterOptions'.
+../core/src/Engines/webgpuEngine.ts(164,23): error TS2304: Cannot find name 'GPUPowerPreference'.
+../core/src/Engines/webgpuEngine.ts(176,24): error TS2304: Cannot find name 'GPUDeviceDescriptor'.
+../core/src/Engines/webgpuEngine.ts(193,23): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/webgpuEngine.ts(244,23): error TS2304: Cannot find name 'GPUAdapter'.
+../core/src/Engines/webgpuEngine.ts(245,42): error TS2304: Cannot find name 'GPUFeatureName'.
+../core/src/Engines/webgpuEngine.ts(246,27): error TS2304: Cannot find name 'GPUAdapterInfo'.
+../core/src/Engines/webgpuEngine.ts(255,38): error TS2304: Cannot find name 'GPUSupportedLimits'.
+../core/src/Engines/webgpuEngine.ts(257,21): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/webgpuEngine.ts(258,39): error TS2304: Cannot find name 'GPUFeatureName'.
+../core/src/Engines/webgpuEngine.ts(259,28): error TS2304: Cannot find name 'GPUSupportedLimits'.
+../core/src/Engines/webgpuEngine.ts(260,23): error TS2304: Cannot find name 'GPUCanvasContext'.
+../core/src/Engines/webgpuEngine.ts(317,27): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/webgpuEngine.ts(318,28): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/webgpuEngine.ts(319,34): error TS2304: Cannot find name 'GPUExtent3D'.
+../core/src/Engines/webgpuEngine.ts(320,34): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/webgpuEngine.ts(321,27): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/webgpuEngine.ts(327,30): error TS2304: Cannot find name 'GPUCommandBuffer'.
+../core/src/Engines/webgpuEngine.ts(453,27): error TS2339: Property 'gpu' does not exist on type 'Navigator'.
+../core/src/Engines/webgpuEngine.ts(455,25): error TS2339: Property 'gpu' does not exist on type 'Navigator'.
+../core/src/Engines/webgpuEngine.ts(459,33): error TS2304: Cannot find name 'GPUAdapter'.
+../core/src/Engines/webgpuEngine.ts(482,49): error TS2304: Cannot find name 'GPUFeatureName'.
+../core/src/Engines/webgpuEngine.ts(487,47): error TS2304: Cannot find name 'GPUFeatureName'.
+../core/src/Engines/webgpuEngine.ts(492,35): error TS2304: Cannot find name 'GPUSupportedLimits'.
+../core/src/Engines/webgpuEngine.ts(590,24): error TS2339: Property 'gpu' does not exist on type 'Navigator'.
+../core/src/Engines/webgpuEngine.ts(595,72): error TS2339: Property 'gpu' does not exist on type 'Navigator'.
+../core/src/Engines/webgpuEngine.ts(657,18): error TS2339: Property 'gpu' does not exist on type 'Navigator'.
+../core/src/Engines/webgpuEngine.ts(659,39): error TS2304: Cannot find name 'GPUAdapter'.
+../core/src/Engines/webgpuEngine.ts(666,58): error TS7006: Parameter 'feature' implicitly has an 'any' type.
+../core/src/Engines/webgpuEngine.ts(677,52): error TS2304: Cannot find name 'GPUFeatureName'.
+../core/src/Engines/webgpuEngine.ts(705,32): error TS2304: Cannot find name 'GPUDevice'.
+../core/src/Engines/webgpuEngine.ts(708,53): error TS7006: Parameter 'feature' implicitly has an 'any' type.
+../core/src/Engines/webgpuEngine.ts(714,71): error TS7006: Parameter 'event' implicitly has an 'any' type.
+../core/src/Engines/webgpuEngine.ts(716,100): error TS2304: Cannot find name 'GPUUncapturedErrorEvent'.
+../core/src/Engines/webgpuEngine.ts(726,50): error TS7006: Parameter 'info' implicitly has an 'any' type.
+../core/src/Engines/webgpuEngine.ts(962,82): error TS2304: Cannot find name 'GPUCanvasContext'.
+../core/src/Engines/webgpuEngine.ts(989,35): error TS2304: Cannot find name 'GPURenderPassColorAttachment'.
+../core/src/Engines/webgpuEngine.ts(992,42): error TS2304: Cannot find name 'GPUTextureDescriptor'.
+../core/src/Engines/webgpuEngine.ts(1036,39): error TS2304: Cannot find name 'GPUTextureDescriptor'.
+../core/src/Engines/webgpuEngine.ts(1050,36): error TS2304: Cannot find name 'GPURenderPassDepthStencilAttachment'.
+../core/src/Engines/webgpuEngine.ts(1270,38): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/webgpuEngine.ts(1524,95): error TS2304: Cannot find name 'GPUColor'.
+../core/src/Engines/webgpuEngine.ts(1636,35): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number | ArrayBuffer | SharedArrayBuffer' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'number' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+../core/src/Engines/webgpuEngine.ts(1762,35): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'number | ArrayBuffer | SharedArrayBuffer' is not assignable to parameter of type 'ArrayBuffer | ArrayLike<number>'.
+      Type 'number' is not assignable to type 'ArrayBuffer | ArrayLike<number>'.
+../core/src/Engines/webgpuEngine.ts(2555,39): error TS2304: Cannot find name 'GPUTexture'.
+../core/src/Engines/webgpuEngine.ts(3141,31): error TS2304: Cannot find name 'GPUTextureView'.
+../core/src/Engines/webgpuEngine.ts(3142,21): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/webgpuEngine.ts(3162,34): error TS2304: Cannot find name 'GPURenderPassColorAttachment'.
+../core/src/Engines/webgpuEngine.ts(3420,42): error TS2304: Cannot find name 'GPUTextureFormat'.
+../core/src/Engines/webgpuEngine.ts(3762,26): error TS2304: Cannot find name 'GPURenderPassEncoder'.
+../core/src/Engines/webgpuEngine.ts(3762,49): error TS2304: Cannot find name 'GPURenderBundleEncoder'.
+../core/src/Engines/webgpuEngine.ts(3856,67): error TS2304: Cannot find name 'GPURenderBundleEncoder'.
+../core/src/Engines/webgpuEngine.ts(4052,49): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Engines/webgpuEngine.ts(4072,22): error TS7006: Parameter 'reason' implicitly has an 'any' type.
+../core/src/FlowGraph/Blocks/Event/flowGraphMeshPickEventBlock.ts(96,38): error TS2352: Conversion of type 'IMouseEvent' to type 'PointerEvent' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'IMouseEvent' is missing the following properties from type 'PointerEvent': altitudeAngle, azimuthAngle, height, isPrimary, and 37 more.
+../core/src/Inputs/scene.inputManager.ts(355,13): error TS2339: Property 'inputIndex' does not exist on type 'PointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(357,57): error TS2345: Argument of type 'PointerEvent' is not assignable to parameter of type 'IPointerEvent'.
+  Property 'inputIndex' is missing in type 'PointerEvent' but required in type 'IPointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(360,46): error TS2345: Argument of type 'PointerEvent' is not assignable to parameter of type 'IPointerEvent'.
+  Property 'inputIndex' is missing in type 'PointerEvent' but required in type 'IPointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(371,13): error TS2339: Property 'inputIndex' does not exist on type 'PointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(373,57): error TS2345: Argument of type 'PointerEvent' is not assignable to parameter of type 'IPointerEvent'.
+  Property 'inputIndex' is missing in type 'PointerEvent' but required in type 'IPointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(377,46): error TS2345: Argument of type 'PointerEvent' is not assignable to parameter of type 'IPointerEvent'.
+  Property 'inputIndex' is missing in type 'PointerEvent' but required in type 'IPointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(482,13): error TS2339: Property 'inputIndex' does not exist on type 'PointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(491,57): error TS2345: Argument of type 'PointerEvent' is not assignable to parameter of type 'IPointerEvent'.
+  Property 'inputIndex' is missing in type 'PointerEvent' but required in type 'IPointerEvent'.
+../core/src/Inputs/scene.inputManager.ts(495,44): error TS2345: Argument of type 'PointerEvent' is not assignable to parameter of type 'IPointerEvent'.
+  Property 'inputIndex' is missing in type 'PointerEvent' but required in type 'IPointerEvent'.
+../core/src/Meshes/WebGPU/webgpuDataBuffer.ts(6,31): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Meshes/WebGPU/webgpuDataBuffer.ts(13,40): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Meshes/WebGPU/webgpuDataBuffer.ts(18,35): error TS2304: Cannot find name 'GPUBuffer'.
+../core/src/Misc/PerformanceViewer/performanceViewerCollectionStrategies.ts(78,69): error TS2304: Cannot find name 'PressureFactor'.
+../core/src/Misc/pressureObserverWrapper.ts(8,33): error TS2304: Cannot find name 'PressureObserver'.
+../core/src/Misc/pressureObserverWrapper.ts(9,28): error TS2304: Cannot find name 'PressureRecord'.
+../core/src/Misc/pressureObserverWrapper.ts(15,47): error TS2304: Cannot find name 'PressureRecord'.
+../core/src/Misc/pressureObserverWrapper.ts(21,27): error TS2304: Cannot find name 'PressureObserverOptions'.
+../core/src/Misc/pressureObserverWrapper.ts(23,34): error TS2304: Cannot find name 'PressureObserver'.
+../core/src/Misc/pressureObserverWrapper.ts(23,52): error TS7006: Parameter 'update' implicitly has an 'any' type.
+../core/src/Misc/pressureObserverWrapper.ts(34,23): error TS2304: Cannot find name 'PressureObserver'.
+../core/src/Misc/pressureObserverWrapper.ts(34,59): error TS2304: Cannot find name 'PressureObserver'.
+../core/src/Misc/pressureObserverWrapper.ts(34,92): error TS2304: Cannot find name 'PressureObserver'.
+../core/src/Misc/pressureObserverWrapper.ts(41,21): error TS2304: Cannot find name 'PressureSource'.
+../core/src/Misc/pressureObserverWrapper.ts(57,23): error TS2304: Cannot find name 'PressureSource'.
+../core/src/States/alphaCullingState.ts(165,25): error TS2339: Property 'enableIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/States/alphaCullingState.ts(167,25): error TS2339: Property 'disableIndexed' does not exist on type 'WebGL2RenderingContext'.
+../core/src/States/alphaCullingState.ts(178,21): error TS2551: Property 'blendFuncSeparateIndexed' does not exist on type 'WebGL2RenderingContext'. Did you mean 'blendFuncSeparate'?
+../core/src/States/alphaCullingState.ts(193,21): error TS2551: Property 'blendEquationSeparateIndexed' does not exist on type 'WebGL2RenderingContext'. Did you mean 'blendEquationSeparate'?
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(19,41): error TS2304: Cannot find name 'XRCompositionLayer'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(34,40): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(34,47): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(35,32): error TS2304: Cannot find name 'XRCompositionLayer'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(39,106): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(43,45): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(50,53): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(50,75): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(84,38): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(84,55): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(91,47): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(98,49): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(102,69): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/Layers/WebXRCompositionLayer.ts(112,60): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(13,41): error TS2304: Cannot find name 'XRProjectionLayer'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(15,22): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(33,40): error TS2304: Cannot find name 'XRProjectionLayer'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(37,26): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(44,39): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(44,48): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(48,57): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(52,55): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(60,69): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/Layers/WebXRProjectionLayer.ts(73,44): error TS2304: Cannot find name 'XRProjectionLayerInit'.
+../core/src/XR/features/WebXRAbstractFeature.ts(167,45): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRAnchorSystem.ts(45,15): error TS2304: Cannot find name 'XRAnchor'.
+../core/src/XR/features/WebXRAnchorSystem.ts(70,20): error TS2304: Cannot find name 'XRAnchor'.
+../core/src/XR/features/WebXRAnchorSystem.ts(90,23): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRAnchorSystem.ts(100,33): error TS2304: Cannot find name 'XRAnchorSet'.
+../core/src/XR/features/WebXRAnchorSystem.ts(104,45): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/features/WebXRAnchorSystem.ts(137,62): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/features/WebXRAnchorSystem.ts(197,23): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRAnchorSystem.ts(243,38): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRAnchorSystem.ts(308,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRAnchorSystem.ts(325,37): error TS7006: Parameter 'xrAnchor' implicitly has an 'any' type.
+../core/src/XR/features/WebXRAnchorSystem.ts(384,47): error TS2304: Cannot find name 'XRAnchor'.
+../core/src/XR/features/WebXRAnchorSystem.ts(393,48): error TS2304: Cannot find name 'XRAnchor'.
+../core/src/XR/features/WebXRAnchorSystem.ts(393,98): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRAnchorSystem.ts(413,72): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRAnchorSystem.ts(413,99): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRBackgroundRemover.ts(100,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRControllerMovement.ts(66,38): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRControllerMovement.ts(76,38): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRControllerMovement.ts(105,23): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRControllerMovement.ts(398,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(96,27): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(193,49): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(202,42): error TS2304: Cannot find name 'XREventType'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(202,65): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(416,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(731,49): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(743,47): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(790,106): error TS2304: Cannot find name 'XREventType'.
+../core/src/XR/features/WebXRControllerPointerSelection.ts(793,85): error TS2304: Cannot find name 'XREventType'.
+../core/src/XR/features/WebXRControllerTeleportation.ts(151,23): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRControllerTeleportation.ts(502,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRDepthSensing.ts(303,52): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRDepthSensing.ts(333,56): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRDepthSensing.ts(340,30): error TS2366: Function lacks ending return statement and return type does not include 'undefined'.
+../core/src/XR/features/WebXRDepthSensing.ts(352,35): error TS2366: Function lacks ending return statement and return type does not include 'undefined'.
+../core/src/XR/features/WebXRDepthSensing.ts(403,26): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRDepthSensing.ts(452,31): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRDepthSensing.ts(516,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRDepthSensing.ts(541,67): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRDepthSensing.ts(541,82): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRDepthSensing.ts(547,119): error TS2304: Cannot find name 'XRCPUDepthInformation'.
+../core/src/XR/features/WebXRDepthSensing.ts(596,76): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRDepthSensing.ts(596,98): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRDepthSensing.ts(601,117): error TS2304: Cannot find name 'XRWebGLDepthInformation'.
+../core/src/XR/features/WebXRDepthSensing.ts(641,63): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/features/WebXRDepthSensing.ts(647,31): error TS2304: Cannot find name 'XRDepthUsage'.
+../core/src/XR/features/WebXRDepthSensing.ts(655,36): error TS2304: Cannot find name 'XRDepthDataFormat'.
+../core/src/XR/features/WebXRDOMOverlay.ts(136,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRDOMOverlay.ts(144,63): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/features/WebXREyeTracking.ts(14,39): error TS2304: Cannot find name 'XRSpace'.
+../core/src/XR/features/WebXREyeTracking.ts(87,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXREyeTracking.ts(114,49): error TS2304: Cannot find name 'XREyeTrackingSourceEvent'.
+../core/src/XR/features/WebXRFeaturePointSystem.ts(104,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRHandTracking.ts(33,23): error TS2749: 'XRHand' refers to a value, but is being used as a type here. Did you mean 'typeof XRHand'?
+../core/src/XR/features/WebXRHandTracking.ts(66,89): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRHandTracking.ts(312,27): error TS2304: Cannot find name 'XRJointSpace'.
+../core/src/XR/features/WebXRHandTracking.ts(450,39): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRHandTracking.ts(450,64): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/features/WebXRHandTracking.ts(762,67): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRHandTracking.ts(844,44): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRHandTracking.ts(848,16): error TS7053: Element implicitly has an 'any' type because expression of type 'XRHandedness' can't be used to index type '{ left: Nullable<WebXRHand>; right: Nullable<WebXRHand>; }'.
+../core/src/XR/features/WebXRHandTracking.ts(959,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRHandTracking.ts(972,48): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ left: AbstractMesh[]; right: AbstractMesh[]; }'.
+../core/src/XR/features/WebXRHandTracking.ts(973,47): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ left: AbstractMesh; right: AbstractMesh; }'.
+../core/src/XR/features/WebXRHandTracking.ts(974,48): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ left: XRHandMeshRigMapping; right: XRHandMeshRigMapping; }'.
+../core/src/XR/features/WebXRHandTracking.ts(981,9): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ left: Nullable<WebXRHand>; right: Nullable<WebXRHand>; }'.
+../core/src/XR/features/WebXRHitTest.ts(43,19): error TS2304: Cannot find name 'XRHitTestTrackableType'.
+../core/src/XR/features/WebXRHitTest.ts(53,19): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/features/WebXRHitTest.ts(70,18): error TS2304: Cannot find name 'XRHitTestResult'.
+../core/src/XR/features/WebXRHitTest.ts(84,49): error TS2304: Cannot find name 'XRTransientInputHitTestSource'.
+../core/src/XR/features/WebXRHitTest.ts(86,40): error TS2304: Cannot find name 'XRHitTestSource'.
+../core/src/XR/features/WebXRHitTest.ts(87,51): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/features/WebXRHitTest.ts(91,31): error TS2304: Cannot find name 'XRRay'.
+../core/src/XR/features/WebXRHitTest.ts(92,31): error TS2304: Cannot find name 'XRHitTestOptionsInit'.
+../core/src/XR/features/WebXRHitTest.ts(104,84): error TS7006: Parameter 'hitTestSource' implicitly has an 'any' type.
+../core/src/XR/features/WebXRHitTest.ts(179,35): error TS2304: Cannot find name 'XRRay'.
+../core/src/XR/features/WebXRHitTest.ts(186,22): error TS7006: Parameter 'hitSource' implicitly has an 'any' type.
+../core/src/XR/features/WebXRHitTest.ts(224,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRHitTest.ts(243,65): error TS2304: Cannot find name 'XRHitTestResult'.
+../core/src/XR/features/WebXRHitTest.ts(243,98): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(47,18): error TS2304: Cannot find name 'XRHitResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(47,32): error TS2304: Cannot find name 'XRHitTestResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(76,36): error TS2304: Cannot find name 'XRHitResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(108,53): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(108,71): error TS2304: Cannot find name 'XRRay'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(108,94): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(108,130): error TS2304: Cannot find name 'XRHitResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(108,164): error TS2304: Cannot find name 'XRHitResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(120,57): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(120,93): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(120,120): error TS2304: Cannot find name 'XRHitResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(125,31): error TS2304: Cannot find name 'XRRay'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(171,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(185,25): error TS2304: Cannot find name 'XRRay'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(193,45): error TS2304: Cannot find name 'XRHitResult'.
+../core/src/XR/features/WebXRHitTestLegacy.ts(214,33): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRImageTracking.ts(48,24): error TS2304: Cannot find name 'XRImageTrackingResult'.
+../core/src/XR/features/WebXRImageTracking.ts(108,39): error TS2304: Cannot find name 'XRTrackedImageInit'.
+../core/src/XR/features/WebXRImageTracking.ts(174,63): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/features/WebXRImageTracking.ts(205,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRLayers.ts(14,32): error TS2304: Cannot find name 'XRWebGLLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(29,35): error TS2304: Cannot find name 'XRProjectionLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(52,30): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLayers.ts(56,54): error TS2304: Cannot find name 'XRCompositionLayer'.
+../core/src/XR/features/WebXRLayers.ts(57,49): error TS2304: Cannot find name 'XRCompositionLayer'.
+../core/src/XR/features/WebXRLayers.ts(80,36): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLayers.ts(109,27): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/features/WebXRLayers.ts(113,40): error TS2304: Cannot find name 'XRProjectionLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(113,64): error TS2304: Cannot find name 'XRQuadLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(128,40): error TS2304: Cannot find name 'XRProjectionLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(128,64): error TS2304: Cannot find name 'XRQuadLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(128,120): error TS2304: Cannot find name 'XRProjectionLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(128,144): error TS2304: Cannot find name 'XRQuadLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(157,57): error TS2304: Cannot find name 'XRQuadLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(159,57): error TS2304: Cannot find name 'XRProjectionLayer'.
+../core/src/XR/features/WebXRLayers.ts(160,58): error TS2304: Cannot find name 'XRProjectionLayer'.
+../core/src/XR/features/WebXRLayers.ts(161,32): error TS2304: Cannot find name 'XRQuadLayerInit'.
+../core/src/XR/features/WebXRLayers.ts(212,40): error TS2304: Cannot find name 'XRQuadLayer'.
+../core/src/XR/features/WebXRLayers.ts(216,31): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRLayers.ts(267,40): error TS2304: Cannot find name 'XRQuadLayer'.
+../core/src/XR/features/WebXRLayers.ts(273,31): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/features/WebXRLayers.ts(324,32): error TS2304: Cannot find name 'XRRenderStateInit'.
+../core/src/XR/features/WebXRLayers.ts(336,59): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLayers.ts(336,95): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLayers.ts(346,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRLayers.ts(353,88): error TS2304: Cannot find name 'XRCompositionLayer'.
+../core/src/XR/features/WebXRLightEstimation.ts(54,24): error TS2304: Cannot find name 'XRReflectionFormat'.
+../core/src/XR/features/WebXRLightEstimation.ts(102,40): error TS2304: Cannot find name 'XRLightEstimate'.
+../core/src/XR/features/WebXRLightEstimation.ts(103,37): error TS2304: Cannot find name 'XRLightProbe'.
+../core/src/XR/features/WebXRLightEstimation.ts(104,39): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLightEstimation.ts(211,32): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLightEstimation.ts(214,40): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRLightEstimation.ts(291,34): error TS2304: Cannot find name 'XRLightProbe'.
+../core/src/XR/features/WebXRLightEstimation.ts(353,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRMeshDetector.ts(28,32): error TS2304: Cannot find name 'XRGeometryDetectorOptions'.
+../core/src/XR/features/WebXRMeshDetector.ts(56,13): error TS2304: Cannot find name 'XRMesh'.
+../core/src/XR/features/WebXRMeshDetector.ts(98,34): error TS2304: Cannot find name 'XRMesh'.
+../core/src/XR/features/WebXRMeshDetector.ts(98,70): error TS2304: Cannot find name 'XRMesh'.
+../core/src/XR/features/WebXRMeshDetector.ts(170,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRMeshDetector.ts(180,42): error TS2304: Cannot find name 'XRMesh'.
+../core/src/XR/features/WebXRMeshDetector.ts(195,41): error TS7006: Parameter 'xrMesh' implicitly has an 'any' type.
+../core/src/XR/features/WebXRMeshDetector.ts(234,49): error TS2304: Cannot find name 'XRMesh'.
+../core/src/XR/features/WebXRMeshDetector.ts(234,99): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRMeshDetector.ts(282,78): error TS2345: Argument of type 'Float32Array<ArrayBufferLike> | undefined' is not assignable to parameter of type 'FloatArray'.
+  Type 'undefined' is not assignable to type 'FloatArray'.
+../core/src/XR/features/WebXRMeshDetector.ts(288,46): error TS2345: Argument of type 'Uint32Array<ArrayBufferLike> | undefined' is not assignable to parameter of type 'IndicesArray'.
+  Type 'undefined' is not assignable to type 'IndicesArray'.
+../core/src/XR/features/WebXRMeshDetector.ts(292,81): error TS2345: Argument of type 'Float32Array<ArrayBufferLike> | undefined' is not assignable to parameter of type 'FloatArray'.
+  Type 'undefined' is not assignable to type 'FloatArray'.
+../core/src/XR/features/WebXRMeshDetector.ts(298,49): error TS2345: Argument of type 'Uint32Array<ArrayBufferLike> | undefined' is not assignable to parameter of type 'IndicesArray'.
+  Type 'undefined' is not assignable to type 'IndicesArray'.
+../core/src/XR/features/WebXRNearInteraction.ts(36,41): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRNearInteraction.ts(52,34): error TS2304: Cannot find name 'XREventType'.
+../core/src/XR/features/WebXRNearInteraction.ts(52,57): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRNearInteraction.ts(115,27): error TS2304: Cannot find name 'XRHandedness'.
+../core/src/XR/features/WebXRNearInteraction.ts(469,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRNearInteraction.ts(753,49): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRNearInteraction.ts(769,47): error TS2304: Cannot find name 'XRInputSourceEvent'.
+../core/src/XR/features/WebXRNearInteraction.ts(814,106): error TS2304: Cannot find name 'XREventType'.
+../core/src/XR/features/WebXRNearInteraction.ts(816,85): error TS2304: Cannot find name 'XREventType'.
+../core/src/XR/features/WebXRPlaneDetector.ts(8,24): error TS2749: 'XRPlane' refers to a value, but is being used as a type here. Did you mean 'typeof XRPlane'?
+../core/src/XR/features/WebXRPlaneDetector.ts(26,32): error TS2304: Cannot find name 'XRGeometryDetectorOptions'.
+../core/src/XR/features/WebXRPlaneDetector.ts(52,14): error TS2749: 'XRPlane' refers to a value, but is being used as a type here. Did you mean 'typeof XRPlane'?
+../core/src/XR/features/WebXRPlaneDetector.ts(64,33): error TS2304: Cannot find name 'XRPlaneSet'.
+../core/src/XR/features/WebXRPlaneDetector.ts(168,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRPlaneDetector.ts(185,37): error TS7006: Parameter 'xrPlane' implicitly has an 'any' type.
+../core/src/XR/features/WebXRPlaneDetector.ts(230,46): error TS2749: 'XRPlane' refers to a value, but is being used as a type here. Did you mean 'typeof XRPlane'?
+../core/src/XR/features/WebXRPlaneDetector.ts(230,93): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRPlaneDetector.ts(231,56): error TS7006: Parameter 'xrPoint' implicitly has an 'any' type.
+../core/src/XR/features/WebXRPlaneDetector.ts(257,45): error TS2749: 'XRPlane' refers to a value, but is being used as a type here. Did you mean 'typeof XRPlane'?
+../core/src/XR/features/WebXRRawCameraAccess.ts(60,26): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRRawCameraAccess.ts(94,31): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRRawCameraAccess.ts(131,43): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRRawCameraAccess.ts(163,43): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRRawCameraAccess.ts(198,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRSpaceWarp.ts(133,40): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRSpaceWarp.ts(133,48): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/WebXRSpaceWarp.ts(134,47): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/WebXRSpaceWarp.ts(141,45): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRSpaceWarp.ts(146,39): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRSpaceWarp.ts(146,48): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/WebXRSpaceWarp.ts(154,45): error TS2304: Cannot find name 'XRProjectionLayer'.
+../core/src/XR/features/WebXRSpaceWarp.ts(158,69): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/WebXRSpaceWarp.ts(195,53): error TS2304: Cannot find name 'XRWebGLSubImage'.
+../core/src/XR/features/WebXRSpaceWarp.ts(195,76): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRSpaceWarp.ts(217,60): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRSpaceWarp.ts(230,37): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRSpaceWarp.ts(239,47): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/features/WebXRSpaceWarp.ts(243,48): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/features/WebXRSpaceWarp.ts(277,30): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRSpaceWarp.ts(304,36): error TS2304: Cannot find name 'XRWebGLBinding'.
+../core/src/XR/features/WebXRSpaceWarp.ts(334,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/features/WebXRWalkingLocomotion.ts(452,33): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/motionController/webXRAbstractMotionController.ts(451,39): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/motionController/webXRAbstractMotionController.ts(520,36): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/motionController/webXRAbstractMotionController.ts(554,46): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/motionController/webXRGenericHandController.ts(50,88): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRHTCViveMotionController.ts(99,71): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRMicrosoftMixedRealityController.ts(237,84): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRMotionControllerManager.ts(12,53): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRMotionControllerManager.ts(114,65): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRMotionControllerManager.ts(211,91): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRMotionControllerManager.ts(254,102): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRMotionControllerManager.ts(275,106): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXROculusHandController.ts(50,74): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXROculusTouchMotionController.ts(160,75): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXROculusTouchMotionController.ts(164,82): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRProfiledMotionController.ts(36,18): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/motionController/webXRProfiledMotionController.ts(146,38): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(4,34): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(6,26): error TS2304: Cannot find name 'XRSpace'.
+../core/src/XR/native/nativeXRFrame.ts(6,46): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/native/nativeXRFrame.ts(6,129): error TS2304: Cannot find name 'XRPose'.
+../core/src/XR/native/nativeXRFrame.ts(7,29): error TS2304: Cannot find name 'XRImageTrackingResult'.
+../core/src/XR/native/nativeXRFrame.ts(11,39): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(12,41): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/native/nativeXRFrame.ts(13,31): error TS2304: Cannot find name 'XRPose'.
+../core/src/XR/native/nativeXRFrame.ts(20,27): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/native/nativeXRFrame.ts(21,33): error TS2339: Property 'session' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(26,27): error TS2304: Cannot find name 'XRSpace'.
+../core/src/XR/native/nativeXRFrame.ts(26,47): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/native/nativeXRFrame.ts(26,66): error TS2304: Cannot find name 'XRPose'.
+../core/src/XR/native/nativeXRFrame.ts(44,50): error TS2339: Property 'fillPoses' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(46,54): error TS2339: Property 'getViewerPose' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(48,58): error TS2339: Property 'getHitTestResults' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(54,34): error TS2304: Cannot find name 'XRAnchorSet'.
+../core/src/XR/native/nativeXRFrame.ts(55,33): error TS2339: Property 'trackedAnchors' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(58,53): error TS2339: Property 'createAnchor' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(60,36): error TS2304: Cannot find name 'XRWorldInformation'.
+../core/src/XR/native/nativeXRFrame.ts(61,33): error TS2339: Property 'worldInformation' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(64,34): error TS2304: Cannot find name 'XRPlaneSet'.
+../core/src/XR/native/nativeXRFrame.ts(65,33): error TS2339: Property 'detectedPlanes' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(68,53): error TS2339: Property 'getJointPose' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(70,55): error TS2339: Property 'fillJointRadii' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(77,33): error TS2339: Property 'featurePointCloud' does not exist on type 'INativeXRFrame'.
+../core/src/XR/native/nativeXRFrame.ts(80,51): error TS2304: Cannot find name 'XRImageTrackingResult'.
+../core/src/XR/native/nativeXRFrame.ts(84,38): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/native/nativeXRFrame.ts(84,47): error TS2304: Cannot find name 'XRCPUDepthInformation'.
+../core/src/XR/native/nativeXRRenderTarget.ts(14,49): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/native/nativeXRRenderTarget.ts(31,27): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/native/nativeXRRenderTarget.ts(54,46): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/native/nativeXRRenderTarget.ts(59,48): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/native/nativeXRRenderTarget.ts(77,30): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/native/nativeXRRenderTarget.ts(85,52): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/native/nativeXRRenderTarget.ts(85,72): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRCamera.ts(57,32): error TS2304: Cannot find name 'XRViewerPose'.
+../core/src/XR/webXRCamera.ts(219,30): error TS2304: Cannot find name 'XRRenderStateInit'.
+../core/src/XR/webXRCamera.ts(393,35): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/webXREnterExitUI.ts(22,29): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXREnterExitUI.ts(24,36): error TS2304: Cannot find name 'XRReferenceSpaceType'.
+../core/src/XR/webXREnterExitUI.ts(47,26): error TS2304: Cannot find name 'XRReferenceSpaceType'.
+../core/src/XR/webXREnterExitUI.ts(56,19): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXREnterExitUI.ts(251,50): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRExperienceHelper.ts(130,22): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXRExperienceHelper.ts(131,29): error TS2304: Cannot find name 'XRReferenceSpaceType'.
+../core/src/XR/webXRExperienceHelper.ts(133,33): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/webXRExperienceHelper.ts(154,34): error TS2304: Cannot find name 'XRRenderStateInit'.
+../core/src/XR/webXRFeaturesManager.ts(82,55): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/webXRFeaturesManager.ts(581,60): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/webXRFeaturesManager.ts(581,84): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/webXRInput.ts(125,45): error TS2304: Cannot find name 'XRInputSourceChangeEvent'.
+../core/src/XR/webXRInput.ts(129,58): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/webXRInput.ts(129,98): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/webXRInputSource.ts(83,26): error TS2304: Cannot find name 'XRPose'.
+../core/src/XR/webXRInputSource.ts(95,29): error TS2304: Cannot find name 'XRInputSource'.
+../core/src/XR/webXRInputSource.ts(193,39): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/webXRInputSource.ts(193,64): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRLayerWrapper.ts(23,74): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRLayerWrapper.ts(32,35): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRLayerWrapper.ts(44,28): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRLayerWrapper.ts(71,32): error TS2304: Cannot find name 'XRLayer'.
+../core/src/XR/webXRManagedOutputCanvas.ts(22,28): error TS2304: Cannot find name 'XRWebGLLayerInit'.
+../core/src/XR/webXRManagedOutputCanvas.ts(67,30): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRManagedOutputCanvas.ts(74,48): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRManagedOutputCanvas.ts(126,40): error TS2339: Property 'makeXRCompatible' does not exist on type 'WebGL2RenderingContext'.
+../core/src/XR/webXRManagedOutputCanvas.ts(152,52): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRManagedOutputCanvas.ts(152,72): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRManagedOutputCanvas.ts(154,32): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRRenderTargetTextureProvider.ts(23,53): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRRenderTargetTextureProvider.ts(29,39): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/webXRRenderTargetTextureProvider.ts(35,41): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRRenderTargetTextureProvider.ts(43,69): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRRenderTargetTextureProvider.ts(44,55): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/webXRRenderTargetTextureProvider.ts(45,57): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRSessionManager.ts(23,30): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(27,27): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXRSessionManager.ts(34,32): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(38,35): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/webXRSessionManager.ts(49,44): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/webXRSessionManager.ts(49,70): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/webXRSessionManager.ts(53,50): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(61,40): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRSessionManager.ts(61,68): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRSessionManager.ts(66,54): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(66,89): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(75,21): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRSessionManager.ts(80,34): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(142,34): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(149,50): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(157,31): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXRSessionManager.ts(203,60): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRSessionManager.ts(212,46): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/webXRSessionManager.ts(221,48): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRSessionManager.ts(260,56): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXRSessionManager.ts(260,103): error TS2304: Cannot find name 'XRSessionInit'.
+../core/src/XR/webXRSessionManager.ts(260,132): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRSessionManager.ts(308,55): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXRSessionManager.ts(330,67): error TS2304: Cannot find name 'XRFrame'.
+../core/src/XR/webXRSessionManager.ts(369,65): error TS2304: Cannot find name 'XRReferenceSpaceType'.
+../core/src/XR/webXRSessionManager.ts(369,112): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(370,29): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(380,48): error TS2304: Cannot find name 'XRRigidTransform'.
+../core/src/XR/webXRSessionManager.ts(381,43): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(390,61): error TS2304: Cannot find name 'XRReferenceSpace'.
+../core/src/XR/webXRSessionManager.ts(404,48): error TS2304: Cannot find name 'XRRenderState'.
+../core/src/XR/webXRSessionManager.ts(430,37): error TS2304: Cannot find name 'XRRenderStateInit'.
+../core/src/XR/webXRSessionManager.ts(444,62): error TS2304: Cannot find name 'XRSessionMode'.
+../core/src/XR/webXRTypes.ts(57,23): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRTypes.ts(64,39): error TS2304: Cannot find name 'XRSession'.
+../core/src/XR/webXRTypes.ts(64,59): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRWebGLLayer.ts(17,49): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRWebGLLayer.ts(37,21): error TS2304: Cannot find name 'XRWebGLLayer'.
+../core/src/XR/webXRWebGLLayer.ts(51,60): error TS2304: Cannot find name 'XRView'.
+../core/src/XR/webXRWebGLLayer.ts(66,46): error TS2304: Cannot find name 'XREye'.
+../core/src/XR/webXRWebGLLayer.ts(86,48): error TS2304: Cannot find name 'XRView'.

@@ -1,0 +1,1508 @@
+PASS unit packages/dev/2d/test/unit/babylon.animated-tiles.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.math2d.test.ts
+FAIL unit packages/dev/2d/test/unit/babylon.public-getters.test.ts
+  ΓùÅ Test suite failed to run
+
+    Cannot find module 'planck' from 'packages/dev/2d/src/Physics/planckPhysicsEngine.ts'
+
+    Require stack:
+      packages/dev/2d/src/Physics/planckPhysicsEngine.ts
+      packages/dev/2d/test/unit/babylon.public-getters.test.ts
+
+      1 | import { Vector2 } from "core/Maths/math.vector";
+    > 2 | import * as planck from "planck";
+        | ^
+      3 |
+      4 | import type { Node2D } from "../Node2D/node2D";
+      5 | import type { IRaycastHit2D } from "../Collision/collisionShapes";
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.<anonymous> (packages/dev/2d/src/Physics/planckPhysicsEngine.ts:2:1)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.public-getters.test.ts:5:1)
+
+FAIL unit packages/dev/2d/test/unit/babylon.physics2d.test.ts
+  ΓùÅ Test suite failed to run
+
+    Cannot find module 'planck' from 'packages/dev/2d/src/Physics/planckPhysicsEngine.ts'
+
+    Require stack:
+      packages/dev/2d/src/Physics/planckPhysicsEngine.ts
+      packages/dev/2d/test/unit/babylon.physics2d.test.ts
+
+      1 | import { Vector2 } from "core/Maths/math.vector";
+    > 2 | import * as planck from "planck";
+        | ^
+      3 |
+      4 | import type { Node2D } from "../Node2D/node2D";
+      5 | import type { IRaycastHit2D } from "../Collision/collisionShapes";
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.<anonymous> (packages/dev/2d/src/Physics/planckPhysicsEngine.ts:2:1)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.physics2d.test.ts:2:1)
+
+PASS unit packages/dev/2d/test/unit/babylon.pathfinding-grid.test.ts
+FAIL unit packages/dev/2d/test/unit/babylon.debug-renderer2d.test.ts
+  ΓùÅ DebugRenderer2D ΓÇ║ drawFilledRect ΓÇ║ should draw 2 diagonal lines
+
+    TypeError: debug.drawFilledRect is not a function
+
+      299 |     describe("drawFilledRect", () => {
+      300 |         it("should draw 2 diagonal lines", () => {
+    > 301 |             debug.drawFilledRect(50, 50, 10, 10, new Color4(0.5, 0, 0, 0.3));
+          |                   ^
+      302 |             expect(lineCount(debug)).toBe(2);
+      303 |         });
+      304 |     });
+
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.debug-renderer2d.test.ts:301:19)
+
+  ΓùÅ DebugRenderer2D ΓÇ║ pathfinding grid collection ΓÇ║ should draw walkable and unwalkable cells
+
+    TypeError: grid.cellToWorldToRef is not a function
+
+      579 |             for (let col = 0; col < width; col++) {
+      580 |                 const walkable = pf.isWalkable(col, row);
+    > 581 |                 grid.cellToWorldToRef(col, row, tempVec);
+          |                      ^
+      582 |                 const halfSize = grid.cellSize / 2;
+      583 |
+      584 |                 if (!walkable) {
+
+      at DebugRenderer2D._collectPathfindingGrid (packages/dev/2d/src/Debug/debugRenderer2D.ts:581:22)
+      at DebugRenderer2D._collectFromSources (packages/dev/2d/src/Debug/debugRenderer2D.ts:454:18)
+      at DebugRenderer2D.render (packages/dev/2d/src/Debug/debugRenderer2D.ts:612:14)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.debug-renderer2d.test.ts:725:19)
+
+PASS unit packages/dev/2d/test/unit/babylon.text2d.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.camera2d-spritesheet.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.sprite2d.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.particle-helper2d.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.collision-tilemap.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.node2d.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.spatial-grid.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.state-machine.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.animated-sprite2d.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.tween.test.ts
+FAIL unit packages/dev/2d/test/unit/babylon.scene2d.test.ts
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should store the engine reference
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should have black background by default
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should have no camera by default
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should start with no root nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should not be disposed initially
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should add a root node
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should not add the same node twice
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should not add a node that has a parent
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should remove a root node
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should handle removing a node not in the scene
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should find a node by id
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should find child nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should return null for unknown id
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should unregister removed nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getAllNodes ΓÇ║ should return all registered nodes including children
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ update ΓÇ║ should call update on root nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ update ΓÇ║ should propagate to child nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ observables ΓÇ║ should fire onDispose when disposed
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should mark scene as disposed
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should clear all root nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should not throw when disposed twice
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should clear node lookup
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ sprite sorting order ΓÇ║ should maintain multiple sprite nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+PASS unit packages/dev/2d/test/unit/babylon.nine-slice.test.ts
+FAIL unit packages/dev/2d/test/unit/babylon.scene-transition.test.ts
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should start active
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:36:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should start with activeScene = from
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:44:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should add overlay to from scene
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:51:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should switch to 'to' scene after half duration
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:60:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should move overlay from 'from' to 'to' at midpoint
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:70:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should complete and call onComplete
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:80:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should remove overlay when done
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:101:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should use custom color
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:111:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should use default duration of 0.5
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:123:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should start active
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:136:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should offset 'to' camera at start (left slide)
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:143:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should restore 'to' camera at end
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:153:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should complete and call onComplete
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:164:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should support all 4 directions
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:183:30)
+
+  ΓùÅ SceneTransition2D ΓÇ║ after completion ΓÇ║ should not advance after done
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:197:26)
+
+PASS unit packages/dev/2d/test/unit/babylon.lighting-particles-iso.test.ts
+PASS unit packages/dev/2d/test/unit/babylon.input-map2d.test.ts
+
+Summary of all failing tests
+FAIL packages/dev/2d/test/unit/babylon.public-getters.test.ts
+  ΓùÅ Test suite failed to run
+
+    Cannot find module 'planck' from 'packages/dev/2d/src/Physics/planckPhysicsEngine.ts'
+
+    Require stack:
+      packages/dev/2d/src/Physics/planckPhysicsEngine.ts
+      packages/dev/2d/test/unit/babylon.public-getters.test.ts
+
+      1 | import { Vector2 } from "core/Maths/math.vector";
+    > 2 | import * as planck from "planck";
+        | ^
+      3 |
+      4 | import type { Node2D } from "../Node2D/node2D";
+      5 | import type { IRaycastHit2D } from "../Collision/collisionShapes";
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.<anonymous> (packages/dev/2d/src/Physics/planckPhysicsEngine.ts:2:1)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.public-getters.test.ts:5:1)
+
+FAIL packages/dev/2d/test/unit/babylon.physics2d.test.ts
+  ΓùÅ Test suite failed to run
+
+    Cannot find module 'planck' from 'packages/dev/2d/src/Physics/planckPhysicsEngine.ts'
+
+    Require stack:
+      packages/dev/2d/src/Physics/planckPhysicsEngine.ts
+      packages/dev/2d/test/unit/babylon.physics2d.test.ts
+
+      1 | import { Vector2 } from "core/Maths/math.vector";
+    > 2 | import * as planck from "planck";
+        | ^
+      3 |
+      4 | import type { Node2D } from "../Node2D/node2D";
+      5 | import type { IRaycastHit2D } from "../Collision/collisionShapes";
+
+      at Resolver._throwModNotFoundError (node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.<anonymous> (packages/dev/2d/src/Physics/planckPhysicsEngine.ts:2:1)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.physics2d.test.ts:2:1)
+
+FAIL packages/dev/2d/test/unit/babylon.debug-renderer2d.test.ts
+  ΓùÅ DebugRenderer2D ΓÇ║ drawFilledRect ΓÇ║ should draw 2 diagonal lines
+
+    TypeError: debug.drawFilledRect is not a function
+
+      299 |     describe("drawFilledRect", () => {
+      300 |         it("should draw 2 diagonal lines", () => {
+    > 301 |             debug.drawFilledRect(50, 50, 10, 10, new Color4(0.5, 0, 0, 0.3));
+          |                   ^
+      302 |             expect(lineCount(debug)).toBe(2);
+      303 |         });
+      304 |     });
+
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.debug-renderer2d.test.ts:301:19)
+
+  ΓùÅ DebugRenderer2D ΓÇ║ pathfinding grid collection ΓÇ║ should draw walkable and unwalkable cells
+
+    TypeError: grid.cellToWorldToRef is not a function
+
+      579 |             for (let col = 0; col < width; col++) {
+      580 |                 const walkable = pf.isWalkable(col, row);
+    > 581 |                 grid.cellToWorldToRef(col, row, tempVec);
+          |                      ^
+      582 |                 const halfSize = grid.cellSize / 2;
+      583 |
+      584 |                 if (!walkable) {
+
+      at DebugRenderer2D._collectPathfindingGrid (packages/dev/2d/src/Debug/debugRenderer2D.ts:581:22)
+      at DebugRenderer2D._collectFromSources (packages/dev/2d/src/Debug/debugRenderer2D.ts:454:18)
+      at DebugRenderer2D.render (packages/dev/2d/src/Debug/debugRenderer2D.ts:612:14)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.debug-renderer2d.test.ts:725:19)
+
+FAIL packages/dev/2d/test/unit/babylon.scene2d.test.ts
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should store the engine reference
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should have black background by default
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should have no camera by default
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should start with no root nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ constructor ΓÇ║ should not be disposed initially
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should add a root node
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should not add the same node twice
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should not add a node that has a parent
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should remove a root node
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ addNode / removeNode ΓÇ║ should handle removing a node not in the scene
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should find a node by id
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should find child nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should return null for unknown id
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getNodeById ΓÇ║ should unregister removed nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ getAllNodes ΓÇ║ should return all registered nodes including children
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ update ΓÇ║ should call update on root nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ update ΓÇ║ should propagate to child nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ observables ΓÇ║ should fire onDispose when disposed
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should mark scene as disposed
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should clear all root nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should not throw when disposed twice
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ dispose ΓÇ║ should clear node lookup
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+  ΓùÅ Scene2D ΓÇ║ sprite sorting order ΓÇ║ should maintain multiple sprite nodes
+
+    TypeError: engine.getCaps is not a function
+
+      808 |         this._engine = engine;
+      809 |         this._capacity = capacity;
+    > 810 |         this._useInstancing = engine.getCaps().instancedArrays;
+          |                                      ^
+      811 |         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
+      812 |
+      813 |         const projData = this._projectionData;
+
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:810:38)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene2d.test.ts:13:17)
+
+FAIL packages/dev/2d/test/unit/babylon.scene-transition.test.ts
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should start active
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:36:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should start with activeScene = from
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:44:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should add overlay to from scene
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:51:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should switch to 'to' scene after half duration
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:60:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should move overlay from 'from' to 'to' at midpoint
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:70:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should complete and call onComplete
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:80:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should remove overlay when done
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:101:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should use custom color
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:111:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ fade ΓÇ║ should use default duration of 0.5
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:123:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should start active
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:136:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should offset 'to' camera at start (left slide)
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:143:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should restore 'to' camera at end
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:153:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should complete and call onComplete
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:164:26)
+
+  ΓùÅ SceneTransition2D ΓÇ║ slide ΓÇ║ should support all 4 directions
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:183:30)
+
+  ΓùÅ SceneTransition2D ΓÇ║ after completion ΓÇ║ should not advance after done
+
+    TypeError: this._engine.createDynamicVertexBuffer is not a function
+
+      175 |             // create buffer
+      176 |             if (this._updatable) {
+    > 177 |                 this._buffer = this._engine.createDynamicVertexBuffer(data, this._label);
+          |                                             ^
+      178 |                 this._data = data;
+      179 |             } else {
+      180 |                 this._buffer = this._engine.createVertexBuffer(data, undefined, this._label);
+
+      at Buffer.create (packages/dev/core/src/Buffers/buffer.ts:177:45)
+      at new Buffer (packages/dev/core/src/Buffers/buffer.ts:83:18)
+      at SpriteBatchRenderer._setupNonInstanced (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:899:24)
+      at new SpriteBatchRenderer (packages/dev/2d/src/Rendering/spriteBatchRenderer.ts:825:18)
+      at new Scene2D (packages/dev/2d/src/Scene2D/scene2D.ts:94:31)
+      at createScene (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:27:19)
+      at Object.<anonymous> (packages/dev/2d/test/unit/babylon.scene-transition.test.ts:197:26)
+
+
+Test Suites: 5 failed, 16 passed, 21 total
+Tests:       40 failed, 351 passed, 391 total
+Snapshots:   0 total
+Time:        6.322 s, estimated 7 s
+Ran all test suites matching /packages\\dev\\2d\\test/i.

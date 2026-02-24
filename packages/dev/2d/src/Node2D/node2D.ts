@@ -56,6 +56,8 @@ export class Node2D {
     private _worldTransformDirty: boolean = true;
     private _worldAlpha: number = 1;
     private _worldZIndex: number = 0;
+    private _worldPosition: Vector2 = Vector2.Zero();
+    private _localTransform: Matrix2D = Matrix2D.Identity();
 
     /**
      * Sorting layer for render ordering. Sprites in lower layers render first (behind).
@@ -263,11 +265,27 @@ export class Node2D {
     }
 
     /**
-     * The resolved world position (read-only)
+     * The resolved world position (read-only).
+     * Returns a cached Vector2 — do not store this reference across frames.
+     * Use {@link worldPositionToRef} if you need a persistent copy.
      */
     public get worldPosition(): Vector2 {
         const wt = this.worldTransform;
-        return new Vector2(wt.m[4], wt.m[5]);
+        this._worldPosition.x = wt.m[4];
+        this._worldPosition.y = wt.m[5];
+        return this._worldPosition;
+    }
+
+    /**
+     * Copies the world position into the provided Vector2.
+     * @param ref - The Vector2 to store the result in
+     * @returns The ref vector for chaining
+     */
+    public worldPositionToRef(ref: Vector2): Vector2 {
+        const wt = this.worldTransform;
+        ref.x = wt.m[4];
+        ref.y = wt.m[5];
+        return ref;
     }
 
     /**
@@ -394,14 +412,14 @@ export class Node2D {
      * then snapshots current Vector2 values for future change detection.
      */
     private _updateWorldTransform(): void {
-        const localTransform = Matrix2D.Compose(this.position, this._rotation, this.scale, this.pivot, this._skewX, this._skewY);
+        Matrix2D.ComposeToRef(this.position, this._rotation, this.scale, this.pivot, this._skewX, this._skewY, this._localTransform);
 
         if (this._parent) {
-            this._worldTransform = this._parent.worldTransform.multiply(localTransform);
+            this._parent.worldTransform.multiplyToRef(this._localTransform, this._worldTransform);
             this._worldAlpha = this._parent.worldAlpha * this._alpha;
             this._worldZIndex = this._parent.worldZIndex + this._zIndex;
         } else {
-            this._worldTransform.copyFrom(localTransform);
+            this._worldTransform.copyFrom(this._localTransform);
             this._worldAlpha = this._alpha;
             this._worldZIndex = this._zIndex;
         }

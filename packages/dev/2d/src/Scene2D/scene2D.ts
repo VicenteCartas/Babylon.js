@@ -14,6 +14,7 @@ import { Matrix2D } from "../Math/matrix2D";
 import { SpriteBatchRenderer } from "../Rendering/spriteBatchRenderer";
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
 import type { LightingManager2D } from "../Lighting/light2D";
+import type { DebugRenderer2D } from "../Debug/debugRenderer2D";
 import { Scene2DStore } from "./scene2DStore";
 
 /**
@@ -42,6 +43,13 @@ export class Scene2D {
      * When set, the sprite batch renderer uses a lit shader variant.
      */
     public lightingManager: LightingManager2D | null = null;
+
+    /**
+     * Optional debug renderer for drawing wireframe overlays
+     * (collision shapes, physics bodies, spatial grid, pathfinding grid).
+     * When set, debug rendering occurs automatically after sprite rendering.
+     */
+    public debugRenderer: DebugRenderer2D | null = null;
 
     /**
      * Observable triggered before rendering
@@ -320,6 +328,10 @@ export class Scene2D {
                 this._collectSprites(root, this._spriteDataPool);
             }
 
+            // Always use the actual engine render dimensions for the projection
+            const vpWidth = engine.getRenderWidth();
+            const vpHeight = engine.getRenderHeight();
+
             if (this._spriteDataPool.length > 0) {
                 // Sort by sorting layer first, then zIndex within the same layer
                 this._spriteDataPool.sort((a, b) => {
@@ -337,12 +349,14 @@ export class Scene2D {
                     renderer.lightingManager = null;
                 }
 
-                // Always use the actual engine render dimensions for the projection
-                const vpWidth = engine.getRenderWidth();
-                const vpHeight = engine.getRenderHeight();
-
                 // Render the batch
                 renderer.render(this._spriteDataPool, vpWidth, vpHeight, viewTransform);
+            }
+
+            // Render debug overlays (after sprites, before onAfterRender)
+            if (this.debugRenderer && this.debugRenderer.enabled) {
+                const debugViewTransform = this.camera ? this.camera.getViewTransform() : Matrix2D.Identity();
+                this.debugRenderer.render(debugViewTransform, vpWidth, vpHeight);
             }
         }
 
@@ -375,6 +389,11 @@ export class Scene2D {
         if (this._batchRenderer) {
             this._batchRenderer.dispose();
             this._batchRenderer = null;
+        }
+
+        if (this.debugRenderer) {
+            this.debugRenderer.dispose();
+            this.debugRenderer = null;
         }
 
         if (this._whiteTexture) {

@@ -127,6 +127,30 @@ export class AStarPathfinder {
     }
 
     /**
+     * Gets the grid width in cells
+     */
+    public get gridWidth(): number {
+        return this._width;
+    }
+
+    /**
+     * Gets the grid height in cells
+     */
+    public get gridHeight(): number {
+        return this._height;
+    }
+
+    /**
+     * Checks whether a particular cell is walkable
+     * @param col - Column index
+     * @param row - Row index
+     * @returns True if the cell is walkable
+     */
+    public isWalkable(col: number, row: number): boolean {
+        return this._isWalkable(col, row);
+    }
+
+    /**
      * Finds a path from (startCol, startRow) to (endCol, endRow).
      * @param startCol - Start column
      * @param startRow - Start row

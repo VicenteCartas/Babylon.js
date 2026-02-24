@@ -56,6 +56,11 @@ export class NineSliceSprite2D extends Sprite2D {
     public borderBottom: number = 0;
 
     /**
+     * Pre-allocated transform matrices for the 9 slices (avoids per-frame allocation)
+     */
+    private _sliceTransforms: Matrix2D[] = Array.from({ length: 9 }, () => Matrix2D.Identity());
+
+    /**
      * Creates a new NineSliceSprite2D.
      * @param name - Node name
      * @param texture - The texture containing the 9-slice source graphic
@@ -162,23 +167,24 @@ export class NineSliceSprite2D extends Sprite2D {
             { y: H / 2 - bB / 2, h: bB, sy: srcY + srcH - sB, sh: sB },
         ];
 
+        let sliceIdx = 0;
         for (const row of rows) {
             for (const col of cols) {
                 if (col.w <= 0 || row.h <= 0) {
+                    sliceIdx++;
                     continue;
                 }
 
                 // Compute world transform for this slice (parent transform + local offset)
                 const cx = col.x;
                 const cy = row.y;
-                const sliceTransform = new Matrix2D(
-                    m[0],
-                    m[1],
-                    m[2],
-                    m[3],
-                    m[0] * cx + m[2] * cy + m[4],
-                    m[1] * cx + m[3] * cy + m[5]
-                );
+                const sliceTransform = this._sliceTransforms[sliceIdx];
+                sliceTransform.m[0] = m[0];
+                sliceTransform.m[1] = m[1];
+                sliceTransform.m[2] = m[2];
+                sliceTransform.m[3] = m[3];
+                sliceTransform.m[4] = m[0] * cx + m[2] * cy + m[4];
+                sliceTransform.m[5] = m[1] * cx + m[3] * cy + m[5];
 
                 // Compute UV rect for this slice
                 const cellU = texW > 0 ? col.sx / texW : 0;
@@ -205,6 +211,7 @@ export class NineSliceSprite2D extends Sprite2D {
                     zIndex,
                     sortingLayer,
                 });
+                sliceIdx++;
             }
         }
     }
