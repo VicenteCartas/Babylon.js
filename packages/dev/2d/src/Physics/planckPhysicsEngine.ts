@@ -7,30 +7,6 @@ import type { IPhysicsEngine2D, IPhysicsBody2D, IPhysicsBody2DOptions, PhysicsCo
 import { PhysicsBodyType2D } from "./physicsEngine2D";
 
 /**
- * Pixels-per-meter scale factor.
- * Planck.js uses meters internally; this converts between pixel coordinates and physics units.
- */
-const PixelsPerMeter = 50;
-
-/**
- * Converts pixels to meters
- * @param px - Value in pixels
- * @returns Value in meters
- */
-function toMeters(px: number): number {
-    return px / PixelsPerMeter;
-}
-
-/**
- * Converts meters to pixels
- * @param m - Value in meters
- * @returns Value in pixels
- */
-function toPixels(m: number): number {
-    return m * PixelsPerMeter;
-}
-
-/**
  * Internal wrapper linking a Planck body to a Node2D
  */
 class PlanckBody2D implements IPhysicsBody2D {
@@ -54,44 +30,63 @@ class PlanckBody2D implements IPhysicsBody2D {
      */
     public readonly shapeOptions: PhysicsShape2DOptions;
 
+    private readonly _pixelsPerMeter: number;
+
     /**
      * Creates a new PlanckBody2D wrapper
      * @param node - The Node2D
      * @param body - The Planck body
      * @param bodyType - The body type
      * @param shapeOptions - The shape configuration
+     * @param pixelsPerMeter - Pixel-to-meter scale
      */
-    constructor(node: Node2D, body: planck.Body, bodyType: PhysicsBodyType2D, shapeOptions: PhysicsShape2DOptions) {
+    constructor(node: Node2D, body: planck.Body, bodyType: PhysicsBodyType2D, shapeOptions: PhysicsShape2DOptions, pixelsPerMeter: number) {
         this.node = node;
         this.planckBody = body;
         this.bodyType = bodyType;
         this.shapeOptions = shapeOptions;
+        this._pixelsPerMeter = pixelsPerMeter;
+    }
+
+    private _toMeters(px: number): number {
+        return px / this._pixelsPerMeter;
+    }
+
+    private _toPixels(m: number): number {
+        return m * this._pixelsPerMeter;
     }
 
     /** @inheritdoc */
     public setLinearVelocity(velocity: Vector2): void {
-        this.planckBody.setLinearVelocity(planck.Vec2(toMeters(velocity.x), toMeters(velocity.y)));
+        this.planckBody.setLinearVelocity(planck.Vec2(this._toMeters(velocity.x), this._toMeters(velocity.y)));
     }
 
     /** @inheritdoc */
     public getLinearVelocity(): Vector2 {
         const v = this.planckBody.getLinearVelocity();
-        return new Vector2(toPixels(v.x), toPixels(v.y));
+        return new Vector2(this._toPixels(v.x), this._toPixels(v.y));
     }
 
     /** @inheritdoc */
     public applyForce(force: Vector2): void {
-        this.planckBody.applyForceToCenter(planck.Vec2(toMeters(force.x), toMeters(force.y)), true);
+        this.planckBody.applyForceToCenter(planck.Vec2(this._toMeters(force.x), this._toMeters(force.y)), true);
     }
 
     /** @inheritdoc */
     public applyImpulse(impulse: Vector2): void {
-        this.planckBody.applyLinearImpulse(planck.Vec2(toMeters(impulse.x), toMeters(impulse.y)), this.planckBody.getWorldCenter(), true);
+        this.planckBody.applyLinearImpulse(planck.Vec2(this._toMeters(impulse.x), this._toMeters(impulse.y)), this.planckBody.getWorldCenter(), true);
     }
 
     /** @inheritdoc */
     public getMass(): number {
         return this.planckBody.getMass();
+    }
+
+    /** @inheritdoc */
+    public setPosition(position: Vector2): void {
+        this.planckBody.setPosition(planck.Vec2(this._toMeters(position.x), this._toMeters(position.y)));
+        this.node.position.x = position.x;
+        this.node.position.y = position.y;
     }
 }
 
@@ -108,14 +103,30 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
     private _beginContactCallbacks: PhysicsContactCallback[] = [];
     private _endContactCallbacks: PhysicsContactCallback[] = [];
     private _bodyMap: Map<planck.Body, PlanckBody2D> = new Map();
+    private _pixelsPerMeter: number;
+
+    /**
+     * Pixel-to-meter conversion scale. Default: 50.
+     * Higher values mean smaller physics bodies relative to pixel coordinates.
+     * Only change this before adding bodies — existing bodies are not rescaled.
+     */
+    public get pixelsPerMeter(): number {
+        return this._pixelsPerMeter;
+    }
+
+    public set pixelsPerMeter(value: number) {
+        this._pixelsPerMeter = value;
+    }
 
     /**
      * Creates a new PlanckPhysicsEngine
      * @param gravity - Gravity in pixels/second^2 (default: 0, 980 for Y-down)
+     * @param pixelsPerMeter - Pixel-to-meter conversion scale (default: 50)
      */
-    constructor(gravity: Vector2 = new Vector2(0, 980)) {
+    constructor(gravity: Vector2 = new Vector2(0, 980), pixelsPerMeter: number = 50) {
+        this._pixelsPerMeter = pixelsPerMeter;
         this._world = new planck.World({
-            gravity: planck.Vec2(toMeters(gravity.x), toMeters(gravity.y)),
+            gravity: planck.Vec2(this._toMeters(gravity.x), this._toMeters(gravity.y)),
         });
 
         // Set up contact listeners
@@ -142,13 +153,13 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
 
     /** @inheritdoc */
     public setGravity(gravity: Vector2): void {
-        this._world.setGravity(planck.Vec2(toMeters(gravity.x), toMeters(gravity.y)));
+        this._world.setGravity(planck.Vec2(this._toMeters(gravity.x), this._toMeters(gravity.y)));
     }
 
     /** @inheritdoc */
     public getGravity(): Vector2 {
         const g = this._world.getGravity();
-        return new Vector2(toPixels(g.x), toPixels(g.y));
+        return new Vector2(this._toPixels(g.x), this._toPixels(g.y));
     }
 
     /** @inheritdoc */
@@ -168,7 +179,7 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
 
         const body = this._world.createBody({
             type: bodyType,
-            position: planck.Vec2(toMeters(node.position.x), toMeters(node.position.y)),
+            position: planck.Vec2(this._toMeters(node.position.x), this._toMeters(node.position.y)),
             angle: node.rotation,
             fixedRotation: options.fixedRotation ?? false,
         });
@@ -177,13 +188,13 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
         let shape: planck.Shape;
         switch (options.shape.type) {
             case "box":
-                shape = planck.Box(toMeters(options.shape.width / 2), toMeters(options.shape.height / 2));
+                shape = planck.Box(this._toMeters(options.shape.width / 2), this._toMeters(options.shape.height / 2));
                 break;
             case "circle":
-                shape = planck.Circle(toMeters(options.shape.radius));
+                shape = planck.Circle(this._toMeters(options.shape.radius));
                 break;
             case "polygon": {
-                const verts = options.shape.vertices.map((v) => planck.Vec2(toMeters(v.x), toMeters(v.y)));
+                const verts = options.shape.vertices.map((v) => planck.Vec2(this._toMeters(v.x), this._toMeters(v.y)));
                 shape = planck.Polygon(verts);
                 break;
             }
@@ -199,7 +210,7 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
             filterMaskBits: options.mask ?? 0xffff,
         });
 
-        const wrapper = new PlanckBody2D(node, body, options.bodyType, options.shape);
+        const wrapper = new PlanckBody2D(node, body, options.bodyType, options.shape, this._pixelsPerMeter);
         this._bodies.push(wrapper);
         this._bodyMap.set(body, wrapper);
 
@@ -225,8 +236,8 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
         // Sync physics bodies back to Node2D transforms
         for (const wrapper of this._bodies) {
             const pos = wrapper.planckBody.getPosition();
-            wrapper.node.position.x = toPixels(pos.x);
-            wrapper.node.position.y = toPixels(pos.y);
+            wrapper.node.position.x = this._toPixels(pos.x);
+            wrapper.node.position.y = this._toPixels(pos.y);
             wrapper.node.rotation = wrapper.planckBody.getAngle();
         }
     }
@@ -240,13 +251,13 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
         const ndx = direction.x / len;
         const ndy = direction.y / len;
 
-        const p1 = planck.Vec2(toMeters(origin.x), toMeters(origin.y));
-        const p2 = planck.Vec2(toMeters(origin.x + ndx * maxDistance), toMeters(origin.y + ndy * maxDistance));
+        const p1 = planck.Vec2(this._toMeters(origin.x), this._toMeters(origin.y));
+        const p2 = planck.Vec2(this._toMeters(origin.x + ndx * maxDistance), this._toMeters(origin.y + ndy * maxDistance));
 
         let closestHit: IRaycastHit2D | null = null;
 
         this._world.rayCast(p1, p2, (fixture: planck.Fixture, point: planck.Vec2, normal: planck.Vec2, fraction: number) => {
-            const hitPoint = new Vector2(toPixels(point.x), toPixels(point.y));
+            const hitPoint = new Vector2(this._toPixels(point.x), this._toPixels(point.y));
             const hitNormal = new Vector2(normal.x, normal.y);
             const hitDist = fraction * maxDistance;
 
@@ -271,6 +282,14 @@ export class PlanckPhysicsEngine implements IPhysicsEngine2D {
     /** @inheritdoc */
     public onEndContact(callback: PhysicsContactCallback): void {
         this._endContactCallbacks.push(callback);
+    }
+
+    private _toMeters(px: number): number {
+        return px / this._pixelsPerMeter;
+    }
+
+    private _toPixels(m: number): number {
+        return m * this._pixelsPerMeter;
     }
 
     /** @inheritdoc */

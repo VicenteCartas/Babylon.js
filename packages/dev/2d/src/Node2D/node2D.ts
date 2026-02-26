@@ -2,14 +2,16 @@ import { Vector2 } from "core/Maths/math.vector";
 import { Observable } from "core/Misc/observable";
 
 import { Matrix2D } from "../Math/matrix2D";
+import type { IMask2D } from "../Masking/iMask2D";
 import { Scene2DStore } from "../Scene2D/scene2DStore";
 import type { Scene2D } from "../Scene2D/scene2D";
+import type { INode2D } from "./iNode2D";
 
 /**
  * Base class for all 2D entities in a Scene2D.
  * Uses a Y-down, top-left origin coordinate system with pixel coordinates.
  */
-export class Node2D {
+export class Node2D implements INode2D {
     /**
      * Unique identifier for this node
      */
@@ -41,6 +43,24 @@ export class Node2D {
     public visible: boolean = true;
 
     /**
+     * The mask applied to this node's subtree.
+     * When set, all children (and this node's own visuals if it's a Sprite2D)
+     * are clipped to the mask region. Set to null to remove the mask.
+     *
+     * Supports both RectMask2D (scissor-based, cheapest) and
+     * SpriteMask2D (stencil-based, shape-based).
+     */
+    public get mask(): IMask2D | null {
+        return this._mask;
+    }
+
+    public set mask(value: IMask2D | null) {
+        this._mask = value;
+    }
+
+    private _mask: IMask2D | null = null;
+
+    /**
      * Observable triggered each frame with delta time in seconds
      */
     public onUpdate: Observable<number> = new Observable<number>();
@@ -48,7 +68,7 @@ export class Node2D {
     /**
      * Observable triggered when the node is disposed
      */
-    public onDispose: Observable<Node2D> = new Observable<Node2D>();
+    public onDispose: Observable<INode2D> = new Observable<INode2D>();
 
     private _parent: Node2D | null = null;
     private _children: Node2D[] = [];
@@ -56,6 +76,8 @@ export class Node2D {
     private _worldTransformDirty: boolean = true;
     private _worldAlpha: number = 1;
     private _worldZIndex: number = 0;
+    private _worldScrollFactorX: number = 1;
+    private _worldScrollFactorY: number = 1;
     private _worldPosition: Vector2 = Vector2.Zero();
     private _localTransform: Matrix2D = Matrix2D.Identity();
 
@@ -66,12 +88,54 @@ export class Node2D {
      */
     public sortingLayer: number = 0;
 
+    /**
+     * Horizontal scroll factor controlling how much camera movement affects this node.
+     * - 1 (default) = moves normally with the camera (foreground)
+     * - 0 = fixed to the camera, unaffected by scrolling (HUD-like)
+     * - 0..1 = parallax depth layers (lower = further away, scrolls slower)
+     * - >1 = foreground parallax (scrolls faster than camera)
+     *
+     * Multiplied through the hierarchy like worldAlpha.
+     */
+    public get scrollFactorX(): number {
+        return this._scrollFactorX;
+    }
+
+    public set scrollFactorX(value: number) {
+        if (this._scrollFactorX !== value) {
+            this._scrollFactorX = value;
+            this._markWorldTransformDirty();
+        }
+    }
+
+    /**
+     * Vertical scroll factor controlling how much camera movement affects this node.
+     * - 1 (default) = moves normally with the camera (foreground)
+     * - 0 = fixed to the camera, unaffected by scrolling (HUD-like)
+     * - 0..1 = parallax depth layers (lower = further away, scrolls slower)
+     * - >1 = foreground parallax (scrolls faster than camera)
+     *
+     * Multiplied through the hierarchy like worldAlpha.
+     */
+    public get scrollFactorY(): number {
+        return this._scrollFactorY;
+    }
+
+    public set scrollFactorY(value: number) {
+        if (this._scrollFactorY !== value) {
+            this._scrollFactorY = value;
+            this._markWorldTransformDirty();
+        }
+    }
+
     // Backing fields for scalar properties with dirty-flagging setters
     private _rotation: number = 0;
     private _alpha: number = 1;
     private _zIndex: number = 0;
     private _skewX: number = 0;
     private _skewY: number = 0;
+    private _scrollFactorX: number = 1;
+    private _scrollFactorY: number = 1;
 
     // Snapshots for Vector2 fields (detect direct .x/.y mutation)
     private _snapshotPosX: number = 0;
@@ -316,6 +380,34 @@ export class Node2D {
     }
 
     /**
+     * The effective horizontal scroll factor accounting for parent hierarchy.
+     * Multiplied through the hierarchy: parent.worldScrollFactorX × this.scrollFactorX.
+     */
+    public get worldScrollFactorX(): number {
+        if (!this._worldTransformDirty) {
+            this._checkLocalChanges();
+        }
+        if (this._worldTransformDirty) {
+            this._updateWorldTransform();
+        }
+        return this._worldScrollFactorX;
+    }
+
+    /**
+     * The effective vertical scroll factor accounting for parent hierarchy.
+     * Multiplied through the hierarchy: parent.worldScrollFactorY × this.scrollFactorY.
+     */
+    public get worldScrollFactorY(): number {
+        if (!this._worldTransformDirty) {
+            this._checkLocalChanges();
+        }
+        if (this._worldTransformDirty) {
+            this._updateWorldTransform();
+        }
+        return this._worldScrollFactorY;
+    }
+
+    /**
      * Transforms a point from local space to world space
      * @param point - The local-space point
      * @returns The world-space point
@@ -371,6 +463,7 @@ export class Node2D {
         this.onUpdate.clear();
         this.onDispose.clear();
 
+        this._mask = null;
         this.parent = null;
     }
 
@@ -418,10 +511,14 @@ export class Node2D {
             this._parent.worldTransform.multiplyToRef(this._localTransform, this._worldTransform);
             this._worldAlpha = this._parent.worldAlpha * this._alpha;
             this._worldZIndex = this._parent.worldZIndex + this._zIndex;
+            this._worldScrollFactorX = this._parent.worldScrollFactorX * this._scrollFactorX;
+            this._worldScrollFactorY = this._parent.worldScrollFactorY * this._scrollFactorY;
         } else {
             this._worldTransform.copyFrom(this._localTransform);
             this._worldAlpha = this._alpha;
             this._worldZIndex = this._zIndex;
+            this._worldScrollFactorX = this._scrollFactorX;
+            this._worldScrollFactorY = this._scrollFactorY;
         }
 
         // Snapshot Vector2 values for change detection

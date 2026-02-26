@@ -56,4 +56,24 @@ export class Rectangle2D {
     public clone(): Rectangle2D {
         return new Rectangle2D(this.x, this.y, this.width, this.height);
     }
+
+    /**
+     * Computes the intersection of two rectangles and stores the result in ref.
+     * If the rectangles don't overlap, ref will have zero width and height.
+     * @param a - First rectangle
+     * @param b - Second rectangle
+     * @param ref - Rectangle to store the result in
+     * @returns The ref rectangle for chaining
+     */
+    public static IntersectToRef(a: Rectangle2D, b: Rectangle2D, ref: Rectangle2D): Rectangle2D {
+        const x = Math.max(a.x, b.x);
+        const y = Math.max(a.y, b.y);
+        const right = Math.min(a.right, b.right);
+        const bottom = Math.min(a.bottom, b.bottom);
+        ref.x = x;
+        ref.y = y;
+        ref.width = Math.max(0, right - x);
+        ref.height = Math.max(0, bottom - y);
+        return ref;
+    }
 }

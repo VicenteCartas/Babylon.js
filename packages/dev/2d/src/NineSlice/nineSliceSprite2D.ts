@@ -153,6 +153,8 @@ export class NineSliceSprite2D extends Sprite2D {
         const a = this.tint.a * this.worldAlpha;
         const zIndex = this.worldZIndex;
         const sortingLayer = this.sortingLayer;
+        const scrollFactorX = this.worldScrollFactorX;
+        const scrollFactorY = this.worldScrollFactorY;
 
         // 3 rows × 3 cols of slices
         // Each defined by: display offset (cx, cy), display size (sw, sh), source rect (px, py, pw, ph)
@@ -210,6 +212,8 @@ export class NineSliceSprite2D extends Sprite2D {
                     texture: tex,
                     zIndex,
                     sortingLayer,
+                    scrollFactorX,
+                    scrollFactorY,
                 });
                 sliceIdx++;
             }

@@ -17,6 +17,7 @@ import type { IPhysicsEngine2D } from "../Physics/physicsEngine2D";
 import { PhysicsBodyType2D } from "../Physics/physicsEngine2D";
 import type { AStarPathfinder } from "../Pathfinding/aStarPathfinder";
 import type { Grid2D } from "../Grid/grid2D";
+import type { IsometricGrid } from "../Isometric/isometricGrid";
 
 // ---------------------------------------------------------------------------
 // Shaders
@@ -214,10 +215,10 @@ export class DebugRenderer2D {
     public pathfinder: AStarPathfinder | null = null;
 
     /**
-     * The Grid2D used for pathfinding coordinate conversion (cellToWorld).
+     * The Grid2D or IsometricGrid used for pathfinding coordinate conversion.
      * Required when {@link pathfinder} is set.
      */
-    public pathfinderGrid: Grid2D | null = null;
+    public pathfinderGrid: Grid2D | IsometricGrid | null = null;
 
     // ─── Internals ───────────────────────────────────────────────────
 
@@ -575,11 +576,21 @@ export class DebugRenderer2D {
         const height = pf.gridHeight;
         const tempVec = TmpVectors.Vector2[0];
 
+        // Detect whether the grid is Grid2D (has cellToWorldToRef) or IsometricGrid (has tileToWorld)
+        const isGrid2D = "cellToWorldToRef" in grid;
+        const halfSize = isGrid2D ? (grid as Grid2D).cellSize / 2 : Math.min((grid as IsometricGrid).tileWidth, (grid as IsometricGrid).tileHeight) / 2;
+
         for (let row = 0; row < height; row++) {
             for (let col = 0; col < width; col++) {
                 const walkable = pf.isWalkable(col, row);
-                grid.cellToWorldToRef(col, row, tempVec);
-                const halfSize = grid.cellSize / 2;
+
+                if (isGrid2D) {
+                    (grid as Grid2D).cellToWorldToRef(col, row, tempVec);
+                } else {
+                    const pos = (grid as IsometricGrid).tileToWorld(col, row);
+                    tempVec.x = pos.x;
+                    tempVec.y = pos.y;
+                }
 
                 if (!walkable) {
                     this.drawCrossHatchRect(tempVec.x, tempVec.y, halfSize, halfSize, wallColor);

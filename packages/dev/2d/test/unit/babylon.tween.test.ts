@@ -302,9 +302,9 @@ describe("Tween", () => {
     });
 
     describe("static factory", () => {
-        it("CreateAsync should create and start a tween", () => {
+        it("Create should create and start a tween", () => {
             let value = 0;
-            const tw = Tween.CreateAsync(0, 100, 1, Easing.Linear, (v) => { value = v; });
+            const tw = Tween.Create(0, 100, 1, Easing.Linear, (v) => { value = v; });
             expect(tw.state).not.toBe(TweenState.Complete);
 
             tw.update(1.0);

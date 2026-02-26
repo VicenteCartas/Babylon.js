@@ -635,6 +635,107 @@ ShaderStore.ShadersStoreWGSL["sprite2DLitInstancedVertexShader"] = _WGSL_LIT_VER
 ShaderStore.ShadersStoreWGSL["sprite2DLitInstancedFragmentShader"] = _WGSL_LIT_FRAG_SHADER;
 
 // ---------------------------------------------------------------------------
+// Mask shader variants (stencil-only rendering with configurable alpha threshold)
+// ---------------------------------------------------------------------------
+
+const _MASK_FRAG_SHADER = `
+precision highp float;
+
+varying vec2 vUV;
+varying vec4 vColor;
+varying float vTextureIndex;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+uniform sampler2D texture3;
+uniform sampler2D texture4;
+uniform sampler2D texture5;
+uniform sampler2D texture6;
+uniform sampler2D texture7;
+uniform float alphaThreshold;
+
+${_TEXTURE_SAMPLE_FN}
+
+void main(void) {
+    vec4 texColor = sampleTex();
+    vec4 finalColor = texColor * vColor;
+
+    if (finalColor.a < alphaThreshold) {
+        discard;
+    }
+
+    gl_FragColor = vec4(1.0);
+}
+`;
+
+const _WGSL_MASK_FRAG_SHADER = `
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+
+var texture0Sampler: sampler;
+var texture0: texture_2d<f32>;
+var texture1Sampler: sampler;
+var texture1: texture_2d<f32>;
+var texture2Sampler: sampler;
+var texture2: texture_2d<f32>;
+var texture3Sampler: sampler;
+var texture3: texture_2d<f32>;
+var texture4Sampler: sampler;
+var texture4: texture_2d<f32>;
+var texture5Sampler: sampler;
+var texture5: texture_2d<f32>;
+var texture6Sampler: sampler;
+var texture6: texture_2d<f32>;
+var texture7Sampler: sampler;
+var texture7: texture_2d<f32>;
+
+uniform alphaThreshold: f32;
+
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+    var uv: vec2f = input.vUV;
+    var idx: i32 = i32(input.vTextureIndex + 0.5);
+    var texColor: vec4f;
+    if (idx < 4) {
+        if (idx < 2) {
+            if (idx == 0) { texColor = textureSampleLevel(texture0, texture0Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture1, texture1Sampler, uv, 0.0); }
+        } else {
+            if (idx == 2) { texColor = textureSampleLevel(texture2, texture2Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture3, texture3Sampler, uv, 0.0); }
+        }
+    } else {
+        if (idx < 6) {
+            if (idx == 4) { texColor = textureSampleLevel(texture4, texture4Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture5, texture5Sampler, uv, 0.0); }
+        } else {
+            if (idx == 6) { texColor = textureSampleLevel(texture6, texture6Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture7, texture7Sampler, uv, 0.0); }
+        }
+    }
+    var finalColor: vec4f = texColor * input.vColor;
+
+    if (finalColor.a < uniforms.alphaThreshold) {
+        discard;
+    }
+
+    fragmentOutputs.color = vec4f(1.0);
+}
+`;
+
+// Mask shaders reuse the base vertex shaders (same attributes/varyings)
+Effect.ShadersStore["sprite2DMaskVertexShader"] = _VERT_SHADER;
+Effect.ShadersStore["sprite2DMaskFragmentShader"] = _MASK_FRAG_SHADER;
+Effect.ShadersStore["sprite2DMaskInstancedVertexShader"] = _VERT_INSTANCED_SHADER;
+Effect.ShadersStore["sprite2DMaskInstancedFragmentShader"] = _MASK_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMaskVertexShader"] = _WGSL_VERT_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMaskFragmentShader"] = _WGSL_MASK_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMaskInstancedVertexShader"] = _WGSL_VERT_INSTANCED_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMaskInstancedFragmentShader"] = _WGSL_MASK_FRAG_SHADER;
+
+// ---------------------------------------------------------------------------
 // ISprite2DRenderData
 // ---------------------------------------------------------------------------
 
@@ -711,6 +812,16 @@ export interface ISprite2DRenderData {
      * Sorting layer — sprites in lower layers render behind higher layers
      */
     sortingLayer: number;
+    /**
+     * Horizontal scroll factor for parallax (1 = normal, 0 = fixed to camera).
+     * Optional — defaults to 1 if omitted.
+     */
+    scrollFactorX?: number;
+    /**
+     * Vertical scroll factor for parallax (1 = normal, 0 = fixed to camera).
+     * Optional — defaults to 1 if omitted.
+     */
+    scrollFactorY?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -756,6 +867,11 @@ export class SpriteBatchRenderer {
     private _litDrawWrapper: DrawWrapper | null = null;
     private _litEffect: Effect | null = null;
     private _isLitReady: boolean = false;
+
+    // Mask shader variant (stencil-only rendering with alphaThreshold)
+    private _maskDrawWrapper: DrawWrapper | null = null;
+    private _maskEffect: Effect | null = null;
+    private _isMaskReady: boolean = false;
 
     /**
      * When set, enables forward lighting in the sprite shader.
@@ -889,6 +1005,25 @@ export class SpriteBatchRenderer {
         this._litEffect.onCompiled = () => {
             this._isLitReady = true;
         };
+
+        // Mask variant (same attributes, alphaThreshold uniform)
+        this._maskEffect = engine.createEffect(
+            { vertex: "sprite2DMaskInstanced", fragment: "sprite2DMaskInstanced" },
+            ["corner", "iTransform0", "iTransform1", "iSize", "iColor", "iCell", "iTexIdx"],
+            ["projection", "alphaThreshold"],
+            _SAMPLER_NAMES,
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
+        );
+        this._maskDrawWrapper = new DrawWrapper(engine);
+        if (this._maskDrawWrapper.drawContext) {
+            this._maskDrawWrapper.drawContext.useInstancing = true;
+        }
+        this._maskDrawWrapper.effect = this._maskEffect;
+        this._maskEffect.onCompiled = () => {
+            this._isMaskReady = true;
+        };
     }
 
     private _setupNonInstanced(capacity: number, defines: string): void {
@@ -952,11 +1087,23 @@ export class SpriteBatchRenderer {
         this._litEffect.onCompiled = () => {
             this._isLitReady = true;
         };
-    }
 
-    // -----------------------------------------------------------------------
-    // Public API
-    // -----------------------------------------------------------------------
+        // Mask variant
+        this._maskEffect = engine.createEffect(
+            "sprite2DMask",
+            [VertexBuffer.PositionKind, VertexBuffer.UVKind, VertexBuffer.ColorKind, "cellInfo", "transform0", "transform1"],
+            ["projection", "alphaThreshold"],
+            _SAMPLER_NAMES,
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
+        );
+        this._maskDrawWrapper = new DrawWrapper(engine);
+        this._maskDrawWrapper.effect = this._maskEffect;
+        this._maskEffect.onCompiled = () => {
+            this._isMaskReady = true;
+        };
+    }
 
     /**
      * Whether the renderer is ready (shaders compiled)
@@ -979,13 +1126,119 @@ export class SpriteBatchRenderer {
     }
 
     /**
+     * Whether the mask shader variant is ready
+     */
+    public get isMaskReady(): boolean {
+        if (!this._isMaskReady && this._maskEffect && this._maskEffect.isReady()) {
+            this._isMaskReady = true;
+        }
+        return this._isMaskReady;
+    }
+
+    /** Reusable single-element array to avoid per-call allocation in renderMaskSprite */
+    private _singleSpriteArray: ISprite2DRenderData[] = [];
+
+    /**
+     * Renders a single sprite into the stencil buffer using the mask shader.
+     * Color writes are disabled; only the stencil buffer is updated.
+     * The caller is responsible for setting up stencil state before calling this.
+     * @param sprite - The mask sprite's render data
+     * @param alphaThreshold - Alpha cutoff for the stencil discard
+     * @param viewportWidth - Viewport width in pixels
+     * @param viewportHeight - Viewport height in pixels
+     * @param cameraTransform - Camera view transform
+     * @param cameraWorldPosition - Camera world position for parallax
+     * @internal
+     */
+    public renderMaskSprite(
+        sprite: ISprite2DRenderData,
+        alphaThreshold: number,
+        viewportWidth: number,
+        viewportHeight: number,
+        cameraTransform: Matrix2D,
+        cameraWorldPosition?: { x: number; y: number } | null
+    ): void {
+        if (!this.isMaskReady) {
+            return;
+        }
+        const engine = this._engine;
+        const maskEffect = this._maskEffect!;
+        const maskWrapper = this._maskDrawWrapper!;
+
+        // Disable color and depth writes for stencil-only rendering
+        engine.setColorWrite(false);
+        engine.setDepthBuffer(false);
+        engine.enableEffect(maskWrapper);
+        (engine as any).applyStates();
+
+        // Set projection
+        const p = this._projectionData;
+        p[0] = 2.0 / viewportWidth;
+        p[5] = -2.0 / viewportHeight;
+        p[10] = 1;
+        p[12] = -1;
+        p[13] = 1;
+        p[15] = 1;
+        this._projectionMatrix.updateFlag++;
+        maskEffect.setMatrix("projection", this._projectionMatrix as any);
+        maskEffect.setFloat("alphaThreshold", alphaThreshold);
+
+        // Render the single mask sprite
+        this._activeEffect = maskEffect;
+        const cwx = cameraWorldPosition ? cameraWorldPosition.x : 0;
+        const cwy = cameraWorldPosition ? cameraWorldPosition.y : 0;
+
+        this._singleSpriteArray[0] = sprite;
+        if (this._useInstancing) {
+            this._renderInstanced(this._singleSpriteArray, cameraTransform, cwx, cwy);
+        } else {
+            this._renderNonInstanced(this._singleSpriteArray, cameraTransform, cwx, cwy);
+        }
+        this._singleSpriteArray.length = 0;
+
+        // Restore color and depth writes
+        engine.setColorWrite(true);
+        engine.setDepthBuffer(false); // Remain off — caller (_processRenderCommands) owns state
+    }
+
+    /**
      * Renders a batch of sprite data.
      * @param sprites - Array of sprite render data, sorted by z-index
      * @param viewportWidth - Width of the viewport in pixels
      * @param viewportHeight - Height of the viewport in pixels
      * @param cameraTransform - The camera's inverse world transform (to convert world → view)
+     * @param cameraWorldPosition - Optional camera world position for parallax scroll factor correction
      */
-    public render(sprites: ISprite2DRenderData[], viewportWidth: number, viewportHeight: number, cameraTransform: Matrix2D): void {
+    public render(sprites: ISprite2DRenderData[], viewportWidth: number, viewportHeight: number, cameraTransform: Matrix2D, cameraWorldPosition?: { x: number; y: number } | null): void {
+        if (!this.isReady || sprites.length === 0) {
+            return;
+        }
+
+        const engine = this._engine;
+        engine.setAlphaMode(Constants.ALPHA_COMBINE);
+        engine.setDepthBuffer(false);
+        engine.setState(false); // Disable backface culling for 2D quads
+
+        this.renderBatch(sprites, viewportWidth, viewportHeight, cameraTransform, cameraWorldPosition);
+
+        engine.setDepthBuffer(true);
+        engine.setAlphaMode(Constants.ALPHA_DISABLE);
+    }
+
+    /**
+     * Renders a batch of sprite data without managing global engine state
+     * (depth buffer, alpha mode, cull state). The caller is responsible
+     * for setting up and restoring engine state.
+     *
+     * Used by Scene2D._processRenderCommands where the outer method owns state.
+     * @param sprites - Array of sprite render data, sorted by z-index
+     * @param viewportWidth - Width of the viewport in pixels
+     * @param viewportHeight - Height of the viewport in pixels
+     * @param cameraTransform - The camera's inverse world transform
+     * @param cameraWorldPosition - Optional camera world position for parallax
+     * @internal
+     */
+    public renderBatch(sprites: ISprite2DRenderData[], viewportWidth: number, viewportHeight: number, cameraTransform: Matrix2D, cameraWorldPosition?: { x: number; y: number } | null): void {
         if (!this.isReady || sprites.length === 0) {
             return;
         }
@@ -996,10 +1249,12 @@ export class SpriteBatchRenderer {
         this._activeEffect = activeEffect;
 
         const engine = this._engine;
-        engine.setAlphaMode(Constants.ALPHA_COMBINE);
-        engine.setDepthBuffer(false);
-        engine.setState(false); // Disable backface culling for 2D quads
         engine.enableEffect(activeWrapper);
+
+        // Ensure deferred GL state (blend, depth, cull) is flushed before drawing.
+        // enableEffect only calls applyStates when the active shader changes;
+        // when the same shader is reused across frames the state may be stale.
+        (engine as any).applyStates();
 
         // Update orthographic projection (Y-down, top-left origin)
         const p = this._projectionData;
@@ -1017,14 +1272,15 @@ export class SpriteBatchRenderer {
             this.lightingManager!.bindToEffect(activeEffect);
         }
 
-        if (this._useInstancing) {
-            this._renderInstanced(sprites, cameraTransform);
-        } else {
-            this._renderNonInstanced(sprites, cameraTransform);
-        }
+        // Extract camera world position for parallax correction
+        const cwx = cameraWorldPosition ? cameraWorldPosition.x : 0;
+        const cwy = cameraWorldPosition ? cameraWorldPosition.y : 0;
 
-        engine.setDepthBuffer(true);
-        engine.setAlphaMode(Constants.ALPHA_DISABLE);
+        if (this._useInstancing) {
+            this._renderInstanced(sprites, cameraTransform, cwx, cwy);
+        } else {
+            this._renderNonInstanced(sprites, cameraTransform, cwx, cwy);
+        }
     }
 
     /**
@@ -1044,6 +1300,18 @@ export class SpriteBatchRenderer {
             this._instanceBuffer.dispose();
         }
         this._effect.dispose();
+        if (this._maskEffect) {
+            this._maskEffect.dispose();
+        }
+        if (this._litEffect) {
+            this._litEffect.dispose();
+        }
+        if (this._litDrawWrapper) {
+            this._litDrawWrapper.dispose();
+        }
+        if (this._maskDrawWrapper) {
+            this._maskDrawWrapper.dispose();
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -1092,7 +1360,7 @@ export class SpriteBatchRenderer {
     // Instanced render path
     // -----------------------------------------------------------------------
 
-    private _renderInstanced(sprites: ISprite2DRenderData[], cameraTransform: Matrix2D): void {
+    private _renderInstanced(sprites: ISprite2DRenderData[], cameraTransform: Matrix2D, cwx: number, cwy: number): void {
         const cm = cameraTransform.m;
         const stride = SpriteBatchRenderer._FLOATS_PER_INSTANCE;
         const data = this._instanceData;
@@ -1114,8 +1382,19 @@ export class SpriteBatchRenderer {
             const cb = cm[1] * wt[0] + cm[3] * wt[1];
             const cc = cm[0] * wt[2] + cm[2] * wt[3];
             const cd = cm[1] * wt[2] + cm[3] * wt[3];
-            const ctx = cm[0] * wt[4] + cm[2] * wt[5] + cm[4];
-            const cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
+            let ctx = cm[0] * wt[4] + cm[2] * wt[5] + cm[4];
+            let cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
+
+            // Parallax scroll factor correction: counteract a portion of the
+            // camera translation so this sprite scrolls slower (or not at all).
+            const sfx = sprite.scrollFactorX ?? 1;
+            const sfy = sprite.scrollFactorY ?? 1;
+            if (sfx !== 1 || sfy !== 1) {
+                const dx = cwx * (1 - sfx);
+                const dy = cwy * (1 - sfy);
+                ctx += cm[0] * dx + cm[2] * dy;
+                cty += cm[1] * dx + cm[3] * dy;
+            }
 
             // UV corners (pre-baked with flip)
             // Babylon textures default to invertY=true, so v=0 is bottom of image.
@@ -1168,7 +1447,7 @@ export class SpriteBatchRenderer {
         }
         this._bindTextures();
         this._instanceBuffer.updateDirectly(this._instanceData, 0, count);
-        this._engine.bindBuffers(this._vertexBuffersMap, null as any, this._effect);
+        this._engine.bindBuffers(this._vertexBuffersMap, null as any, this._activeEffect);
         this._engine.drawArraysType(Constants.MATERIAL_TriangleStripDrawMode, 0, 4, count);
         this._resetTextureSlots();
     }
@@ -1177,7 +1456,7 @@ export class SpriteBatchRenderer {
     // Non-instanced render path (fallback)
     // -----------------------------------------------------------------------
 
-    private _renderNonInstanced(sprites: ISprite2DRenderData[], cameraTransform: Matrix2D): void {
+    private _renderNonInstanced(sprites: ISprite2DRenderData[], cameraTransform: Matrix2D, cwx: number, cwy: number): void {
         const cm = cameraTransform.m;
         const vd = this._vertexData;
         let count = 0;
@@ -1198,8 +1477,19 @@ export class SpriteBatchRenderer {
             const cb = cm[1] * wt[0] + cm[3] * wt[1];
             const cc = cm[0] * wt[2] + cm[2] * wt[3];
             const cd = cm[1] * wt[2] + cm[3] * wt[3];
-            const ctx = cm[0] * wt[4] + cm[2] * wt[5] + cm[4];
-            const cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
+            let ctx = cm[0] * wt[4] + cm[2] * wt[5] + cm[4];
+            let cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
+
+            // Parallax scroll factor correction: counteract a portion of the
+            // camera translation so this sprite scrolls slower (or not at all).
+            const sfx = sprite.scrollFactorX ?? 1;
+            const sfy = sprite.scrollFactorY ?? 1;
+            if (sfx !== 1 || sfy !== 1) {
+                const dx = cwx * (1 - sfx);
+                const dy = cwy * (1 - sfy);
+                ctx += cm[0] * dx + cm[2] * dy;
+                cty += cm[1] * dx + cm[3] * dy;
+            }
 
             const w = sprite.width;
             const h = sprite.height;
@@ -1277,7 +1567,7 @@ export class SpriteBatchRenderer {
         }
         this._bindTextures();
         this._buffer.updateDirectly(this._vertexData, 0, count * SpriteBatchRenderer._VERTS_PER_QUAD);
-        this._engine.bindBuffers(this._vertexBuffersMap, this._indexBuffer, this._effect);
+        this._engine.bindBuffers(this._vertexBuffersMap, this._indexBuffer, this._activeEffect);
         this._engine.drawElementsType(Constants.MATERIAL_TriangleFillMode, 0, count * SpriteBatchRenderer._INDICES_PER_QUAD);
         this._resetTextureSlots();
     }

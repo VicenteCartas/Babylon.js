@@ -47,13 +47,12 @@ describe("SceneTransition2D", () => {
             expect(t.activeScene).toBe(from);
         });
 
-        it("should add overlay to from scene", () => {
+        it("should not pollute rootNodes with overlay", () => {
             const from = createScene();
             const to = createScene();
             SceneTransition2D.fade({ from, to });
-            // Overlay is added as root node
-            expect(from.rootNodes.length).toBe(1);
-            expect(from.rootNodes[0].name).toBe("__transition_overlay__");
+            // Overlay is internal — not visible in rootNodes
+            expect(from.rootNodes.length).toBe(0);
         });
 
         it("should switch to 'to' scene after half duration", () => {
@@ -66,14 +65,14 @@ describe("SceneTransition2D", () => {
             expect(t.activeScene).toBe(to);
         });
 
-        it("should move overlay from 'from' to 'to' at midpoint", () => {
+        it("should keep rootNodes clean during transition", () => {
             const from = createScene();
             const to = createScene();
             const t = SceneTransition2D.fade({ from, to, duration: 1.0 });
 
             t.update(0.6); // Past midpoint
             expect(from.rootNodes.length).toBe(0);
-            expect(to.rootNodes.length).toBe(1);
+            expect(to.rootNodes.length).toBe(0);
         });
 
         it("should complete and call onComplete", () => {
@@ -111,9 +110,10 @@ describe("SceneTransition2D", () => {
             const from = createScene();
             const to = createScene();
             const red = new Color4(1, 0, 0, 1);
-            SceneTransition2D.fade({ from, to, color: red });
+            const t = SceneTransition2D.fade({ from, to, color: red });
 
-            const overlay = from.rootNodes[0] as any;
+            // Access internal overlay via cast (test-only)
+            const overlay = (t as any)._overlay;
             expect(overlay.tint.r).toBe(1);
             expect(overlay.tint.g).toBe(0);
             expect(overlay.tint.b).toBe(0);

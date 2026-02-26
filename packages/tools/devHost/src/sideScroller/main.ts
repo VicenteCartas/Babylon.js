@@ -20,16 +20,113 @@ import { ObjectPool } from "2d/ObjectPool/objectPool";
 import type { IPoolable } from "2d/ObjectPool/objectPool";
 import { SpriteAtlasBuilder } from "2d/SpriteAtlas/spriteAtlasBuilder";
 import type { SpriteAtlas } from "2d/SpriteAtlas/spriteAtlas";
-import { Vector2 } from "core/Maths/math.vector";
+import { RenderTexture2D } from "2d/RenderTexture/renderTexture2D";
+import { SpatialAudio2D } from "2d/Audio/spatialAudio2D";
+import { Tween } from "2d/Tween/tween";
+import { TweenManager } from "2d/Tween/tween";
+import { Easing } from "2d/Tween/easing";
+import { Vector2, Vector3 } from "core/Maths/math.vector";
 import { Color4 } from "core/Maths/math.color";
+import { ParticleSystem } from "core/Particles/particleSystem";
+import { ParticleHelper2D } from "2d/Particles/particleHelper2D";
+
+// ─── Procedural Audio Helpers ────────────────────────────────────────
+// Uses the Web Audio API OscillatorNode directly to produce retro-style
+// beeps and chirps without any external audio files.
+
+/** Shared AudioContext — created lazily on first user gesture. */
+let _audioCtx: AudioContext | null = null;
+
+/**
+ * Returns the shared AudioContext, creating it on demand.
+ * Call only from a user-gesture handler so browsers allow playback.
+ */
+function getAudioContext(): AudioContext {
+    if (!_audioCtx) {
+        _audioCtx = new AudioContext();
+    }
+    // Resume if suspended (browser autoplay policy)
+    if (_audioCtx.state === "suspended") {
+        _audioCtx.resume();
+    }
+    return _audioCtx;
+}
+
+/**
+ * Play a simple constant-frequency tone with an exponential decay envelope.
+ * @param frequency - Oscillator frequency in Hz
+ * @param duration  - Length of the tone in seconds
+ * @param type      - Waveform: "sine" | "square" | "sawtooth" | "triangle"
+ * @param volume    - Peak gain (0–1, keep low ~0.1)
+ */
+function playTone(
+    frequency: number,
+    duration: number,
+    type: OscillatorType = "square",
+    volume: number = 0.1
+): void {
+    const ctx = getAudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = frequency;
+    gain.gain.value = volume;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+}
+
+/**
+ * Play a frequency-sweep tone (chirp / pew / whoosh).
+ * The frequency ramps linearly from `startFreq` to `endFreq` over `duration`.
+ * @param startFreq - Starting frequency in Hz
+ * @param endFreq   - Ending frequency in Hz
+ * @param duration  - Sweep length in seconds
+ * @param type      - Waveform type
+ * @param volume    - Peak gain
+ */
+function playSweep(
+    startFreq: number,
+    endFreq: number,
+    duration: number,
+    type: OscillatorType = "square",
+    volume: number = 0.1
+): void {
+    const ctx = getAudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(endFreq, ctx.currentTime + duration);
+    gain.gain.value = volume;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+}
+
+// Convenience wrappers for each game event — keeps inline code tidy.
+/** Rising chirp (300→600 Hz, 0.1 s) */
+function sfxJump(): void { playSweep(300, 600, 0.1, "square", 0.08); }
+/** Sawtooth whoosh (150 Hz, 0.15 s) */
+function sfxDash(): void { playTone(150, 0.15, "sawtooth", 0.1); }
+/** Descending pew (800→200 Hz, 0.08 s) */
+function sfxShoot(): void { playSweep(800, 200, 0.08, "square", 0.07); }
+/** Pleasant ding (880 Hz sine, 0.15 s) */
+function sfxCollect(): void { playTone(880, 0.15, "sine", 0.1); }
+/** Low thud (100 Hz square, 0.1 s) */
+function sfxEnemyHit(): void { playTone(100, 0.1, "square", 0.1); }
 
 /**
  * Side-scroller demo — "Hollow Knight lite"
- * Demonstrates: Sprite2D, Camera2D follow, Physics2D, InputMap2D, parallax,
- *               StateMachine2D (enemy AI), Text2D (HUD), NineSliceSprite2D (panels),
+ * Demonstrates: Sprite2D, Camera2D follow, Node2D.scrollFactor (built-in parallax),
+ *               Physics2D, InputMap2D, StateMachine2D (enemy AI), Text2D (HUD),
+ *               NineSliceSprite2D (panels),
  *               LightingManager2D (GPU forward lighting — player glow + collectible lights),
- *               ObjectPool (bullet pooling for zero-GC shooting)
- *               **SpriteAtlasBuilder** (runtime atlas packing for batch rendering)
+ *               ObjectPool (bullet pooling for zero-GC shooting),
+ *               **SpriteAtlasBuilder** (runtime atlas packing for batch rendering),
+ *               **SpatialAudio2D** + procedural SFX (Web Audio oscillators)
  */
 export async function Main(_searchParams: URLSearchParams): Promise<void> {
     const mainDiv = document.getElementById("main-div") as HTMLDivElement;
@@ -43,20 +140,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     canvas.style.cssText = "width:100%;height:100%;display:block;background:#1a1a2e;";
     mainDiv.appendChild(canvas);
 
-    // Instructions overlay
-    const overlay = document.createElement("div");
-    overlay.style.cssText = "position:absolute;top:10px;left:10px;color:#fff;font-family:monospace;font-size:14px;z-index:10;pointer-events:none;background:rgba(0,0,0,0.5);padding:8px;border-radius:4px;";
-    overlay.innerHTML = "← → Move &nbsp; Space Jump &nbsp; Shift Dash &nbsp; X Shoot &nbsp; <b>F3 Debug</b><br>Babylon.js 2D Side-Scroller Demo" +
-        `<br><br><b>Features:</b> Scene2D, Sprite2D, Camera2D (follow + parallax), InputMap2D, PlanckPhysicsEngine,` +
-        `<br>&nbsp;&nbsp;StateMachine2D (enemy AI), Text2D (HUD), NineSliceSprite2D (panel), LightingManager2D (GPU),` +
-        `<br>&nbsp;&nbsp;<b>ObjectPool</b> (zero-GC bullet recycling), <b>SpriteAtlasBuilder</b> (runtime atlas packing),` +
-        `<br>&nbsp;&nbsp;<b>DebugRenderer2D</b> (physics overlay)` +
-        `<br><b>Sources:</b> Scene2D/scene2D.ts · Sprite2D/sprite2D.ts · Camera2D/camera2D.ts · Input/inputMap2D.ts` +
-        `<br>&nbsp;&nbsp;Physics/planckPhysicsEngine.ts · StateMachine/stateMachine.ts · Lighting/light2D.ts` +
-        `<br>&nbsp;&nbsp;<b>ObjectPool/objectPool.ts · SpriteAtlas/spriteAtlasBuilder.ts · Debug/debugRenderer2D.ts</b>`;
-    mainDiv.appendChild(overlay);
-
-    const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+    const engine= new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
 
     // Force canvas to match its display size
     engine.resize();
@@ -77,11 +161,29 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
 
     // ─── GPU Lighting ────────────────────────────────────────────────
     const lighting = new LightingManager2D();
-    lighting.ambientColor = new Color4(0.08, 0.06, 0.12, 1); // Very dark purple ambient
+    lighting.ambientColor = new Color4(0.25, 0.22, 0.30, 1); // Visible base lighting — platforms readable everywhere
     const playerLight = lighting.createPointLight(0, 0, new Color4(1.0, 0.95, 0.7, 1), 260);
     playerLight.intensity = 1.8;
     playerLight.falloff = 1.2;
+
+    // Warm torches at platforms
+    const torch1 = lighting.createPointLight(7 * 40 + 20, 13 * 40 - 30, new Color4(1.0, 0.6, 0.2, 1), 180);
+    torch1.intensity = 1.5;
+    torch1.falloff = 1.0;
+    const torch2 = lighting.createPointLight(38 * 40 + 20, 10 * 40 - 30, new Color4(1.0, 0.6, 0.2, 1), 180);
+    torch2.intensity = 1.5;
+    torch2.falloff = 1.0;
+
+    // Danger zone light
+    const dangerLight = lighting.createPointLight(52 * 40 + 20, 12 * 40 - 30, new Color4(1.0, 0.15, 0.1, 1), 200);
+    dangerLight.intensity = 1.2;
+    dangerLight.falloff = 1.0;
+
     scene.lightingManager = lighting;
+    scene.unlitSortingLayerMin = 1000; // HUD elements (sortingLayer >= 1000) render without lighting
+
+    // ─── TweenManager (shared for all game tweens) ──────────────────
+    const tweenManager = new TweenManager();
 
     const input= new InputMap2D(engine, camera);
     input.defineAction("moveRight", { type: "key", key: "ArrowRight" }, { type: "key", key: "KeyD" });
@@ -90,34 +192,114 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     input.defineAction("dash", { type: "key", key: "ShiftLeft" }, { type: "key", key: "ShiftRight" });
     input.defineAction("shoot", { type: "key", key: "KeyX" }, { type: "key", key: "KeyZ" });
 
+    // ─── SpatialAudio2D (positional audio listener tracking) ─────────
+    // We create the utility early so it's ready to sync each frame.
+    // The AudioContext itself is created lazily by getAudioContext() the
+    // first time the player presses a key (respecting autoplay policy).
+    const spatialAudio = new SpatialAudio2D(engine);
+
+    // ─── Particles (ParticleHelper2D) ────────────────────────────────────
+    const particleHelper = new ParticleHelper2D(engine);
+    particleHelper.camera = camera;
+
+    // Particle texture — small white circle via canvas (required by core ParticleSystem)
+    const particleCanvas = document.createElement("canvas");
+    particleCanvas.width = 8;
+    particleCanvas.height = 8;
+    const partCtx = particleCanvas.getContext("2d")!;
+    partCtx.fillStyle = "#ffffff";
+    partCtx.beginPath();
+    partCtx.arc(4, 4, 3, 0, Math.PI * 2);
+    partCtx.fill();
+    const particleTex = new DynamicTexture("particleTex", particleCanvas, particleHelper.scene, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+    particleTex._texture = engine.createDynamicTexture(8, 8, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+    engine.updateDynamicTexture(particleTex._texture, particleCanvas, false);
+
+    // Landing dust (manual emit bursts)
+    const dustPS = particleHelper.createParticleSystem("dust", 30);
+    dustPS.emitter = new Vector3(0, 0, 0);
+    dustPS.minSize = 2;
+    dustPS.maxSize = 5;
+    dustPS.minLifeTime = 0.15;
+    dustPS.maxLifeTime = 0.3;
+    dustPS.emitRate = 0; // Manual bursts only
+    dustPS.gravity = new Vector3(0, -50, 0); // Float up (Y-down, so negative = up)
+    dustPS.minEmitPower = 20;
+    dustPS.maxEmitPower = 50;
+    dustPS.direction1 = new Vector3(-1, -0.5, 0);
+    dustPS.direction2 = new Vector3(1, -0.5, 0);
+    dustPS.color1 = new Color4(0.6, 0.5, 0.3, 0.8);
+    dustPS.color2 = new Color4(0.4, 0.35, 0.25, 0.6);
+    dustPS.colorDead = new Color4(0.3, 0.25, 0.2, 0);
+    dustPS.blendMode = 2; // BLENDMODE_ADD
+    dustPS.particleTexture = particleTex;
+    dustPS.start();
+
+    // Bullet impact sparks
+    const sparkPS = particleHelper.createParticleSystem("sparks", 20);
+    sparkPS.emitter = new Vector3(0, 0, 0);
+    sparkPS.minSize = 1;
+    sparkPS.maxSize = 3;
+    sparkPS.minLifeTime = 0.1;
+    sparkPS.maxLifeTime = 0.2;
+    sparkPS.emitRate = 0;
+    sparkPS.gravity = new Vector3(0, 100, 0);
+    sparkPS.minEmitPower = 40;
+    sparkPS.maxEmitPower = 80;
+    sparkPS.direction1 = new Vector3(-1, -1, 0);
+    sparkPS.direction2 = new Vector3(1, 0.5, 0);
+    sparkPS.color1 = new Color4(0.3, 0.9, 1.0, 1);
+    sparkPS.color2 = new Color4(0.5, 0.7, 1.0, 0.8);
+    sparkPS.colorDead = new Color4(0.1, 0.3, 0.5, 0);
+    sparkPS.blendMode = 2;
+    sparkPS.particleTexture = particleTex;
+    sparkPS.start();
+
+    // Collectible pickup burst
+    const collectPS = particleHelper.createParticleSystem("collect", 30);
+    collectPS.emitter = new Vector3(0, 0, 0);
+    collectPS.minSize = 1.5;
+    collectPS.maxSize = 3;
+    collectPS.minLifeTime = 0.15;
+    collectPS.maxLifeTime = 0.35;
+    collectPS.emitRate = 0;
+    collectPS.gravity = new Vector3(0, -80, 0); // Fast upward pull (Y-down)
+    collectPS.minEmitPower = 60;
+    collectPS.maxEmitPower = 120;
+    collectPS.direction1 = new Vector3(-0.8, -1, 0);
+    collectPS.direction2 = new Vector3(0.8, -0.6, 0);
+    collectPS.color1 = new Color4(1.0, 0.95, 0.5, 1);
+    collectPS.color2 = new Color4(1.0, 0.8, 0.2, 0.9);
+    collectPS.colorDead = new Color4(1.0, 0.6, 0.0, 0);
+    collectPS.blendMode = 2;
+    collectPS.particleTexture = particleTex;
+    collectPS.start();
+
+    // Ambient floating motes
+    const ambientPS = particleHelper.createParticleSystem("ambient", 40);
+    ambientPS.emitter = new Vector3(0, 0, 0); // Will follow camera
+    ambientPS.minSize = 1;
+    ambientPS.maxSize = 2;
+    ambientPS.minLifeTime = 3;
+    ambientPS.maxLifeTime = 6;
+    ambientPS.emitRate = 5;
+    ambientPS.gravity = new Vector3(0, -5, 0); // Slow upward drift
+    ambientPS.minEmitPower = 2;
+    ambientPS.maxEmitPower = 8;
+    ambientPS.direction1 = new Vector3(-0.5, -1, 0);
+    ambientPS.direction2 = new Vector3(0.5, 0, 0);
+    ambientPS.color1 = new Color4(0.5, 0.8, 1.0, 0.3);
+    ambientPS.color2 = new Color4(0.3, 0.6, 0.9, 0.2);
+    ambientPS.colorDead = new Color4(0.2, 0.4, 0.7, 0);
+    ambientPS.minEmitBox = new Vector3(-200, -100, 0);
+    ambientPS.maxEmitBox = new Vector3(200, 100, 0);
+    ambientPS.blendMode = 2;
+    ambientPS.particleTexture = particleTex;
+    ambientPS.start();
+
     // ═══ SpriteAtlasBuilder — Pack all game sprites into a single texture ═══
     console.time("⏱ SpriteAtlasBuilder: Total atlas build time");
     
-    // Helper: Create a simple canvas texture with a solid color and optional glow
-    function createSpriteTexture(width: number, height: number, color: Color4, glow = false): HTMLCanvasElement {
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d")!;
-        
-        // Fill with color
-        ctx.fillStyle = `rgba(${color.r * 255}, ${color.g * 255}, ${color.b * 255}, ${color.a})`;
-        ctx.fillRect(0, 0, width, height);
-        
-        // Add simple visual detail (border or glow)
-        if (glow) {
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = ctx.fillStyle;
-            ctx.fillRect(width * 0.2, height * 0.2, width * 0.6, height * 0.6);
-        } else {
-            ctx.strokeStyle = `rgba(${color.r * 255 * 0.7}, ${color.g * 255 * 0.7}, ${color.b * 255 * 0.7}, ${color.a})`;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(1, 1, width - 2, height - 2);
-        }
-        
-        return canvas;
-    }
-
     // Build atlas with all sprite types used in the game
     const atlasBuilder = new SpriteAtlasBuilder(engine, {
         maxWidth: 2048,
@@ -126,23 +308,26 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         powerOfTwo: true,
     });
 
-    // Terrain tiles (multiple variants for visual variety)
-    atlasBuilder.addImage("terrain_rock", createSpriteTexture(40, 40, new Color4(0.25, 0.2, 0.18, 1)));
-    atlasBuilder.addImage("terrain_dirt", createSpriteTexture(40, 40, new Color4(0.3, 0.25, 0.2, 1)));
-    atlasBuilder.addImage("terrain_stone", createSpriteTexture(40, 40, new Color4(0.2, 0.2, 0.22, 1)));
-    
+    // Terrain tiles (3 variants × 2 surface types = 6)
+    for (let v = 0; v < 3; v++) {
+        atlasBuilder.addImage(`terrain_${v}`, createTerrainSprite(40, 40, v, false));
+        atlasBuilder.addImage(`terrain_top_${v}`, createTerrainSprite(40, 40, v, true));
+    }
+
     // Characters
-    atlasBuilder.addImage("player", createSpriteTexture(28, 44, new Color4(0.3, 0.9, 0.5, 1)));
-    atlasBuilder.addImage("enemy", createSpriteTexture(30, 30, new Color4(0.9, 0.2, 0.2, 1)));
-    
+    atlasBuilder.addImage("player", createPlayerSprite(28, 44));
+    atlasBuilder.addImage("enemy", createEnemySprite(30, 30));
+
     // Items
-    atlasBuilder.addImage("collectible", createSpriteTexture(16, 16, new Color4(1.0, 0.85, 0.3, 1), true));
-    atlasBuilder.addImage("bullet", createSpriteTexture(12, 6, new Color4(0.2, 0.8, 1.0, 1)));
-    
+    atlasBuilder.addImage("collectible", createGemSprite(16, 16));
+    atlasBuilder.addImage("bullet", createBulletSprite(12, 6));
+
     // Parallax background elements
-    atlasBuilder.addImage("bg_far", createSpriteTexture(64, 64, new Color4(0.05, 0.05, 0.15, 0.8)));
-    atlasBuilder.addImage("bg_mid", createSpriteTexture(48, 48, new Color4(0.08, 0.08, 0.2, 0.8)));
-    atlasBuilder.addImage("bg_near", createSpriteTexture(32, 32, new Color4(0.1, 0.1, 0.25, 0.8)));
+    for (let i = 0; i < 3; i++) {
+        atlasBuilder.addImage(`bg_far_${i}`, createFarBgSprite(128, 96, i));
+        atlasBuilder.addImage(`bg_mid_${i}`, createMidBgSprite(64, 80, i));
+        atlasBuilder.addImage(`bg_near_${i}`, createNearBgSprite(48, 56, i));
+    }
 
     // Build the atlas asynchronously
     const gameAtlas: SpriteAtlas = await atlasBuilder.buildAsync();
@@ -186,7 +371,6 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     scene.addNode(terrainParent);
 
     // Visual sprites — one per tile (using SpriteAtlas)
-    const terrainTextures = ["terrain_rock", "terrain_dirt", "terrain_stone"];
     for (let row = 0; row < LEVEL_HEIGHT; row++) {
         for (let col = 0; col < LEVEL_WIDTH; col++) {
             if (level[row][col] === 1) {
@@ -196,8 +380,10 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
                 tile.height = TILE;
                 tile.position = new Vector2(col * TILE + TILE / 2, row * TILE + TILE / 2);
                 
-                // Use atlas texture and frame
-                const textureKey = terrainTextures[(col + row * 3) % terrainTextures.length];
+                // Use atlas texture and frame — pick surface variant if air above
+                const isTop = row === 0 || level[row - 1][col] === 0;
+                const variant = (col + row * 3) % 3;
+                const textureKey = isTop ? `terrain_top_${variant}` : `terrain_${variant}`;
                 tile.texture = gameAtlas.texture;
                 tile.sourceRect = gameAtlas.getFrame(textureKey);
                 tile.tint = getTileColor(row, level);
@@ -206,6 +392,9 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     }
 
     // Merged physics bodies — one per horizontal run of tiles (eliminates tile-seam ghost collisions)
+    // Build horizontal runs per row, then merge vertically to eliminate ghost-vertex seams
+    type TerrainRun = { row: number; startCol: number; width: number };
+    const runs: TerrainRun[] = [];
     for (let row = 0; row < LEVEL_HEIGHT; row++) {
         let runStart = -1;
         for (let col = 0; col <= LEVEL_WIDTH; col++) {
@@ -213,24 +402,80 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
             if (isTile && runStart === -1) {
                 runStart = col;
             } else if (!isTile && runStart !== -1) {
-                const runLen = col - runStart;
-                const bodyNode = new Node2D(`terrain_body_${row}_${runStart}`);
-                bodyNode.parent = terrainParent;
-                bodyNode.position = new Vector2(
-                    runStart * TILE + (runLen * TILE) / 2,
-                    row * TILE + TILE / 2
-                );
-                physics.addBody(bodyNode, {
-                    bodyType: PhysicsBodyType2D.Static,
-                    shape: { type: "box", width: runLen * TILE, height: TILE },
-                });
+                runs.push({ row, startCol: runStart, width: col - runStart });
                 runStart = -1;
             }
         }
     }
 
+    // Sort by (startCol, width, row) so vertically adjacent same-span runs are consecutive
+    runs.sort((a, b) => a.startCol - b.startCol || a.width - b.width || a.row - b.row);
+
+    // Merge vertically adjacent runs with same startCol and width
+    let i = 0;
+    while (i < runs.length) {
+        const startCol = runs[i].startCol;
+        const w = runs[i].width;
+        let topRow = runs[i].row;
+        let bottomRow = topRow;
+        let j = i + 1;
+        while (j < runs.length && runs[j].startCol === startCol && runs[j].width === w && runs[j].row === bottomRow + 1) {
+            bottomRow = runs[j].row;
+            j++;
+        }
+        const heightInTiles = bottomRow - topRow + 1;
+        const bodyNode = new Node2D(`terrain_body_${topRow}_${startCol}`);
+        bodyNode.parent = terrainParent;
+        bodyNode.position = new Vector2(
+            startCol * TILE + (w * TILE) / 2,
+            topRow * TILE + (heightInTiles * TILE) / 2
+        );
+        physics.addBody(bodyNode, {
+            bodyType: PhysicsBodyType2D.Static,
+            shape: { type: "box", width: w * TILE, height: heightInTiles * TILE },
+        });
+        i = j;
+    }
+
     // ─── Parallax Backgrounds ────────────────────────────────────────
-    const parallaxLayers = createParallaxLayers(scene, LEVEL_WIDTH * TILE, gameAtlas);
+    // Scroll factors are set on parent nodes via Node2D.scrollFactorX/Y — no per-frame update needed.
+    createParallaxLayers(scene, LEVEL_WIDTH * TILE, gameAtlas);
+
+    // ─── Star Field (very far background) ────────────────────────────
+    {
+        const starsParent = new Node2D("bg_stars");
+        scene.addNode(starsParent);
+        starsParent.zIndex = -110;
+        starsParent.scrollFactorX = 0.05;
+        starsParent.scrollFactorY = 1.0; // Full vertical scroll — stays in sky, no floating
+
+        const starCanvas = document.createElement("canvas");
+        starCanvas.width = 2;
+        starCanvas.height = 2;
+        const sCtx = starCanvas.getContext("2d")!;
+        sCtx.fillStyle = "#ffffff";
+        sCtx.fillRect(0, 0, 2, 2);
+        const starTex = new DynamicTexture("starTex", starCanvas, null, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+        starTex._texture = engine.createDynamicTexture(2, 2, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+        engine.updateDynamicTexture(starTex._texture, starCanvas, false);
+
+        for (let i = 0; i < 40; i++) {
+            const star = new Sprite2D(`star_${i}`, null);
+            star.parent = starsParent;
+            star.width = 1 + Math.random() * 2;
+            star.height = star.width;
+            star.position.x = Math.random() * LEVEL_WIDTH * TILE;
+            star.position.y = -200 + Math.random() * 400; // Sky area above terrain
+            star.texture = starTex;
+            star.alpha = 0.3 + Math.random() * 0.7;
+            star.tint = new Color4(
+                (0.7 + Math.random() * 0.3) * 3,
+                (0.7 + Math.random() * 0.3) * 3,
+                1.0 * 3,
+                1
+            );
+        }
+    }
 
     // ─── Player ──────────────────────────────────────────────────────
     const player = new Sprite2D("player");
@@ -246,7 +491,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         bodyType: PhysicsBodyType2D.Dynamic,
         shape: { type: "box", width: 24, height: 40 },
         fixedRotation: true,
-        friction: 0.2,
+        friction: 0,
         density: 1,
     });
 
@@ -261,12 +506,29 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
 
     // ─── Camera Follow ───────────────────────────────────────────────
     camera.lockedTarget = player;
-    camera.lerpSpeed = 0.08;
+    camera.lerpSpeed = 0.06;
     camera.bounds = new Rectangle2D(0, 0, LEVEL_WIDTH * TILE, LEVEL_HEIGHT * TILE);
 
     // ─── HUD (Text2D + NineSliceSprite2D) ────────────────────────────
     const DESIGN_W = 480;
     const DESIGN_H = 270;
+
+    // ─── RenderTexture2D — Dash Trail / Afterimage ───────────────────
+    // Renders the scene to an offscreen texture each frame, then displays
+    // that texture as a full-screen sprite behind everything at low alpha.
+    // The trail sprite is hidden during RT capture to avoid reading from
+    // and writing to the same texture simultaneously. During dashes, the
+    // player's ghost appears as a faint afterimage.
+    const trailRT = new RenderTexture2D("dashTrail", engine, DESIGN_W, DESIGN_H);
+
+    const trailSprite = new Sprite2D("trailSprite");
+    scene.addNode(trailSprite);
+    trailSprite.width = DESIGN_W;
+    trailSprite.height = DESIGN_H;
+    trailSprite.texture = trailRT.texture;
+    trailSprite.sortingLayer = 1; // Above gameplay, below HUD
+    trailSprite.alpha = 0;
+    trailSprite.visible = false;
 
     // Create a 9-slice panel texture: 16×16 with 2px lighter border, dark interior
     const panelCanvas = document.createElement("canvas");
@@ -324,57 +586,177 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     debugIndicator.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
     scene.addNode(debugIndicator);
 
-    // Helper: position HUD elements relative to camera in design coords
+    // ─── Control Hints — fade out after 5 seconds ───────────────────
+    const hintText = new Text2D("hintText", "← → Move  |  Space Jump  |  Shift Dash  |  X Shoot  |  F3 Debug", {
+        font: "bold 10px monospace",
+        color: "#aaccff",
+        textAlign: "center",
+        textBaseline: "middle",
+    });
+    hintText.sortingLayer = 1000;
+    hintText.zIndex = 2;
+    hintText.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
+    scene.addNode(hintText);
+
+    // Auto-fade the hints after 5 seconds
+    setTimeout(() => {
+        tweenManager.add(
+            Tween.Create(1.0, 0.0, 2.0, Easing.QuadOut, (value: number) => {
+                hintText.alpha = value;
+            })
+        );
+    }, 5000);
+
+    // Health bar background (NineSlice)
+    const healthPanel = new NineSliceSprite2D("healthPanel", panelTex);
+    healthPanel.setUniformBorders(2);
+    healthPanel.width = 52;
+    healthPanel.height = 10;
+    healthPanel.sortingLayer = 1000;
+    healthPanel.zIndex = 0;
+    scene.addNode(healthPanel);
+
+    // Health bar fill (simple Sprite2D with red-to-green tinting)
+    const healthFillCanvas = document.createElement("canvas");
+    healthFillCanvas.width = 4;
+    healthFillCanvas.height = 4;
+    const hfCtx = healthFillCanvas.getContext("2d")!;
+    hfCtx.fillStyle = "#ffffff";
+    hfCtx.fillRect(0, 0, 4, 4);
+    const healthFillTex = new DynamicTexture("healthFillTex", healthFillCanvas, null, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+    healthFillTex._texture = engine.createDynamicTexture(4, 4, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+    engine.updateDynamicTexture(healthFillTex._texture, healthFillCanvas, false);
+
+    const healthFill = new Sprite2D("healthFill");
+    healthFill.texture = healthFillTex;
+    healthFill.width = 48;
+    healthFill.height = 6;
+    healthFill.sortingLayer = 1000;
+    healthFill.zIndex = 1;
+    healthFill.tint = new Color4(0.3, 0.9, 0.3, 1);
+    scene.addNode(healthFill);
+
+    // Health label
+    const healthLabel = new Text2D("healthLabel", "HP", {
+        font: "bold 8px monospace",
+        color: "#ff6666",
+        textAlign: "right",
+        textBaseline: "middle",
+    });
+    healthLabel.sortingLayer = 1000;
+    healthLabel.zIndex = 2;
+    healthLabel.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
+    scene.addNode(healthLabel);
+
+    // Title text with subtle alpha pulse
+    const titleText = new Text2D("titleText", "BABYLON.JS 2D", {
+        font: "bold 10px monospace",
+        color: "#6688cc",
+        textAlign: "center",
+        textBaseline: "middle",
+    });
+    titleText.sortingLayer = 1000;
+    titleText.zIndex = 2;
+    titleText.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
+    scene.addNode(titleText);
+
+    // Gem icon next to score
+    const gemIcon = new Sprite2D("gemIcon");
+    gemIcon.texture = gameAtlas.texture;
+    gemIcon.sourceRect = gameAtlas.getFrame("collectible");
+    gemIcon.width = 10;
+    gemIcon.height = 10;
+    gemIcon.sortingLayer = 1000;
+    gemIcon.zIndex = 1;
+    scene.addNode(gemIcon);
+
+    // Helper: position HUD elements relative to camera viewport edges
     function updateHUD() {
         const cx = camera.position.x;
         const cy = camera.position.y;
-        const hw = DESIGN_W / 2;
-        const hh = DESIGN_H / 2;
+        // Compute actual visible world half-extents (handles resize + design resolution)
+        const { scaleX, scaleY } = camera.effectiveScale;
+        const hw = camera.viewportWidth / (2 * scaleX);
+        const hh = camera.viewportHeight / (2 * scaleY);
 
-        // Compute scaled text size for panel fitting
+        // Health bar — top-left (label to the left of the bar)
+        const hlw = healthLabel.width * TEXT_SCALE;
+        const hpX = cx - hw + hlw + 30;
+        const hpY = cy - hh + 8;
+        healthPanel.position.x = hpX;
+        healthPanel.position.y = hpY;
+        const healthRatio = playerHealth / MAX_HEALTH;
+        healthFill.width = 48 * healthRatio;
+        healthFill.position.x = hpX - (48 - healthFill.width) / 2;
+        healthFill.position.y = hpY;
+        // Color: green → yellow → red
+        healthFill.tint = healthRatio > 0.5
+            ? new Color4(0.3, 0.9, 0.3, 1)
+            : healthRatio > 0.25
+                ? new Color4(0.9, 0.9, 0.2, 1)
+                : new Color4(0.9, 0.2, 0.2, 1);
+        healthLabel.position.x = cx - hw + hlw / 2 + 2;
+        healthLabel.position.y = hpY;
+
+        // Score panel + gem icon + text — top-right
         const tw = scoreText.width * TEXT_SCALE;
         const th = scoreText.height * TEXT_SCALE;
-        const panelW = tw + 8;
+        const panelW = tw + 16; // Extra space for gem icon
         const panelH = th + 4;
         scorePanel.width = panelW;
         scorePanel.height = panelH;
-
-        // Score panel + text: top-right, both share same center
         const hudX = cx + hw - panelW / 2 - 4;
         const hudY = cy - hh + panelH / 2 + 4;
         scorePanel.position.x = hudX;
         scorePanel.position.y = hudY;
-        scoreText.position.x = hudX;
+        gemIcon.position.x = hudX - panelW / 2 + 8;
+        gemIcon.position.y = hudY;
+        scoreText.position.x = hudX + 4;
         scoreText.position.y = hudY;
 
-        // Debug text: bottom-left
+        // Title — top-center
+        titleText.position.x = cx;
+        titleText.position.y = cy - hh + 8;
+
+        // Debug text — bottom-left
         const dtw = debugText.width * TEXT_SCALE;
         const dth = debugText.height * TEXT_SCALE;
         debugText.position.x = cx - hw + dtw / 2 + 4;
         debugText.position.y = cy + hh - dth / 2 - 4;
 
-        // Debug mode indicator: top-left
+        // Debug mode indicator — top-left (below health bar)
         if (debugMode) {
             debugIndicator.text = "[F3] DEBUG";
             const diw = debugIndicator.width * TEXT_SCALE;
             const dih = debugIndicator.height * TEXT_SCALE;
             debugIndicator.position.x = cx - hw + diw / 2 + 4;
-            debugIndicator.position.y = cy - hh + dih / 2 + 4;
+            debugIndicator.position.y = cy - hh + dih / 2 + 18;
         } else {
             debugIndicator.text = "";
         }
+
+        // Control hints — bottom center
+        const hth = hintText.height * TEXT_SCALE;
+        hintText.position.x = cx;
+        hintText.position.y = cy + hh - hth / 2 - 6;
     }
 
     // ─── Player State ────────────────────────────────────────────────
     let onGround = false;
+    let wasInAir = false;
     let jumpBuffer = 0;
     let coyoteTime = 0;
     let dashCooldown = 0;
     let isDashing = false;
     let dashTimer = 0;
     let dashDir = 1;
+    let dashJustStarted = false;
+    let skidTimer = 0;
+    let trailFade = 0;
     let facingRight = true;
     let score = 0;
+    let playerHealth = 3;
+    const MAX_HEALTH = 3;
     let shootCooldown = 0;
     const MOVE_SPEED = 350;
     const JUMP_FORCE = 800;
@@ -419,6 +801,19 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         input.update();
 
         // ── Player Movement ──
+        // Landing shake
+        if (onGround && wasInAir) {
+            camera.shake(2, 0.1);
+            dustPS.emitter = new Vector3(player.position.x, player.position.y + 20, 0);
+            dustPS.manualEmitCount = 8;
+            player.scale = new Vector2(1.2, 0.7);
+            tweenManager.add(Tween.Create(0.7, 1.0, 0.15, Easing.BounceOut)
+                .onUpdate((v: number) => { player.scale.y = v; }));
+            tweenManager.add(Tween.Create(1.2, 1.0, 0.15, Easing.BounceOut)
+                .onUpdate((v: number) => { player.scale.x = v; }));
+        }
+        wasInAir = !onGround;
+
         const vel = playerBody.getLinearVelocity();
         let moveX = 0;
 
@@ -453,6 +848,13 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
             jumpBuffer = 0;
             coyoteTime = 0;
             onGround = false;
+            sfxJump(); // 🔊 Rising chirp
+            player.scale = new Vector2(0.8, 1.3);
+            tweenManager.add(Tween.Create(1.3, 1.0, 0.1, Easing.QuadOut)
+                .onUpdate((v: number) => { player.scale.y = v; }));
+            tweenManager.add(Tween.Create(0.8, 1.0, 0.1, Easing.QuadOut)
+                .onUpdate((v: number) => { player.scale.x = v; }));
+            camera.shake(1.5, 0.06);
         }
 
         // Reset ground if moving upward
@@ -468,6 +870,7 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
             const offsetX = facingRight ? 20 : -20;
             bullet.spawn(player.position.x + offsetX, player.position.y, facingRight ? 1 : -1);
             activeBullets.push(bullet);
+            sfxShoot(); // 🔊 Descending pew
         }
 
         // Dash
@@ -477,12 +880,23 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
             dashTimer = DASH_DURATION;
             dashCooldown = DASH_COOLDOWN;
             dashDir = facingRight ? 1 : -1;
+            dashJustStarted = true;
+            trailFade = 1.0;
+            sfxDash(); // 🔊 Sawtooth whoosh
+            camera.shake(2, 0.08);
+            // Dash stretch
+            player.scale = new Vector2(1.4, 0.8);
+            tweenManager.add(Tween.Create(1.4, 1.0, 0.12, Easing.QuadOut)
+                .onUpdate((v: number) => { player.scale.x = v; }));
+            tweenManager.add(Tween.Create(0.8, 1.0, 0.12, Easing.QuadOut)
+                .onUpdate((v: number) => { player.scale.y = v; }));
         }
 
         if (isDashing) {
             dashTimer -= dt;
             if (dashTimer <= 0) {
                 isDashing = false;
+                skidTimer = 0.1; // Brief deceleration
             } else {
                 playerBody.setLinearVelocity(new Vector2(dashDir * DASH_SPEED, 0));
                 player.tint = new Color4(0.8, 1.0, 0.8, 0.7); // Flash during dash
@@ -490,17 +904,42 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         } else {
             // Re-read velocity so jump's Y component isn't overwritten by stale `vel`
             const currentVel = playerBody.getLinearVelocity();
-            playerBody.setLinearVelocity(new Vector2(moveX * MOVE_SPEED, currentVel.y));
+            if (skidTimer > 0) {
+                skidTimer -= dt;
+                // Skid: gradually reduce speed from dash velocity to normal
+                const skidFactor = skidTimer / 0.1;
+                const skidSpeed = moveX * MOVE_SPEED + dashDir * DASH_SPEED * skidFactor * 0.5;
+                playerBody.setLinearVelocity(new Vector2(skidSpeed, currentVel.y));
+            } else {
+                playerBody.setLinearVelocity(new Vector2(moveX * MOVE_SPEED, currentVel.y));
+            }
             player.tint = new Color4(0.3, 0.9, 0.5, 1);
         }
 
         // ── Enemy AI ──
+        // Camera look-ahead — offset toward facing direction
+        const targetOffsetX = facingRight ? 40 : -40;
+        camera.followOffset.x += (targetOffsetX - camera.followOffset.x) * 0.05;
+
         for (const enemy of enemies) {
             updateEnemy(enemy, player, dt);
+            // Enemy contact damage
+            if (enemy.context.playerDist < 35 && playerHealth > 0 && dashCooldown < DASH_COOLDOWN - 0.3) {
+                playerHealth--;
+                camera.shake(4, 0.15);
+                player.tint = new Color4(1, 0.3, 0.3, 1);
+                tweenManager.add(Tween.Create(0.3, 1.0, 0.3, Easing.QuadOut)
+                    .onUpdate((v: number) => {
+                        player.tint.g = v * 0.9;
+                        player.tint.b = v * 0.5;
+                    }));
+                // Brief invincibility via dash cooldown reuse
+                dashCooldown = DASH_COOLDOWN;
+            }
         }
 
         // ── Bullet Updates ──
-        updateBullets(bulletPool, activeBullets, enemies, dt);
+        updateBullets(bulletPool, activeBullets, enemies, dt, camera, tweenManager, sparkPS);
 
         // ── Collectibles ──
         const px = player.position.x;
@@ -516,9 +955,26 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
                 const dy = c.sprite.position.y - py;
                 if (dx * dx + dy * dy < 600) {
                     c.collected = true;
-                    c.sprite.alpha = 0;
                     score++;
+                    collectPS.emitter = new Vector3(c.sprite.position.x, c.sprite.position.y, 0);
+                    collectPS.manualEmitCount = 15;
+                    // Pickup burst: scale up + fade out
+                    tweenManager.add(Tween.Create(1.0, 1.8, 0.3, Easing.QuadOut)
+                        .onUpdate((v: number) => {
+                            c.sprite.scale.x = v;
+                            c.sprite.scale.y = v;
+                        }));
+                    tweenManager.add(Tween.Create(1.0, 0.0, 0.3, Easing.QuadOut)
+                        .onUpdate((v: number) => { c.sprite.alpha = v; }));
+                    // Score text bump
+                    scoreText.scale = new Vector2(TEXT_SCALE * 1.3, TEXT_SCALE * 1.3);
+                    tweenManager.add(Tween.Create(TEXT_SCALE * 1.3, TEXT_SCALE, 0.2, Easing.BackOut)
+                        .onUpdate((v: number) => {
+                            scoreText.scale.x = v;
+                            scoreText.scale.y = v;
+                        }));
                     if (c.light) { c.light.enabled = false; }
+                    sfxCollect(); // 🔊 Pleasant ding
                 }
             }
             // Bobbing animation + light follows
@@ -531,26 +987,81 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         // ── Physics Step ──
         physics.step(dt);
 
-        // ── Parallax Scrolling ──
-        // Offset each parallax layer based on camera position and its scroll factor.
-        // A factor of 0 = fully static (infinite distance), 1 = moves with camera (foreground).
-        const camX = camera.position.x;
-        const camY = camera.position.y;
-        for (const layer of parallaxLayers) {
-            layer.parent.position.x = -camX * (1 - layer.factor);
-            layer.parent.position.y = -camY * (1 - layer.factor) * 0.5;
-        }
-
         // ── Scene + Camera Update ──
         scene.update(dt);
+        tweenManager.update(dt);
         camera.update(dt);
 
+        // Ambient motes follow camera
+        ambientPS.emitter = new Vector3(camera.position.x, camera.position.y, 0);
+
+        // ── SpatialAudio2D — sync listener to camera position ──
+        // This keeps the Web Audio API listener centered on the camera so
+        // any future spatial sounds (e.g. positional enemy audio) pan
+        // correctly relative to the viewport.
+        if (_audioCtx) {
+            spatialAudio.update(camera);
+        }
+
         // ── HUD Update (Text2D + NineSliceSprite2D) ──
-        scoreText.text = `Score: ${score} / ${collectibles.length}`;
+        // Torch flicker
+        const flickerTime = performance.now() / 1000;
+        torch1.intensity = 1.5 + Math.sin(flickerTime * 8) * 0.3 + Math.sin(flickerTime * 13) * 0.15;
+        torch2.intensity = 1.5 + Math.sin(flickerTime * 7 + 2) * 0.3 + Math.sin(flickerTime * 11 + 1) * 0.15;
+
+        // Title text alpha pulse
+        titleText.alpha = 0.6 + Math.sin(performance.now() / 1500) * 0.3;
+
+        scoreText.text= `Score: ${score} / ${collectibles.length}`;
         debugText.text = `FPS: ${engine.getFps().toFixed(0)} | Pos: ${player.position.x.toFixed(0)},${player.position.y.toFixed(0)} | Ground: ${onGround} | Pool: ${bulletPool.activeCount}/${bulletPool.totalCreated}`;
         updateHUD();
 
+        // ── RenderTexture2D: Dash Trail Afterimage ──
+        // During dashes, stamp only the player into the RT (no clear) to
+        // accumulate ghost positions. Temporarily swap the camera viewport
+        // to the RT dimensions so the view transform offset matches the
+        // projection, then restore the canvas viewport afterward.
+        if (isDashing) {
+            // Save and swap camera viewport to match RT dimensions
+            const savedVpW = camera.viewportWidth;
+            const savedVpH = camera.viewportHeight;
+            camera.setViewport(DESIGN_W, DESIGN_H);
+
+            // Hide everything except the player for a focused afterimage
+            const roots = scene.rootNodes;
+            const savedVis: boolean[] = [];
+            for (let i = 0; i < roots.length; i++) {
+                savedVis[i] = roots[i].visible;
+                if (roots[i] !== player) {
+                    roots[i].visible = false;
+                }
+            }
+
+            trailRT.renderScene(scene, dashJustStarted);
+            dashJustStarted = false;
+
+            // Restore visibility
+            for (let i = 0; i < roots.length; i++) {
+                roots[i].visible = savedVis[i];
+            }
+            camera.setViewport(savedVpW, savedVpH);
+
+            trailSprite.visible = true;
+            trailSprite.alpha = 0.5;
+        } else if (trailFade > 0) {
+            trailFade = Math.max(0, trailFade - dt * 3);
+            trailSprite.alpha = trailFade * 0.5;
+            trailSprite.visible = trailFade > 0.01;
+        } else {
+            trailSprite.visible = false;
+        }
+        trailSprite.position.x = camera.position.x;
+        trailSprite.position.y = camera.position.y;
+
         scene.render();
+
+        // ── Particles (rendered on top of scene, below debug) ──
+        particleHelper.render();
 
         // ── DebugRenderer2D ──
         if (debugMode && debugRenderer.isReady) {
@@ -630,6 +1141,297 @@ function generateLevel(width: number, height: number): number[][] {
     return level;
 }
 
+// ─── Pixel-Art Sprite Generators ─────────────────────────────────────
+
+/** Create a pixel-art player sprite — small character with head, body, legs, dark outline */
+function createPlayerSprite(width: number, height: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    const outline = "#1a2a1a";
+    const bodyLight = "#5ddb6e";
+    const bodyDark = "#2d8a3a";
+    const eyeColor = "#ffffff";
+
+    // Body outline
+    ctx.fillStyle = outline;
+    ctx.fillRect(8, 0, 12, 4); // top of head
+    ctx.fillRect(6, 4, 16, 2); // head sides
+    ctx.fillRect(4, 6, 20, 28); // body block
+    ctx.fillRect(6, 34, 6, 10); // left leg
+    ctx.fillRect(16, 34, 6, 10); // right leg
+
+    // Body fill
+    ctx.fillStyle = bodyLight;
+    ctx.fillRect(10, 2, 8, 2); // inner head top
+    ctx.fillRect(8, 4, 12, 6); // head fill
+    ctx.fillRect(6, 10, 16, 22); // torso
+    ctx.fillStyle = bodyDark;
+    ctx.fillRect(6, 22, 16, 10); // lower torso (darker)
+    ctx.fillRect(8, 34, 4, 8); // left leg inner
+    ctx.fillRect(16, 34, 4, 8); // right leg inner (gap = 4px stride)
+
+    // Eyes
+    ctx.fillStyle = eyeColor;
+    ctx.fillRect(10, 6, 2, 2);
+    ctx.fillRect(16, 6, 2, 2);
+
+    // Belt detail
+    ctx.fillStyle = "#8B7355";
+    ctx.fillRect(6, 20, 16, 2);
+
+    return c;
+}
+
+/** Create a pixel-art enemy sprite — angular slime/blob shape with angry eyes */
+function createEnemySprite(width: number, height: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    const outline = "#2a0a0a";
+    const bodyLight = "#e03030";
+    const bodyDark = "#8a1515";
+
+    // Blob shape (wider at bottom)
+    ctx.fillStyle = outline;
+    ctx.fillRect(8, 2, 14, 4); // top
+    ctx.fillRect(4, 6, 22, 4); // upper mid
+    ctx.fillRect(2, 10, 26, 12); // body
+    ctx.fillRect(0, 22, 30, 8); // base (widest)
+
+    // Fill
+    ctx.fillStyle = bodyLight;
+    ctx.fillRect(10, 4, 10, 2);
+    ctx.fillRect(6, 6, 18, 4);
+    ctx.fillRect(4, 10, 22, 10);
+    ctx.fillStyle = bodyDark;
+    ctx.fillRect(2, 20, 26, 8);
+
+    // Angry eyes
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(8, 10, 4, 4);
+    ctx.fillRect(18, 10, 4, 4);
+    ctx.fillStyle = "#ff0000";
+    ctx.fillRect(10, 12, 2, 2);
+    ctx.fillRect(20, 12, 2, 2);
+
+    // Angry eyebrows (angled down toward center)
+    ctx.fillStyle = outline;
+    ctx.fillRect(7, 8, 6, 2);
+    ctx.fillRect(17, 8, 6, 2);
+
+    return c;
+}
+
+/** Create a terrain tile with cracks, grass tufts on surface tiles */
+function createTerrainSprite(width: number, height: number, variant: number, isTopSurface: boolean): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    // Base stone fill
+    const baseColors = ["#3a3545", "#35304a", "#2e2940"];
+    ctx.fillStyle = baseColors[variant % 3];
+    ctx.fillRect(0, 0, width, height);
+
+    // Darker border
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(0, 0, width, 1);
+    ctx.fillRect(0, 0, 1, height);
+    ctx.fillRect(width - 1, 0, 1, height);
+    ctx.fillRect(0, height - 1, width, 1);
+
+    // Noise dots for texture
+    const rng = (variant * 7 + 13) % 97;
+    for (let i = 0; i < 6; i++) {
+        const nx = ((rng * (i + 1) * 31) % (width - 4)) + 2;
+        const ny = ((rng * (i + 1) * 47) % (height - 4)) + 2;
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.fillRect(nx, ny, 2, 2);
+    }
+
+    // Crack lines
+    if (variant % 2 === 0) {
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillRect(12, 8, 1, 12);
+        ctx.fillRect(13, 18, 1, 8);
+        ctx.fillRect(26, 4, 1, 16);
+    }
+
+    // Grass tufts on top-surface tiles
+    if (isTopSurface) {
+        ctx.fillStyle = "#4a7a3a";
+        ctx.fillRect(4, 0, 2, 3);
+        ctx.fillRect(12, 0, 3, 4);
+        ctx.fillRect(22, 0, 2, 3);
+        ctx.fillRect(32, 0, 3, 2);
+        ctx.fillStyle = "#6aaa4a";
+        ctx.fillRect(5, 0, 1, 2);
+        ctx.fillRect(13, 0, 1, 3);
+        ctx.fillRect(23, 0, 1, 2);
+    }
+
+    return c;
+}
+
+/** Create a gem collectible with faceted highlight */
+function createGemSprite(width: number, height: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    // Octagonal gem shape
+    ctx.fillStyle = "#e8a820";
+    ctx.fillRect(4, 0, 8, 2); // top
+    ctx.fillRect(2, 2, 12, 4); // upper
+    ctx.fillRect(0, 6, 16, 4); // middle (widest)
+    ctx.fillRect(2, 10, 12, 4); // lower
+    ctx.fillRect(4, 14, 8, 2); // bottom
+
+    // Inner highlight (upper-left)
+    ctx.fillStyle = "#ffd86a";
+    ctx.fillRect(4, 2, 6, 2);
+    ctx.fillRect(2, 4, 4, 4);
+
+    // Dark facet (lower-right)
+    ctx.fillStyle = "#b07810";
+    ctx.fillRect(8, 10, 6, 4);
+    ctx.fillRect(6, 12, 4, 2);
+
+    // Sparkle pixel
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(4, 4, 2, 2);
+
+    return c;
+}
+
+/** Create a bullet/projectile with gradient glow */
+function createBulletSprite(width: number, height: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    // Outer glow
+    ctx.fillStyle = "rgba(50, 180, 255, 0.3)";
+    ctx.fillRect(0, 0, width, height);
+
+    // Core
+    ctx.fillStyle = "#40c8ff";
+    ctx.fillRect(2, 1, width - 4, height - 2);
+
+    // Bright center
+    ctx.fillStyle = "#b0f0ff";
+    ctx.fillRect(3, 2, width - 6, height - 4);
+
+    // Hot pixel
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(4, 2, 2, 2);
+
+    return c;
+}
+
+/** Create a distant mountain/hill silhouette for far parallax */
+function createFarBgSprite(width: number, height: number, seed: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    // White silhouette — tint handles color, lighting handles brightness
+    ctx.fillStyle = "#ffffff";
+    const peakX = width * 0.3 + (seed % 5) * width * 0.1;
+    const peakY = height * 0.15 + (seed % 3) * height * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(0, height);
+    ctx.lineTo(peakX * 0.3, height * 0.5);
+    ctx.lineTo(peakX, peakY);
+    ctx.lineTo(peakX + width * 0.2, height * 0.35);
+    ctx.lineTo(width * 0.8, height * 0.6);
+    ctx.lineTo(width, height * 0.7);
+    ctx.lineTo(width, height);
+    ctx.closePath();
+    ctx.fill();
+
+    // Slight highlight on peak
+    ctx.fillStyle = "rgba(200, 200, 255, 0.3)";
+    ctx.fillRect(Math.floor(peakX) - 2, Math.floor(peakY), 4, 4);
+
+    return c;
+}
+
+/** Create a mid-distance tree/ruin silhouette */
+function createMidBgSprite(width: number, height: number, seed: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.fillStyle = "#ffffff";
+    if (seed % 2 === 0) {
+        // Dead tree
+        const trunkX = width * 0.4;
+        ctx.fillRect(trunkX, height * 0.2, 4, height * 0.8);
+        ctx.fillRect(trunkX - 8, height * 0.3, 12, 3);
+        ctx.fillRect(trunkX + 2, height * 0.15, 10, 3);
+        ctx.fillRect(trunkX - 4, height * 0.5, 6, 3);
+    } else {
+        // Ruined building
+        ctx.fillRect(4, height * 0.3, width - 8, height * 0.7);
+        ctx.fillRect(2, height * 0.3, width - 4, 4);
+        ctx.clearRect(10, height * 0.45, 6, 8);
+        ctx.clearRect(width - 16, height * 0.45, 6, 8);
+        ctx.clearRect(width * 0.6, height * 0.3, 8, 10);
+    }
+
+    return c;
+}
+
+/** Create a near foreground rock/bush */
+function createNearBgSprite(width: number, height: number, seed: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    if (seed % 2 === 0) {
+        // Rock
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(4, height * 0.3, width - 8, height * 0.7);
+        ctx.fillRect(8, height * 0.2, width - 16, height * 0.15);
+        ctx.fillStyle = "rgba(200, 200, 255, 0.3)";
+        ctx.fillRect(6, height * 0.3, 4, height * 0.3);
+    } else {
+        // Glowing fungus cluster
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(8, height * 0.5, width - 16, height * 0.5);
+        ctx.fillRect(4, height * 0.3, 6, 8);
+        ctx.fillRect(14, height * 0.2, 8, 10);
+        ctx.fillRect(width - 12, height * 0.35, 6, 8);
+        // Glow spots (brighter)
+        ctx.fillStyle = "rgba(180, 255, 230, 0.6)";
+        ctx.fillRect(5, height * 0.3, 4, 4);
+        ctx.fillRect(16, height * 0.2, 4, 4);
+        ctx.fillRect(width - 11, height * 0.35, 4, 4);
+    }
+
+    return c;
+}
+
 // ─── Tile Colors ─────────────────────────────────────────────────────
 function getTileColor(row: number, level: number[][]): Color4 {
     const h = level.length;
@@ -649,28 +1451,49 @@ interface IParallaxLayer {
 
 function createParallaxLayers(scene: Scene2D, levelWidth: number, atlas: SpriteAtlas): IParallaxLayer[] {
     const layers: IParallaxLayer[] = [];
+    // Ground Y in world coords (floor is at row 18, TILE=40)
+    const groundY = 18 * 40;
+
     const layerDefs = [
-        { color: new Color4(0.05, 0.05, 0.15, 1), factor: 0.1, count: 20, sizeMin: 60, sizeMax: 200, yRange: [0, 0.5], atlasKey: "bg_far" },
-        { color: new Color4(0.08, 0.08, 0.2, 1), factor: 0.3, count: 15, sizeMin: 40, sizeMax: 120, yRange: [0.1, 0.7], atlasKey: "bg_mid" },
-        { color: new Color4(0.1, 0.1, 0.25, 1), factor: 0.5, count: 12, sizeMin: 30, sizeMax: 80, yRange: [0.2, 0.8], atlasKey: "bg_near" },
+        {
+            color: new Color4(1.2, 1.0, 2.4, 0.25), // Faint blue-violet mountains
+            factor: 0.1, count: 5, sizeMin: 100, sizeMax: 180,
+            atlasPrefix: "bg_far",
+        },
+        {
+            color: new Color4(1.0, 0.8, 2.0, 0.2), // Subtle purple trees/ruins
+            factor: 0.3, count: 4, sizeMin: 40, sizeMax: 70,
+            atlasPrefix: "bg_mid",
+        },
+        {
+            color: new Color4(0.8, 0.7, 1.6, 0.18), // Near rocks/bushes
+            factor: 0.5, count: 3, sizeMin: 18, sizeMax: 32,
+            atlasPrefix: "bg_near",
+        },
     ];
 
     for (const def of layerDefs) {
         const parent = new Node2D(`bg_layer_${def.factor}`);
         scene.addNode(parent);
         parent.zIndex = -100 + def.factor * 10;
+        parent.scrollFactorX = def.factor;
+        parent.scrollFactorY = 1.0; // Full vertical scroll — prevents floating when climbing
         const sprites: Sprite2D[] = [];
 
         for (let i = 0; i < def.count; i++) {
-            const s = new Sprite2D(`bg_${def.factor}_${i}`);
+            // Pass null to avoid auto-adding to scene rootNodes (parent handles hierarchy)
+            const s = new Sprite2D(`bg_${def.factor}_${i}`, null);
             s.parent = parent;
             const size = def.sizeMin + Math.random() * (def.sizeMax - def.sizeMin);
             s.width = size * (0.8 + Math.random() * 0.4);
             s.height = size;
-            s.position.x = Math.random() * levelWidth;
-            s.position.y = def.yRange[0] * 800 + Math.random() * (def.yRange[1] - def.yRange[0]) * 800;
+            // Spread evenly across level width with jitter to avoid clustering
+            const spacing = levelWidth / def.count;
+            s.position.x = spacing * i + Math.random() * spacing * 0.6;
+            // Bottom-align to ground floor (row 18). +2px overlap prevents sub-pixel gap.
+            s.position.y = groundY - s.height / 2 + 2;
             s.texture = atlas.texture;
-            s.sourceRect = atlas.getFrame(def.atlasKey);
+            s.sourceRect = atlas.getFrame(`${def.atlasPrefix}_${i % 3}`);
             s.tint = def.color;
             sprites.push(s);
         }
@@ -727,7 +1550,7 @@ function createEnemies(scene: Scene2D, physics: PlanckPhysicsEngine, tileSize: n
             bodyType: PhysicsBodyType2D.Dynamic,
             shape: { type: "box", width: 26, height: 26 },
             fixedRotation: true,
-            friction: 0.5,
+            friction: 0,
         });
 
         const ctx: IEnemyContext = {
@@ -922,8 +1745,7 @@ function createBulletPool(scene: Scene2D, physics: PlanckPhysicsEngine, lighting
                 light,
 
                 spawn(x: number, y: number, direction: number) {
-                    this.sprite.position.x = x;
-                    this.sprite.position.y = y;
+                    this.body.setPosition(new Vector2(x, y));
                     this.sprite.alpha = 1;
                     this.sprite.flipX = direction < 0;
                     this.velocity.x = direction * BULLET_SPEED;
@@ -945,6 +1767,7 @@ function createBulletPool(scene: Scene2D, physics: PlanckPhysicsEngine, lighting
                     if (this.light) {
                         this.light.position.x = this.sprite.position.x;
                         this.light.position.y = this.sprite.position.y;
+                        this.light.intensity = 0.6 + Math.sin(this.lifetime * 20) * 0.4;
                     }
                 },
 
@@ -969,8 +1792,7 @@ function createBulletPool(scene: Scene2D, physics: PlanckPhysicsEngine, lighting
             bullet.lifetime = 0;
             bullet.active = false;
             bullet.sprite.alpha = 0;
-            bullet.sprite.position.x = -9999; // Move offscreen
-            bullet.sprite.position.y = -9999;
+            bullet.body.setPosition(new Vector2(-9999, -9999));
             bullet.body.setLinearVelocity(new Vector2(0, 0));
             if (bullet.light) { bullet.light.enabled = false; }
         },
@@ -989,7 +1811,10 @@ function updateBullets(
     bulletPool: ObjectPool<IBullet>,
     activeBullets: IBullet[],
     enemies: IEnemy[],
-    dt: number
+    dt: number,
+    camera: Camera2D,
+    tweenManager: TweenManager,
+    sparkPS: ParticleSystem
 ): void {
     // Update all active bullets and check for expiration / collisions
     for (let i = activeBullets.length - 1; i >= 0; i--) {
@@ -1008,16 +1833,25 @@ function updateBullets(
             const dx = bullet.sprite.position.x - enemy.sprite.position.x;
             const dy = bullet.sprite.position.y - enemy.sprite.position.y;
             const distSq = dx * dx + dy * dy;
-            if (distSq < 400) { // ~20px radius
+            if (distSq < 900) { // ~30px radius
                 // Hit! Flash enemy and release bullet
+                sfxEnemyHit(); // 🔊 Low thud
+                camera.shake(3, 0.12);
+                sparkPS.emitter = new Vector3(bullet.sprite.position.x, bullet.sprite.position.y, 0);
+                sparkPS.manualEmitCount = 6;
+                // Hit flash + scale pop via Tween
                 enemy.sprite.tint = new Color4(1, 1, 1, 1);
-                setTimeout(() => {
-                    if (enemy.sprite.tint.r === 1 && enemy.sprite.tint.g === 1) {
+                enemy.sprite.scale = new Vector2(1.4, 1.4);
+                tweenManager.add(Tween.Create(1.4, 1.0, 0.2, Easing.ElasticOut)
+                    .onUpdate((v: number) => {
+                        enemy.sprite.scale.x = v;
+                        enemy.sprite.scale.y = v;
+                    })
+                    .onComplete(() => {
                         enemy.sprite.tint = enemy.context.playerDist < enemy.context.chaseRange
-                            ? new Color4(1.0, 0.4, 0.1, 1) // Chase color
-                            : new Color4(0.9, 0.2, 0.2, 1); // Patrol color
-                    }
-                }, 100);
+                            ? new Color4(1.0, 0.4, 0.1, 1)
+                            : new Color4(0.9, 0.2, 0.2, 1);
+                    }));
                 bulletPool.release(bullet);
                 activeBullets.splice(i, 1);
                 break;

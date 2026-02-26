@@ -4,6 +4,39 @@ import { Constants } from "core/Engines/constants";
 import { Sprite2D } from "../Sprite2D/sprite2D";
 import type { Scene2D } from "../Scene2D/scene2D";
 
+// Module-level shared canvases to avoid per-frame DOM allocations (W5)
+let _sharedMeasureCanvas: HTMLCanvasElement | null = null;
+let _sharedMeasureCtx: CanvasRenderingContext2D | null = null;
+let _sharedDrawCanvas: HTMLCanvasElement | null = null;
+let _sharedDrawCtx: CanvasRenderingContext2D | null = null;
+
+/**
+ * Returns a lazily-created shared canvas context for text measurement.
+ * @returns A reusable CanvasRenderingContext2D
+ * @internal
+ */
+function _getSharedMeasureCtx(): CanvasRenderingContext2D {
+    if (!_sharedMeasureCtx) {
+        _sharedMeasureCanvas = document.createElement("canvas");
+        _sharedMeasureCtx = _sharedMeasureCanvas.getContext("2d")!;
+    }
+    return _sharedMeasureCtx;
+}
+
+/**
+ * Returns a lazily-created shared canvas context for text drawing.
+ * The caller must resize and clear before use.
+ * @returns A reusable CanvasRenderingContext2D
+ * @internal
+ */
+function _getSharedDrawCtx(): CanvasRenderingContext2D {
+    if (!_sharedDrawCtx) {
+        _sharedDrawCanvas = document.createElement("canvas");
+        _sharedDrawCtx = _sharedDrawCanvas.getContext("2d")!;
+    }
+    return _sharedDrawCtx;
+}
+
 /**
  * Options for configuring a Text2D node
  */
@@ -191,9 +224,8 @@ export class Text2D extends Sprite2D {
             return;
         }
 
-        // Measure text using a temporary canvas context
-        const measureCanvas = document.createElement("canvas");
-        const measureCtx = measureCanvas.getContext("2d")!;
+        // Measure text using the shared measure context (avoids per-frame canvas allocation)
+        const measureCtx = _getSharedMeasureCtx();
         measureCtx.font = this._font;
         const metrics = measureCtx.measureText(this._text);
 
@@ -218,17 +250,13 @@ export class Text2D extends Sprite2D {
             return;
         }
 
-        // Create or resize the DynamicTexture
-        if (this._dynamicTexture) {
-            this._dynamicTexture.dispose();
-        }
-
-        // Always render with "alphabetic" baseline at a known y for pixel-perfect placement
-        const drawCanvas = document.createElement("canvas");
+        // Draw text into the shared draw canvas (resize + clear before use)
+        const ctx = _getSharedDrawCtx();
+        const drawCanvas = _sharedDrawCanvas!;
         drawCanvas.width = texWidth;
         drawCanvas.height = texHeight;
-        const ctx = drawCanvas.getContext("2d")!;
 
+        // Always render with "alphabetic" baseline at a known y for pixel-perfect placement
         ctx.clearRect(0, 0, texWidth, texHeight);
         ctx.font = this._font;
         ctx.fillStyle = this._color;
@@ -247,22 +275,37 @@ export class Text2D extends Sprite2D {
 
         ctx.fillText(this._text, x, y);
 
-        // Wrap in DynamicTexture and upload
-        this._dynamicTexture = new DynamicTexture(
-            this.name + "_tex",
-            drawCanvas,
-            null,
-            false,
-            Constants.TEXTURE_NEAREST_SAMPLINGMODE,
-            Constants.TEXTUREFORMAT_RGBA,
-            false
-        );
         const engine = this.scene!.engine;
-        this._dynamicTexture._texture = engine.createDynamicTexture(texWidth, texHeight, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
-        (engine as any).updateDynamicTexture(this._dynamicTexture._texture, drawCanvas, false);
 
-        // Assign to Sprite2D
-        this.texture = this._dynamicTexture;
+        // Reuse the existing DynamicTexture when dimensions match (avoids dispose/recreate churn)
+        const existingTex = this._dynamicTexture?._texture;
+        const canReuse = existingTex && existingTex.width === texWidth && existingTex.height === texHeight;
+
+        if (canReuse) {
+            // Just re-upload the canvas content into the existing GPU texture
+            (engine as any).updateDynamicTexture(existingTex, drawCanvas, false);
+        } else {
+            // Dimensions changed — dispose old and create new DynamicTexture
+            if (this._dynamicTexture) {
+                this._dynamicTexture.dispose();
+            }
+
+            this._dynamicTexture = new DynamicTexture(
+                this.name + "_tex",
+                drawCanvas,
+                null,
+                false,
+                Constants.TEXTURE_NEAREST_SAMPLINGMODE,
+                Constants.TEXTUREFORMAT_RGBA,
+                false
+            );
+            this._dynamicTexture._texture = engine.createDynamicTexture(texWidth, texHeight, false, Constants.TEXTURE_NEAREST_SAMPLINGMODE);
+            (engine as any).updateDynamicTexture(this._dynamicTexture._texture, drawCanvas, false);
+
+            // Assign to Sprite2D
+            this.texture = this._dynamicTexture;
+        }
+
         this.width = texWidth;
         this.height = texHeight;
     }

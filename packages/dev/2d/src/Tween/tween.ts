@@ -321,7 +321,7 @@ export class Tween {
     // ─── Static helpers ──────────────────────────────────────────────
 
     /**
-     * Creates and starts a simple value tween
+     * Creates and starts a simple value tween.
      * @param from - Start value
      * @param to - End value
      * @param duration - Duration in seconds
@@ -329,12 +329,19 @@ export class Tween {
      * @param onUpdate - Callback with current value each frame
      * @returns The started tween
      */
-    public static CreateAsync(from: number, to: number, duration: number, easing: EasingFunction = Easing.Linear, onUpdate?: (value: number) => void): Tween {
+    public static Create(from: number, to: number, duration: number, easing: EasingFunction = Easing.Linear, onUpdate?: (value: number) => void): Tween {
         const tween = new Tween({ from, to }, duration, easing);
         if (onUpdate) {
             tween.onUpdate(onUpdate);
         }
         return tween.start();
+    }
+
+    /**
+     * @deprecated Use Tween.Create() instead. This method does not return a Promise.
+     */
+    public static CreateAsync(from: number, to: number, duration: number, easing: EasingFunction = Easing.Linear, onUpdate?: (value: number) => void): Tween {
+        return Tween.Create(from, to, duration, easing, onUpdate);
     }
 }
 

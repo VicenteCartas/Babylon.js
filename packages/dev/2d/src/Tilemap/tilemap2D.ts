@@ -1,4 +1,5 @@
 import type { BaseTexture } from "core/Materials/Textures/baseTexture";
+import { Logger } from "core/Misc/logger";
 
 import { Node2D } from "../Node2D/node2D";
 import { Rectangle2D } from "../Math/rectangle2D";
@@ -236,6 +237,7 @@ export class Tilemap2D {
 
         for (const layerData of data.layers) {
             if (layerData.type !== "tilelayer") {
+                Logger.Warn(`Tilemap2D.FromTiled: Skipping unsupported layer "${layerData.name ?? "unnamed"}" of type "${layerData.type}".`);
                 continue;
             }
 

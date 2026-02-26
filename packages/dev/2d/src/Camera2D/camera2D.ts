@@ -79,6 +79,7 @@ export class Camera2D {
     private _shakeDuration: number = 0;
     private _shakeElapsed: number = 0;
     private _shakeOffset: Vector2 = Vector2.Zero();
+    private _shakeRng: (() => number) | null = null;
     private _viewTransform: Matrix2D = Matrix2D.Identity();
     private _invertedViewTransform: Matrix2D = Matrix2D.Identity();
 
@@ -230,24 +231,43 @@ export class Camera2D {
                 this._shakeElapsed = 0;
                 this._shakeOffset.x = 0;
                 this._shakeOffset.y = 0;
+                this._shakeRng = null;
             } else {
                 const progress = this._shakeElapsed / this._shakeDuration;
                 const decay = 1 - progress;
-                this._shakeOffset.x = (Math.random() * 2 - 1) * this._shakeIntensity * decay;
-                this._shakeOffset.y = (Math.random() * 2 - 1) * this._shakeIntensity * decay;
+                const rng = this._shakeRng ?? Math.random;
+                this._shakeOffset.x = (rng() * 2 - 1) * this._shakeIntensity * decay;
+                this._shakeOffset.y = (rng() * 2 - 1) * this._shakeIntensity * decay;
             }
         }
+    }
+
+    /**
+     * Simple mulberry32 PRNG for deterministic shake sequences
+     * @param seed - Integer seed value
+     * @returns A function that returns pseudo-random numbers in [0, 1)
+     */
+    private static _createSeededRng(seed: number): () => number {
+        let s = seed | 0;
+        return () => {
+            s = (s + 0x6d2b79f5) | 0;
+            let t = Math.imul(s ^ (s >>> 15), 1 | s);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
     }
 
     /**
      * Triggers a screen shake effect
      * @param intensity - Maximum pixel offset
      * @param duration - Duration in seconds
+     * @param seed - Optional RNG seed for deterministic shake sequences (useful for replays)
      */
-    public shake(intensity: number, duration: number): void {
+    public shake(intensity: number, duration: number, seed?: number): void {
         this._shakeIntensity = intensity;
         this._shakeDuration = duration;
         this._shakeElapsed = 0;
+        this._shakeRng = seed !== undefined ? Camera2D._createSeededRng(seed) : null;
     }
 
     /**

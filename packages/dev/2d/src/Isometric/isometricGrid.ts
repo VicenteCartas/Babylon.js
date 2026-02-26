@@ -1,5 +1,7 @@
 import { Vector2 } from "core/Maths/math.vector";
 
+import type { IGrid2D, IGridCoord } from "../Grid/iGrid2D";
+
 /**
  * Orientation of the isometric projection
  */
@@ -21,7 +23,7 @@ export enum IsometricOrientation {
  * In diamond iso, tiles are rotated 45° and scaled vertically by 0.5 (2:1 ratio).
  * The world origin is at the top of the diamond.
  */
-export class IsometricGrid {
+export class IsometricGrid implements IGrid2D {
     /**
      * Tile width in pixels (the wide dimension of the diamond)
      */
@@ -94,7 +96,7 @@ export class IsometricGrid {
      * @param worldY - World Y position
      * @returns Tile coordinate (col, row)
      */
-    public worldToTile(worldX: number, worldY: number): { col: number; row: number } {
+    public worldToTile(worldX: number, worldY: number): IGridCoord {
         if (this.orientation === IsometricOrientation.Diamond) {
             const tw2 = this.tileWidth / 2;
             const th2 = this.tileHeight / 2;
@@ -133,7 +135,7 @@ export class IsometricGrid {
      * @param cameraY - Camera world Y offset
      * @returns Array of visible tile coordinates
      */
-    public getVisibleTiles(screenX: number, screenY: number, screenW: number, screenH: number, cameraX: number = 0, cameraY: number = 0): Array<{ col: number; row: number }> {
+    public getVisibleTiles(screenX: number, screenY: number, screenW: number, screenH: number, cameraX: number = 0, cameraY: number = 0): IGridCoord[] {
         const worldLeft = screenX + cameraX;
         const worldTop = screenY + cameraY;
         const worldRight = worldLeft + screenW;
@@ -150,7 +152,7 @@ export class IsometricGrid {
         const minRow = Math.max(0, Math.min(topLeft.row, bottomRight.row) - 1);
         const maxRow = Math.min(this.height - 1, Math.max(topLeft.row, bottomRight.row) + 1);
 
-        const tiles: Array<{ col: number; row: number }> = [];
+        const tiles: IGridCoord[] = [];
         for (let row = minRow; row <= maxRow; row++) {
             for (let col = minCol; col <= maxCol; col++) {
                 const world = this.tileToWorld(col, row);
@@ -174,8 +176,8 @@ export class IsometricGrid {
      * @param row - Row
      * @returns Array of valid neighbor coordinates
      */
-    public getNeighbors(col: number, row: number): Array<{ col: number; row: number }> {
-        const neighbors: Array<{ col: number; row: number }> = [];
+    public getNeighbors(col: number, row: number): IGridCoord[] {
+        const neighbors: IGridCoord[] = [];
         const offsets = [
             { col: 0, row: -1 },
             { col: 1, row: 0 },
@@ -190,6 +192,28 @@ export class IsometricGrid {
             }
         }
         return neighbors;
+    }
+
+    /**
+     * Converts a grid coordinate to world pixel position (center of tile).
+     * Delegates to {@link tileToWorld} for IGrid2D compatibility.
+     * @param col - Column
+     * @param row - Row
+     * @returns World position
+     */
+    public cellToWorld(col: number, row: number): Vector2 {
+        return this.tileToWorld(col, row);
+    }
+
+    /**
+     * Converts a world pixel position to the nearest grid coordinate.
+     * Delegates to {@link worldToTile} for IGrid2D compatibility.
+     * @param worldX - World X position
+     * @param worldY - World Y position
+     * @returns Grid coordinate
+     */
+    public worldToCell(worldX: number, worldY: number): IGridCoord {
+        return this.worldToTile(worldX, worldY);
     }
 
     /**

@@ -35,7 +35,7 @@ export interface ISpriteAtlasBuilderOptions {
 /**
  * Image source that can be added to the atlas builder
  */
-type ImageSource = string | HTMLImageElement | BaseTexture;
+type ImageSource = string | HTMLImageElement | HTMLCanvasElement | BaseTexture;
 
 /**
  * Internal representation of an image to be packed
@@ -125,7 +125,7 @@ export class SpriteAtlasBuilder {
     /**
      * Adds an image to the atlas builder
      * @param key - Unique identifier for the image
-     * @param source - Image source (URL string, HTMLImageElement, or Texture)
+     * @param source - Image source (URL string, HTMLImageElement, HTMLCanvasElement, or Texture)
      */
     public addImage(key: string, source: ImageSource): void {
         if (this._images.has(key)) {
@@ -218,6 +218,14 @@ export class SpriteAtlasBuilder {
                 };
                 img.src = source;
             });
+        } else if (source instanceof HTMLCanvasElement) {
+            // Use existing canvas element directly
+            return {
+                key,
+                width: source.width,
+                height: source.height,
+                source,
+            };
         } else if (source instanceof HTMLImageElement) {
             // Use existing image element
             return {

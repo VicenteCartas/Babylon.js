@@ -50,10 +50,19 @@ export class SpatialGrid {
     }
 
     /**
-     * Gets the cell size in pixels
+     * Gets or sets the cell size in pixels.
+     * Setting this clears all registered colliders; re-insert them after changing.
      */
     public get cellSize(): number {
         return this._cellSize;
+    }
+
+    public set cellSize(value: number) {
+        if (value > 0 && value !== this._cellSize) {
+            this._cellSize = value;
+            this._cells.clear();
+            this._allEntries.length = 0;
+        }
     }
 
     /**

@@ -32,6 +32,9 @@ export interface IParticleSystem2DOptions {
  * syncs with a `Camera2D`. Core particles render in the same coordinate space
  * as 2D sprites, with Y-down convention matching Camera2D.
  *
+ * If your application already has a core Scene, you can pass it to the
+ * constructor to avoid creating an additional one.
+ *
  * @example
  * ```typescript
  * const helper = new ParticleHelper2D(engine);
@@ -59,14 +62,19 @@ export class ParticleHelper2D {
 
     private _orthoCamera: FreeCamera;
     private _camera2D: Camera2D | null = null;
+    private _ownsScene: boolean;
     private _zOffset: number = -10;
 
     /**
      * Creates a new ParticleHelper2D.
      * @param engine - The Babylon.js engine (shared with Scene2D)
+     * @param existingScene - Optional pre-existing core Scene to use for particle rendering.
+     *   If omitted, a dedicated Scene is created internally. When provided, the scene's
+     *   `autoClear` will be set to `false` and an orthographic camera will be added.
      */
-    constructor(engine: AbstractEngine) {
-        this.scene = new Scene(engine);
+    constructor(engine: AbstractEngine, existingScene?: Scene) {
+        this.scene = existingScene ?? new Scene(engine);
+        this._ownsScene = !existingScene;
         this.scene.autoClear = false;
 
         this._orthoCamera = new FreeCamera("__particles2d_cam__", new Vector3(0, 0, this._zOffset), this.scene);
@@ -157,10 +165,14 @@ export class ParticleHelper2D {
     }
 
     /**
-     * Disposes the helper, its scene, and all particle systems within it.
+     * Disposes the helper and all particle systems within it.
+     * If the helper created its own scene, the scene is also disposed.
+     * If an external scene was provided, it is left intact.
      */
     public dispose(): void {
-        this.scene.dispose();
+        if (this._ownsScene) {
+            this.scene.dispose();
+        }
         this._camera2D = null;
     }
 }

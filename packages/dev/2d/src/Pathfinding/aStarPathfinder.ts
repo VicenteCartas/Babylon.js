@@ -106,12 +106,40 @@ function heuristicOctile(ax: number, ay: number, bx: number, by: number): number
  * ```
  */
 export class AStarPathfinder {
+    private static readonly _CARDINAL_DIRECTIONS: readonly (readonly [number, number])[] = [
+        [0, -1],
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+    ];
+
+    private static readonly _ALL_DIRECTIONS: readonly (readonly [number, number])[] = [
+        [0, -1],
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+        [-1, -1],
+    ];
+
     private _width: number;
     private _height: number;
     private _isWalkable: (col: number, row: number) => boolean;
     private _getCost: (col: number, row: number) => number;
     private _allowDiagonal: boolean;
     private _heuristic: (ax: number, ay: number, bx: number, by: number) => number;
+
+    /** Reusable node grid for findPath — avoids per-call 2D array allocation */
+    private _nodeGrid: IAStarNode[][] = [];
+    private _nodeGridWidth: number = 0;
+    private _nodeGridHeight: number = 0;
+
+    /** Reusable cost grid for getReachableCells */
+    private _costGrid: number[][] = [];
+    private _costGridWidth: number = 0;
+    private _costGridHeight: number = 0;
 
     /**
      * Creates a new AStarPathfinder
@@ -170,24 +198,8 @@ export class AStarPathfinder {
             return [{ col: startCol, row: startRow }];
         }
 
-        // Create node grid
-        const nodes: IAStarNode[][] = [];
-        for (let row = 0; row < this._height; row++) {
-            nodes[row] = [];
-            for (let col = 0; col < this._width; col++) {
-                nodes[row][col] = {
-                    col,
-                    row,
-                    g: Infinity,
-                    h: 0,
-                    f: Infinity,
-                    parentCol: -1,
-                    parentRow: -1,
-                    closed: false,
-                    opened: false,
-                };
-            }
-        }
+        // Reuse pooled node grid
+        const nodes = this._ensureNodeGrid();
 
         // Open list (simple array, sorted by f)
         const open: IAStarNode[] = [];
@@ -200,23 +212,7 @@ export class AStarPathfinder {
         open.push(startNode);
 
         // Direction offsets
-        const dirs = this._allowDiagonal
-            ? [
-                  [0, -1],
-                  [1, 0],
-                  [0, 1],
-                  [-1, 0],
-                  [1, -1],
-                  [1, 1],
-                  [-1, 1],
-                  [-1, -1],
-              ]
-            : [
-                  [0, -1],
-                  [1, 0],
-                  [0, 1],
-                  [-1, 0],
-              ];
+        const dirs = this._allowDiagonal ? AStarPathfinder._ALL_DIRECTIONS : AStarPathfinder._CARDINAL_DIRECTIONS;
 
         while (open.length > 0) {
             // Find node with lowest f
@@ -291,32 +287,14 @@ export class AStarPathfinder {
             return [];
         }
 
-        const costGrid: number[][] = [];
-        for (let r = 0; r < this._height; r++) {
-            costGrid[r] = new Array(this._width).fill(Infinity);
-        }
+        // Reuse pooled cost grid
+        const costGrid = this._ensureCostGrid();
         costGrid[row][col] = 0;
 
         const results: Array<{ col: number; row: number; cost: number }> = [{ col, row, cost: 0 }];
         const queue: Array<{ col: number; row: number; cost: number }> = [{ col, row, cost: 0 }];
 
-        const dirs = this._allowDiagonal
-            ? [
-                  [0, -1],
-                  [1, 0],
-                  [0, 1],
-                  [-1, 0],
-                  [1, -1],
-                  [1, 1],
-                  [-1, 1],
-                  [-1, -1],
-              ]
-            : [
-                  [0, -1],
-                  [1, 0],
-                  [0, 1],
-                  [-1, 0],
-              ];
+        const dirs = this._allowDiagonal ? AStarPathfinder._ALL_DIRECTIONS : AStarPathfinder._CARDINAL_DIRECTIONS;
 
         while (queue.length > 0) {
             // Find lowest cost in queue
@@ -396,6 +374,54 @@ export class AStarPathfinder {
                 y0 += sy;
             }
         }
+    }
+
+    private _ensureNodeGrid(): IAStarNode[][] {
+        if (this._nodeGridWidth !== this._width || this._nodeGridHeight !== this._height) {
+            this._nodeGrid = [];
+            for (let r = 0; r < this._height; r++) {
+                const row: IAStarNode[] = [];
+                for (let c = 0; c < this._width; c++) {
+                    row.push({ col: c, row: r, g: Infinity, h: 0, f: Infinity, parentCol: -1, parentRow: -1, closed: false, opened: false });
+                }
+                this._nodeGrid.push(row);
+            }
+            this._nodeGridWidth = this._width;
+            this._nodeGridHeight = this._height;
+        } else {
+            // Reset all nodes for reuse
+            for (let r = 0; r < this._height; r++) {
+                for (let c = 0; c < this._width; c++) {
+                    const node = this._nodeGrid[r][c];
+                    node.g = Infinity;
+                    node.h = 0;
+                    node.f = Infinity;
+                    node.parentCol = -1;
+                    node.parentRow = -1;
+                    node.closed = false;
+                    node.opened = false;
+                }
+            }
+        }
+        return this._nodeGrid;
+    }
+
+    private _ensureCostGrid(): number[][] {
+        if (this._costGridWidth !== this._width || this._costGridHeight !== this._height) {
+            this._costGrid = [];
+            for (let r = 0; r < this._height; r++) {
+                this._costGrid.push(new Array(this._width));
+            }
+            this._costGridWidth = this._width;
+            this._costGridHeight = this._height;
+        }
+        // Reset all to Infinity
+        for (let r = 0; r < this._height; r++) {
+            for (let c = 0; c < this._width; c++) {
+                this._costGrid[r][c] = Infinity;
+            }
+        }
+        return this._costGrid;
     }
 
     private _inBounds(col: number, row: number): boolean {

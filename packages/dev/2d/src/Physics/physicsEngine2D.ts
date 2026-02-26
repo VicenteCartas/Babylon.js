@@ -113,6 +113,12 @@ export interface IPhysicsBody2D {
      * @returns Mass in kg
      */
     getMass(): number;
+    /**
+     * Teleports the body to a new position (in pixels).
+     * Also updates the attached node's position.
+     * @param position - New position in pixels
+     */
+    setPosition(position: Vector2): void;
 }
 
 /**

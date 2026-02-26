@@ -11,11 +11,17 @@ import { Node2D } from "../Node2D/node2D";
 import { Sprite2D } from "../Sprite2D/sprite2D";
 import { Camera2D } from "../Camera2D/camera2D";
 import { Matrix2D } from "../Math/matrix2D";
+import { Rectangle2D } from "../Math/rectangle2D";
 import { SpriteBatchRenderer } from "../Rendering/spriteBatchRenderer";
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
 import type { LightingManager2D } from "../Lighting/light2D";
 import type { DebugRenderer2D } from "../Debug/debugRenderer2D";
 import { Scene2DStore } from "./scene2DStore";
+import { RectMask2D } from "../Masking/rectMask2D";
+import { SpriteMask2D } from "../Masking/spriteMask2D";
+import { RenderCommandType } from "../Masking/renderCommand2D";
+import type { RenderCommand2D, ISpriteRenderCommand, IPushRectMaskCommand, IPushSpriteMaskCommand } from "../Masking/renderCommand2D";
+import { MaskStateManager } from "../Masking/maskStateManager";
 
 /**
  * Represents a 2D scene that manages a hierarchy of Node2D entities.
@@ -43,6 +49,15 @@ export class Scene2D {
      * When set, the sprite batch renderer uses a lit shader variant.
      */
     public lightingManager: LightingManager2D | null = null;
+
+    /**
+     * Minimum sorting layer that renders without lighting.
+     * Sprites with `sortingLayer >= unlitSortingLayerMin` bypass the
+     * lit shader, which is useful for HUD elements that should not
+     * be affected by in-world lights.
+     * Set to `Infinity` (default) to light everything.
+     */
+    public unlitSortingLayerMin: number = Infinity;
 
     /**
      * Optional debug renderer for drawing wireframe overlays
@@ -78,6 +93,20 @@ export class Scene2D {
     private _whiteTexture: RawTexture | null = null;
     private _spriteDataPool: ISprite2DRenderData[] = [];
     private _executeWhenReadyTimeoutId: Nullable<ReturnType<typeof setTimeout>> = null;
+    private _hasMasks: boolean = false;
+    private _hasMasksLastFrame: boolean = false;
+    private _renderCommands: RenderCommand2D[] = [];
+    /** Reusable array for sprite batch in _processRenderCommands (W3: avoid per-frame allocation) */
+    private _spriteBatchTemp: ISprite2DRenderData[] = [];
+    /** Reusable array for mask sprite data in _processRenderCommands */
+    private _maskSpriteDataTemp: ISprite2DRenderData[] = [];
+    private _maskStateManager: MaskStateManager | null = null;
+    /**
+     * Internal overlay nodes rendered on top of rootNodes but not exposed
+     * in the public `rootNodes` array. Used by SceneTransition2D.
+     * @internal
+     */
+    private _overlayNodes: Node2D[] = [];
 
     /**
      * Creates a new Scene2D
@@ -204,6 +233,32 @@ export class Scene2D {
     }
 
     /**
+     * Adds an internal overlay node that renders on top of the scene but is
+     * not included in the public `rootNodes` array.
+     * @param node - The overlay node to add
+     * @internal
+     */
+    public _addOverlay(node: Node2D): void {
+        if (this._overlayNodes.indexOf(node) === -1) {
+            this._overlayNodes.push(node);
+        }
+        node._setScene(this);
+    }
+
+    /**
+     * Removes an internal overlay node previously added with `_addOverlay`.
+     * @param node - The overlay node to remove
+     * @internal
+     */
+    public _removeOverlay(node: Node2D): void {
+        const index = this._overlayNodes.indexOf(node);
+        if (index !== -1) {
+            this._overlayNodes.splice(index, 1);
+        }
+        node._setScene(null);
+    }
+
+    /**
      * Registers a node in the scene's lookup table
      * @param node - The node to register
      */
@@ -270,20 +325,274 @@ export class Scene2D {
     }
 
     /**
-     * Recursively collects visible Sprite2D nodes from the scene graph
+     * Recursively collects render commands including mask push/pop boundaries.
+     * Sprites within each mask group are sorted locally.
      */
-    private _collectSprites(node: Node2D, list: ISprite2DRenderData[]): void {
+    private _collectRenderCommands(node: Node2D, commands: RenderCommand2D[]): void {
         if (!node.visible || node.worldAlpha <= 0) {
             return;
         }
 
-        if (node instanceof Sprite2D) {
-            node._collectRenderData(list, this._getWhiteTexture());
+        const mask = node.mask;
+        const hasMask = mask !== null && mask.enabled;
+        let pushCommand: IPushRectMaskCommand | IPushSpriteMaskCommand | null = null;
+        let groupStartIndex = -1;
+
+        if (hasMask) {
+            this._hasMasks = true;
+            groupStartIndex = commands.length;
+
+            if (mask instanceof RectMask2D) {
+                pushCommand = { type: RenderCommandType.PushRectMask, rectMask: mask, maskOwner: node };
+                commands.push(pushCommand);
+            } else if (mask instanceof SpriteMask2D) {
+                pushCommand = { type: RenderCommandType.PushSpriteMask, spriteMask: mask, maskOwner: node };
+                commands.push(pushCommand);
+            }
         }
 
-        for (const child of node.children) {
-            this._collectSprites(child, list);
+        // Collect this node's sprite data
+        if (node instanceof Sprite2D) {
+            const beforeLen = this._spriteDataPool.length;
+            node._collectRenderData(this._spriteDataPool, this._getWhiteTexture());
+            // Emit sprite commands for any new entries
+            for (let i = beforeLen; i < this._spriteDataPool.length; i++) {
+                commands.push({ type: RenderCommandType.Sprite, spriteData: this._spriteDataPool[i] });
+            }
         }
+
+        // Recurse children
+        for (const child of node.children) {
+            this._collectRenderCommands(child, commands);
+        }
+
+        if (hasMask && groupStartIndex >= 0 && pushCommand) {
+            // Sort sprite commands within this mask group (between push and pop)
+            const pushIdx = groupStartIndex;
+            const popIdx = commands.length;
+            // Count sprite-only vs other commands in this range
+            let hasOther = false;
+            let spriteCount = 0;
+            for (let i = pushIdx + 1; i < popIdx; i++) {
+                if (commands[i].type === RenderCommandType.Sprite) {
+                    spriteCount++;
+                } else {
+                    hasOther = true;
+                    break;
+                }
+            }
+
+            // Only sort if there are no nested masks (simple case)
+            if (!hasOther && spriteCount > 1) {
+                // All commands in this range are sprites — safe to sort in-place
+                const start = pushIdx + 1;
+                const subArray = commands as ISpriteRenderCommand[];
+                // In-place insertion sort (fast for small arrays, no allocation)
+                for (let i = start + 1; i < popIdx; i++) {
+                    const cmd = subArray[i];
+                    const sd = cmd.spriteData;
+                    let j = i - 1;
+                    while (j >= start) {
+                        const prev = subArray[j];
+                        const pd = prev.spriteData;
+                        if (pd.sortingLayer !== sd.sortingLayer ? pd.sortingLayer > sd.sortingLayer : pd.zIndex > sd.zIndex) {
+                            subArray[j + 1] = prev;
+                            j--;
+                        } else {
+                            break;
+                        }
+                    }
+                    subArray[j + 1] = cmd;
+                }
+            }
+
+            commands.push({ type: RenderCommandType.PopMask, pushCommand });
+        }
+    }
+
+    /**
+     * Processes the render command list, executing mask push/pop and sprite batching.
+     * This method owns the global engine state (depth, alpha, cull) for the entire
+     * command sequence. Uses renderer.renderBatch() to avoid state conflicts.
+     */
+    private _processRenderCommands(
+        commands: RenderCommand2D[],
+        renderer: SpriteBatchRenderer,
+        viewTransform: Matrix2D,
+        vpWidth: number,
+        vpHeight: number,
+        camPos: { x: number; y: number } | null,
+        unlitSortingLayerMin: number = Infinity
+    ): void {
+        if (!this._maskStateManager) {
+            this._maskStateManager = new MaskStateManager(this.engine);
+        }
+        const maskMgr = this._maskStateManager;
+        maskMgr.reset();
+        maskMgr.setViewportHeight(vpHeight);
+
+        const engine = this.engine;
+        engine.setAlphaMode(Constants.ALPHA_COMBINE);
+        engine.setDepthBuffer(false);
+        engine.setState(false);
+
+        // Reuse pre-allocated arrays
+        const spriteBatch = this._spriteBatchTemp;
+        spriteBatch.length = 0;
+
+        const flushSpriteBatch = () => {
+            if (spriteBatch.length > 0) {
+                // Toggle lighting based on whether this batch is above the unlit threshold
+                const batchLayer = spriteBatch[0].sortingLayer;
+                renderer.lightingManager = (batchLayer < unlitSortingLayerMin) ? this.lightingManager : null;
+                renderer.renderBatch(spriteBatch, vpWidth, vpHeight, viewTransform, camPos);
+                spriteBatch.length = 0;
+            }
+        };
+
+        // Reusable rect for PushRectMask viewport conversion
+        const tempViewportRect = new Rectangle2D();
+
+        for (let i = 0; i < commands.length; i++) {
+            const cmd = commands[i];
+
+            switch (cmd.type) {
+                case RenderCommandType.Sprite: {
+                    // Flush if crossing the lit/unlit boundary
+                    const sd = cmd.spriteData;
+                    if (spriteBatch.length > 0) {
+                        const prevLayer = spriteBatch[0].sortingLayer;
+                        const prevLit = prevLayer < unlitSortingLayerMin;
+                        const currLit = sd.sortingLayer < unlitSortingLayerMin;
+                        if (prevLit !== currLit) {
+                            flushSpriteBatch();
+                        }
+                    }
+                    spriteBatch.push(sd);
+                    break;
+                }
+
+                case RenderCommandType.PushRectMask: {
+                    flushSpriteBatch();
+                    this._pushRectMaskToGPU(cmd, viewTransform, camPos, maskMgr, tempViewportRect);
+                    break;
+                }
+
+                case RenderCommandType.PushSpriteMask: {
+                    flushSpriteBatch();
+
+                    const mask = cmd.spriteMask;
+                    const sprite = mask.sprite;
+
+                    // Collect the mask sprite's render data
+                    const maskSpriteData = this._maskSpriteDataTemp;
+                    maskSpriteData.length = 0;
+                    sprite._collectRenderData(maskSpriteData, this._getWhiteTexture());
+
+                    if (maskSpriteData.length > 0) {
+                        // Configure stencil for mask writing (INCR)
+                        maskMgr.beginStencilMaskWrite();
+
+                        // Render the mask sprite into the stencil buffer
+                        renderer.renderMaskSprite(maskSpriteData[0], mask.alphaThreshold, vpWidth, vpHeight, viewTransform, camPos);
+                    }
+
+                    // Configure stencil for masked content rendering
+                    maskMgr.pushSpriteMask(mask.inverted);
+                    break;
+                }
+
+                case RenderCommandType.PopMask: {
+                    flushSpriteBatch();
+
+                    // For sprite masks, re-render the mask sprite with DECR to undo stencil writes
+                    const pushCmd = cmd.pushCommand;
+                    if (pushCmd.type === RenderCommandType.PushSpriteMask) {
+                        const mask = pushCmd.spriteMask;
+                        const sprite = mask.sprite;
+                        const maskSpriteData = this._maskSpriteDataTemp;
+                        maskSpriteData.length = 0;
+                        sprite._collectRenderData(maskSpriteData, this._getWhiteTexture());
+
+                        if (maskSpriteData.length > 0) {
+                            // Configure stencil for mask erasing (DECR)
+                            maskMgr.beginStencilMaskErase();
+                            renderer.renderMaskSprite(maskSpriteData[0], mask.alphaThreshold, vpWidth, vpHeight, viewTransform, camPos);
+                        }
+                    }
+
+                    maskMgr.popMask();
+                    break;
+                }
+            }
+        }
+
+        flushSpriteBatch();
+
+        engine.setDepthBuffer(true);
+        engine.setAlphaMode(Constants.ALPHA_DISABLE);
+    }
+
+    /**
+     * Transforms a PushRectMask command's local-space rectangle into viewport
+     * space and pushes it onto the mask state manager.
+     */
+    private _pushRectMaskToGPU(
+        cmd: IPushRectMaskCommand,
+        viewTransform: Matrix2D,
+        camPos: { x: number; y: number } | null,
+        maskMgr: MaskStateManager,
+        outRect: Rectangle2D
+    ): void {
+        const mask = cmd.rectMask;
+        const owner = cmd.maskOwner;
+        const wt = owner.worldTransform;
+        const r = mask.rect;
+        const pad = mask.padding;
+
+        const lx = r.x - pad;
+        const ly = r.y - pad;
+        const lw = r.width + pad * 2;
+        const lh = r.height + pad * 2;
+
+        const wtm = wt.m;
+        const cm = viewTransform.m;
+
+        // Parallax correction
+        const sfx = owner.worldScrollFactorX;
+        const sfy = owner.worldScrollFactorY;
+        let parallaxDx = 0;
+        let parallaxDy = 0;
+        if ((sfx !== 1 || sfy !== 1) && camPos) {
+            parallaxDx = camPos.x * (1 - sfx);
+            parallaxDy = camPos.y * (1 - sfy);
+        }
+
+        // Compute AABB of transformed corners (unrolled — no temp arrays)
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const cx0 = lx, cy0 = ly;
+        const cx1 = lx + lw, cy1 = ly;
+        const cx2 = lx + lw, cy2 = ly + lh;
+        const cx3 = lx, cy3 = ly + lh;
+
+        for (let ci = 0; ci < 4; ci++) {
+            const px = ci === 0 ? cx0 : ci === 1 ? cx1 : ci === 2 ? cx2 : cx3;
+            const py = ci === 0 ? cy0 : ci === 1 ? cy1 : ci === 2 ? cy2 : cy3;
+            const wx = wtm[0] * px + wtm[2] * py + wtm[4] + parallaxDx;
+            const wy = wtm[1] * px + wtm[3] * py + wtm[5] + parallaxDy;
+            const vx = cm[0] * wx + cm[2] * wy + cm[4];
+            const vy = cm[1] * wx + cm[3] * wy + cm[5];
+            if (vx < minX) { minX = vx; }
+            if (vy < minY) { minY = vy; }
+            if (vx > maxX) { maxX = vx; }
+            if (vy > maxY) { maxY = vy; }
+        }
+
+        outRect.x = minX;
+        outRect.y = minY;
+        outRect.width = maxX - minX;
+        outRect.height = maxY - minY;
+        maskMgr.pushRectMask(outRect, mask.inverted);
     }
 
     /**
@@ -315,42 +624,93 @@ export class Scene2D {
         const renderer = this._getBatchRenderer();
 
         if (clear) {
-            engine.clear(this.backgroundColor, true, true, false);
+            engine.clear(this.backgroundColor, true, true, this._hasMasksLastFrame);
         }
 
         if (renderer.isReady) {
             // Provide fallback texture for unused WebGPU texture slots
             renderer.fallbackTexture = this._getWhiteTexture();
 
-            // Collect visible sprites
+            // Reset mask tracking for this frame
+            this._hasMasks = false;
+
+            // Collect visible sprites and detect masks
             this._spriteDataPool.length = 0;
+            this._renderCommands.length = 0;
+
+            // First pass: collect render commands (detects masks)
             for (const root of this._rootNodes) {
-                this._collectSprites(root, this._spriteDataPool);
+                this._collectRenderCommands(root, this._renderCommands);
+            }
+
+            // Collect overlay nodes (internal, not in rootNodes — e.g. transition overlays)
+            for (const overlay of this._overlayNodes) {
+                this._collectRenderCommands(overlay, this._renderCommands);
             }
 
             // Always use the actual engine render dimensions for the projection
             const vpWidth = engine.getRenderWidth();
             const vpHeight = engine.getRenderHeight();
 
-            if (this._spriteDataPool.length > 0) {
-                // Sort by sorting layer first, then zIndex within the same layer
+            if (this._hasMasks) {
+                // Mask path: process render commands with push/pop mask orchestration
+                const viewTransform = this.camera ? this.camera.getViewTransform() : Matrix2D.Identity();
+
+                // Pack light uniforms for the mask path
+                if (this.lightingManager) {
+                    this.lightingManager.packLightUniforms(viewTransform.m);
+                }
+
+                const camPos = this.camera ? this.camera.position : null;
+                const unlitMin = this.unlitSortingLayerMin;
+                this._processRenderCommands(this._renderCommands, renderer, viewTransform, vpWidth, vpHeight, camPos, unlitMin);
+            } else if (this._spriteDataPool.length > 0) {
+                // Fast path (no masks): existing flat sort + batch render
                 this._spriteDataPool.sort((a, b) => {
                     return a.sortingLayer !== b.sortingLayer ? a.sortingLayer - b.sortingLayer : a.zIndex - b.zIndex;
                 });
 
-                // Compute camera view transform
                 const viewTransform = this.camera ? this.camera.getViewTransform() : Matrix2D.Identity();
+                const camPos = this.camera ? this.camera.position : null;
 
-                // Pack light uniforms in view space and wire to renderer
-                if (this.lightingManager) {
-                    this.lightingManager.packLightUniforms(viewTransform.m);
-                    renderer.lightingManager = this.lightingManager;
+                // Split lit / unlit sprites at the unlitSortingLayerMin boundary.
+                // Because the pool is sorted by sortingLayer, a binary search finds
+                // the first unlit sprite and we render two contiguous slices.
+                const unlitMin = this.unlitSortingLayerMin;
+                const hasLighting = this.lightingManager !== null;
+                const needsSplit = hasLighting && unlitMin !== Infinity;
+
+                if (needsSplit) {
+                    // Find first sprite at or above the unlit threshold
+                    let splitIdx = this._spriteDataPool.length;
+                    for (let i = 0; i < this._spriteDataPool.length; i++) {
+                        if (this._spriteDataPool[i].sortingLayer >= unlitMin) {
+                            splitIdx = i;
+                            break;
+                        }
+                    }
+
+                    // Render lit sprites
+                    if (splitIdx > 0) {
+                        this.lightingManager!.packLightUniforms(viewTransform.m);
+                        renderer.lightingManager = this.lightingManager;
+                        renderer.render(this._spriteDataPool.slice(0, splitIdx), vpWidth, vpHeight, viewTransform, camPos);
+                    }
+
+                    // Render unlit sprites (HUD etc.)
+                    if (splitIdx < this._spriteDataPool.length) {
+                        renderer.lightingManager = null;
+                        renderer.render(this._spriteDataPool.slice(splitIdx), vpWidth, vpHeight, viewTransform, camPos);
+                    }
                 } else {
-                    renderer.lightingManager = null;
+                    if (hasLighting) {
+                        this.lightingManager!.packLightUniforms(viewTransform.m);
+                        renderer.lightingManager = this.lightingManager;
+                    } else {
+                        renderer.lightingManager = null;
+                    }
+                    renderer.render(this._spriteDataPool, vpWidth, vpHeight, viewTransform, camPos);
                 }
-
-                // Render the batch
-                renderer.render(this._spriteDataPool, vpWidth, vpHeight, viewTransform);
             }
 
             // Render debug overlays (after sprites, before onAfterRender)
@@ -360,6 +720,7 @@ export class Scene2D {
             }
         }
 
+        this._hasMasksLastFrame = this._hasMasks;
         this.onAfterRender.notifyObservers(this);
     }
 
@@ -384,11 +745,17 @@ export class Scene2D {
         }
 
         this._rootNodes.length = 0;
+        this._overlayNodes.length = 0;
         this._allNodes.clear();
 
         if (this._batchRenderer) {
             this._batchRenderer.dispose();
             this._batchRenderer = null;
+        }
+
+        if (this._maskStateManager) {
+            this._maskStateManager.dispose();
+            this._maskStateManager = null;
         }
 
         if (this.debugRenderer) {
@@ -406,6 +773,10 @@ export class Scene2D {
         this.onAfterRender.clear();
         this.onDispose.clear();
         this.onReadyObservable.clear();
+
+        if (Scene2DStore._LastCreatedScene === this) {
+            Scene2DStore._LastCreatedScene = null;
+        }
 
         this._isDisposed = true;
     }

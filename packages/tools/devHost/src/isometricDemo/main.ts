@@ -11,6 +11,7 @@ import { Tween, TweenManager } from "2d/Tween/tween";
 import { Easing } from "2d/Tween/easing";
 import { Text2D } from "2d/Text2D/text2D";
 import { DebugRenderer2D } from "2d/Debug/debugRenderer2D";
+import { RenderTexture2D } from "2d/RenderTexture/renderTexture2D";
 import { Vector2 } from "core/Maths/math.vector";
 import { Color4 } from "core/Maths/math.color";
 
@@ -48,9 +49,10 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     overlay.innerHTML = "WASD/Arrows Pan &nbsp; Click to move unit &nbsp; <b>F3 Debug</b><br>Babylon.js 2D Isometric Demo" +
         `<br><br><b>Features:</b> IsometricGrid, AStarPathfinder, Camera2D (pan + design resolution), InputMap2D, Sprite2D,` +
         `<br>&nbsp;&nbsp;Tilemap2D (animated water tiles), Tween (smooth path movement), Text2D (hover info),` +
-        `<br>&nbsp;&nbsp;<b>DebugRenderer2D</b> (pathfinding grid overlay)` +
+        `<br>&nbsp;&nbsp;<b>DebugRenderer2D</b> (pathfinding grid overlay), <b>RenderTexture2D</b> (minimap)` +
         `<br><b>Sources:</b> Isometric/isometricGrid.ts · Pathfinding/aStarPathfinder.ts · Tilemap/tilemap2D.ts` +
-        `<br>&nbsp;&nbsp;Tween/tween.ts · Text2D/text2D.ts · Camera2D/camera2D.ts · Input/inputMap2D.ts · <b>Debug/debugRenderer2D.ts</b>`;
+        `<br>&nbsp;&nbsp;Tween/tween.ts · Text2D/text2D.ts · Camera2D/camera2D.ts · Input/inputMap2D.ts · <b>Debug/debugRenderer2D.ts</b>` +
+        `<br>&nbsp;&nbsp;<b>RenderTexture/renderTexture2D.ts</b>`;
     mainDiv.appendChild(overlay);
 
     const engine = new Engine(canvas, true);
@@ -73,23 +75,6 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     input.defineAction("panLeft", { type: "key", key: "ArrowLeft" }, { type: "key", key: "KeyA" });
     input.defineAction("panRight", { type: "key", key: "ArrowRight" }, { type: "key", key: "KeyD" });
     input.defineAction("click", { type: "mouseButton", button: 0 });
-
-    // ─── DebugRenderer2D ─────────────────────────────────────────────
-    const debugRenderer = new DebugRenderer2D(engine);
-    debugRenderer.pathfinder = pathfinder;
-    debugRenderer.pathfinderGrid = isoGrid;
-    debugRenderer.enabled = false;
-    let debugMode = false;
-
-    // Toggle debug mode with F3
-    window.addEventListener("keydown", (e) => {
-        if (e.key === "F3") {
-            e.preventDefault();
-            debugMode = !debugMode;
-            debugRenderer.enabled = debugMode;
-            debugRenderer.showPathfindingGrid = debugMode;
-        }
-    });
 
     // Terrain — procedural, stored in Tilemap2D for animated tile support
     const terrainGids: number[] = [];
@@ -160,6 +145,23 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         width: MAP_W,
         height: MAP_H,
         isWalkable: (col, row) => getBaseGid(col, row) === 3,
+    });
+
+    // ─── DebugRenderer2D ─────────────────────────────────────────────
+    const debugRenderer = new DebugRenderer2D(engine);
+    debugRenderer.pathfinder = pathfinder;
+    debugRenderer.pathfinderGrid = isoGrid;
+    debugRenderer.enabled = false;
+    let debugMode = false;
+
+    // Toggle debug mode with F3
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "F3") {
+            e.preventDefault();
+            debugMode = !debugMode;
+            debugRenderer.enabled = debugMode;
+            debugRenderer.showPathfindingGrid = debugMode;
+        }
     });
 
     // Unit (sorting layer 1 — always renders above ground tiles)
@@ -247,6 +249,39 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
     debugIndicator.scale = new Vector2(TEXT_SCALE, TEXT_SCALE);
     scene.addNode(debugIndicator);
 
+    // ─── RenderTexture2D — Minimap ──────────────────────────────────
+    // Creates a zoomed-out view of the entire map rendered to an offscreen
+    // texture, displayed as a small sprite in the bottom-right corner.
+    // A second Camera2D is used with a wider view to capture the full map.
+    const MINIMAP_SIZE = 100;
+    const minimapRT = new RenderTexture2D("minimap", engine, MINIMAP_SIZE, MINIMAP_SIZE);
+
+    // Minimap camera: zoomed out to show the entire map
+    const minimapCamera = new Camera2D();
+    minimapCamera.setViewport(MINIMAP_SIZE, MINIMAP_SIZE);
+    // Center on the map and zoom out enough to see all tiles
+    const mapCenterX = isoGrid.tileToWorld(MAP_W / 2, MAP_H / 2).x;
+    const mapCenterY = isoGrid.tileToWorld(MAP_W / 2, MAP_H / 2).y;
+    minimapCamera.position = new Vector2(mapCenterX, mapCenterY);
+    minimapCamera.setDesignResolution(MAP_W * TILE_W, MAP_H * TILE_H, ScaleMode.FIT);
+
+    // Semi-transparent border behind the minimap
+    const minimapBorder = new Sprite2D("minimapBorder");
+    scene.addNode(minimapBorder);
+    minimapBorder.width = MINIMAP_SIZE + 4;
+    minimapBorder.height = MINIMAP_SIZE + 4;
+    minimapBorder.tint = new Color4(0.1, 0.15, 0.1, 0.7);
+    minimapBorder.sortingLayer = 999;
+
+    // Minimap sprite: displays the RT content
+    const minimapSprite = new Sprite2D("minimapSprite");
+    scene.addNode(minimapSprite);
+    minimapSprite.width = MINIMAP_SIZE;
+    minimapSprite.height = MINIMAP_SIZE;
+    minimapSprite.texture = minimapRT.texture;
+    minimapSprite.sortingLayer = 1000;
+    let minimapFrameCounter = 0;
+
     // Game loop
     let lastTime = performance.now();
 
@@ -322,6 +357,35 @@ export async function Main(_searchParams: URLSearchParams): Promise<void> {
         // Standing depth when not moving
         if (!isMoving) {
             unit.zIndex = (unit.position.y * 2 / TILE_H) + 0.5;
+        }
+
+        // ── RenderTexture2D: Minimap capture (every 6 frames for perf) ──
+        // Position minimap in bottom-right corner, relative to camera
+        const minimapX = cx + DESIGN_W / 2 - MINIMAP_SIZE / 2 - 6;
+        const minimapY = cy + DESIGN_H / 2 - MINIMAP_SIZE / 2 - 6;
+        minimapBorder.position.x = minimapX;
+        minimapBorder.position.y = minimapY;
+        minimapSprite.position.x = minimapX;
+        minimapSprite.position.y = minimapY;
+
+        minimapFrameCounter++;
+        if (minimapFrameCounter % 6 === 0) {
+            // Hide HUD elements so they don't appear in the minimap
+            minimapSprite.visible = false;
+            minimapBorder.visible = false;
+            hoverText.visible = false;
+            debugIndicator.visible = false;
+            highlight.visible = false;
+            // Swap to minimap camera, render to RT, then restore
+            scene.camera = minimapCamera;
+            minimapRT.renderScene(scene, true);
+            scene.camera = camera;
+            // Restore visibility
+            minimapSprite.visible = true;
+            minimapBorder.visible = true;
+            hoverText.visible = true;
+            debugIndicator.visible = true;
+            highlight.visible = true;
         }
 
         scene.update(dt);

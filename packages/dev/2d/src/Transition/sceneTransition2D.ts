@@ -248,7 +248,7 @@ export class SceneTransition2D {
         this._overlay.sortingLayer = 0x7FFFFFFF; // Render on top of everything
         this._overlay.width = 99999;
         this._overlay.height = 99999;
-        scene.addNode(this._overlay);
+        scene._addOverlay(this._overlay);
     }
 
     private _updateFade(t: number, easedT: number): void {
@@ -263,9 +263,9 @@ export class SceneTransition2D {
 
             if (t >= 1) {
                 // Switch to "in" phase
-                this._fromScene.removeNode(this._overlay);
+                this._fromScene._removeOverlay(this._overlay);
                 this._overlay.tint.a = 1;
-                this._toScene.addNode(this._overlay);
+                this._toScene._addOverlay(this._overlay);
                 this._phase = "in";
                 this._elapsed = 0;
             }
@@ -275,7 +275,7 @@ export class SceneTransition2D {
             this._positionOverlay(this._toScene);
 
             if (t >= 1) {
-                this._toScene.removeNode(this._overlay);
+                this._toScene._removeOverlay(this._overlay);
                 this._overlay = null;
                 this._phase = "done";
                 this._onComplete?.();

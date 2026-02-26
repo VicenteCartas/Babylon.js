@@ -24,3 +24,6 @@ export * from "./Transition/index";
 export * from "./Debug/index";
 export * from "./ObjectPool/index";
 export * from "./SpriteAtlas/index";
+export * from "./RenderTexture/index";
+export * from "./Audio/index";
+export * from "./Masking/index";

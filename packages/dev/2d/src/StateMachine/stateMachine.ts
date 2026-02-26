@@ -120,6 +120,7 @@ export class StateMachine2D<TContext = any> {
     private _states: Map<string, IState2D<TContext>> = new Map();
     private _transitions: ITransition2D<TContext>[] = [];
     private _namedTransitions: Map<string, ITransition2D<TContext>> = new Map();
+    private _transitionsByState: Map<string, ITransition2D<TContext>[]> = new Map();
     private _currentState: IState2D<TContext> | null = null;
     private _currentStateName: string = "";
     private _context: TContext;
@@ -182,6 +183,16 @@ export class StateMachine2D<TContext = any> {
         this._transitions.push(transition);
         if (transition.name) {
             this._namedTransitions.set(transition.name, transition);
+        }
+        // Update the per-state cache for condition-based transitions
+        if (transition.condition) {
+            let stateTransitions = this._transitionsByState.get(transition.from);
+            if (!stateTransitions) {
+                stateTransitions = [];
+                this._transitionsByState.set(transition.from, stateTransitions);
+            }
+            stateTransitions.push(transition);
+            stateTransitions.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
         }
         return this;
     }
@@ -274,6 +285,7 @@ export class StateMachine2D<TContext = any> {
         this._states.clear();
         this._transitions.length = 0;
         this._namedTransitions.clear();
+        this._transitionsByState.clear();
         this._currentState = null;
         this._currentStateName = "";
         this._isStarted = false;
@@ -284,14 +296,10 @@ export class StateMachine2D<TContext = any> {
      * Evaluates auto-transitions from the current state, sorted by priority
      */
     private _evaluateTransitions(): void {
-        // Collect applicable transitions sorted by priority (descending)
-        const applicable: ITransition2D<TContext>[] = [];
-        for (const t of this._transitions) {
-            if (t.from === this._currentStateName && t.condition) {
-                applicable.push(t);
-            }
+        const applicable = this._transitionsByState.get(this._currentStateName);
+        if (!applicable) {
+            return;
         }
-        applicable.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
         for (const t of applicable) {
             if (t.condition!(this._context)) {

@@ -1,5 +1,7 @@
 import { Vector2 } from "core/Maths/math.vector";
 
+import type { IGrid2D, IGridCoord } from "./iGrid2D";
+
 /**
  * Supported grid topologies
  */
@@ -19,25 +21,11 @@ export enum GridTopology {
 }
 
 /**
- * A cell coordinate in the grid
- */
-export interface IGridCoord {
-    /**
-     * Column
-     */
-    col: number;
-    /**
-     * Row
-     */
-    row: number;
-}
-
-/**
  * Utility class for 2D grid operations.
  * Supports square and hexagonal grids with coordinate conversion,
  * neighbor queries, distance calculations, and range queries.
  */
-export class Grid2D {
+export class Grid2D implements IGrid2D {
     /**
      * Grid width in cells
      */
