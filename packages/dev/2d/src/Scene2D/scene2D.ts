@@ -101,6 +101,8 @@ export class Scene2D {
     /** Reusable array for mask sprite data in _processRenderCommands */
     private _maskSpriteDataTemp: ISprite2DRenderData[] = [];
     private _maskStateManager: MaskStateManager | null = null;
+    /** Timestamp (ms) of the last auto-update, for computing dt independently of the 3D engine */
+    private _lastAutoUpdateTime: number = -1;
     /**
      * Internal overlay nodes rendered on top of rootNodes but not exposed
      * in the public `rootNodes` array. Used by SceneTransition2D.
@@ -596,24 +598,59 @@ export class Scene2D {
     }
 
     /**
-     * Renders the 2D scene.
-     * Collects all visible Sprite2D nodes, sorts by zIndex, batches by texture,
-     * and submits draw calls via the SpriteBatchRenderer.
+     * Computes delta time in seconds since the last auto-update call,
+     * using `performance.now()` so it works correctly even when called
+     * after a 3D scene has already consumed the engine's frame delta.
+     * @internal
+     */
+    private _computeDeltaTime(): number {
+        const now = performance.now();
+        if (this._lastAutoUpdateTime < 0) {
+            this._lastAutoUpdateTime = now;
+            return 0;
+        }
+        const dt = (now - this._lastAutoUpdateTime) / 1000;
+        this._lastAutoUpdateTime = now;
+        return dt;
+    }
+
+    /**
+     * Renders the 2D scene (standalone mode — owns the full frame).
+     * Computes delta time, updates the camera and all nodes, then renders.
+     * This is the simplest render loop: just call `scene2D.render()` each frame.
      */
     public render(): void {
+        const dt = this._computeDeltaTime();
+        if (this.camera) {
+            this.camera.update(dt);
+        }
+        this.update(dt);
         const engine = this.engine;
         engine.beginFrame();
-        this.renderContent();
+        this.renderContent(true, false);
         engine.endFrame();
     }
 
     /**
      * Renders the scene content (clear, collect sprites, draw) without
      * calling engine.beginFrame()/endFrame(). Useful for compositing
-     * multiple scenes in a single frame (e.g., slide transitions).
+     * multiple scenes in a single frame (e.g., 2D overlay on top of 3D).
+     *
+     * If `autoUpdate` is true (default), computes delta time and updates the
+     * camera and all nodes before rendering. Set to false only if you need
+     * manual control over the update step.
+     *
      * @param clear - Whether to clear the framebuffer before rendering. Default: true.
+     * @param autoUpdate - Whether to automatically call camera.update() and scene.update(). Default: true.
      */
-    public renderContent(clear: boolean = true): void {
+    public renderContent(clear: boolean = true, autoUpdate: boolean = true): void {
+        if (autoUpdate) {
+            const dt = this._computeDeltaTime();
+            if (this.camera) {
+                this.camera.update(dt);
+            }
+            this.update(dt);
+        }
         const engine = this.engine;
 
         this.onBeforeRender.notifyObservers(this);

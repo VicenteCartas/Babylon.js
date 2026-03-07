@@ -3778,32 +3778,6 @@
             "playgroundId": "#PPC2EI#5",
             "renderCount": 120,
             "referenceImage": "particles-flowmaps-2.png"
-        },
-        {
-            "title": "2D - Hello World",
-            "playgroundId": "#B9J5GF",
-            "referenceImage": "2d-hello-world.png"
-        },
-        {
-            "title": "2D - 2D + 3D Compositing",
-            "playgroundId": "#03W08W",
-            "referenceImage": "2d-3d-compositing.png"
-        },
-        {
-            "title": "2D - Sprite2D Basics",
-            "playgroundId": "#EP0ZJV#1",
-            "referenceImage": "2d-sprite2d-basics.png"
-        },
-        {
-            "title": "2D - Animated Sprites",
-            "playgroundId": "#T6Q16K",
-            "renderCount": 30,
-            "referenceImage": "2d-animated-sprites.png"
-        },
-        {
-            "title": "2D - Source Rectangles",
-            "playgroundId": "#JHCZ8B#1",
-            "referenceImage": "2d-source-rectangles.png"
         }
     ]
 }

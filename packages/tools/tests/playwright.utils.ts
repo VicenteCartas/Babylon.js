@@ -85,6 +85,11 @@ export function getBabylonServerTestsList() {
             use: getUseDefinition("Viewer"),
         },
         {
+            name: "2d",
+            testMatch: "**/*2d.test.ts",
+            use: getUseDefinition("2D"),
+        },
+        {
             name: "webxr",
             testMatch: "**/*.webxr.test.ts",
             use: getUseDefinition("WebXR"),
