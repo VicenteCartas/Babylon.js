@@ -125,6 +125,7 @@ module.exports = (env) => {
                 accessibility: path.resolve(basePathForTools, "accessibility", outputDirectoryForAliases),
                 addons: path.resolve(basePathForSources, "addons", outputDirectoryForAliases),
                 "2d": path.resolve(basePathForSources, "2d", outputDirectoryForAliases),
+                "@tools/snippet-loader": path.resolve(basePathForTools, "snippetLoader", outputDirectoryForAliases),
             },
             symlinks: false,
             // modules: [path.resolve(__dirname, "../../dev/"), 'node_modules'],

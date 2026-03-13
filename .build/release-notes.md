@@ -1,10 +1,10 @@
 
 ### Core
 
-- FrameGraph: miscellaneous fixes - [_Bug Fix_] by [Popov72](https://github.com/Popov72) ([#18037](https://github.com/BabylonJS/Babylon.js/pull/18037))
-- Upgrade Jest - by [RaananW](https://github.com/RaananW) ([#18026](https://github.com/BabylonJS/Babylon.js/pull/18026))
-- Particle System: Set a default position if emitter mesh is not found during parsing - [_Bug Fix_] by [Popov72](https://github.com/Popov72) ([#18033](https://github.com/BabylonJS/Babylon.js/pull/18033))
+- WebGPU: Fix dual source blending detection - [_Bug Fix_] by [Popov72](https://github.com/Popov72) ([#18082](https://github.com/BabylonJS/Babylon.js/pull/18082))
+- WebGPU: Fix wrong selected meshes in the selection outline layer - [_Bug Fix_] by [Popov72](https://github.com/Popov72) ([#18080](https://github.com/BabylonJS/Babylon.js/pull/18080))
+- Clustered lights: Limit batch size for mobile devices - [_Bug Fix_] by [Popov72](https://github.com/Popov72) ([#18081](https://github.com/BabylonJS/Babylon.js/pull/18081))
 
-### Loaders
+### Node Particle Editor
 
-- Upgrade Jest - by [RaananW](https://github.com/RaananW) ([#18026](https://github.com/BabylonJS/Babylon.js/pull/18026))
+- Removing auto movement of camera because of framing - by [VicenteCartas](https://github.com/VicenteCartas) ([#18077](https://github.com/BabylonJS/Babylon.js/pull/18077))

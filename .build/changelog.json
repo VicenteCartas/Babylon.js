@@ -1,6 +1,909 @@
 {
-    "fromTag": "8.54.0",
+    "fromTag": "8.55.0",
     "changelog": {
+        "8.55.1": [
+            {
+                "pr": "18082",
+                "title": "WebGPU: Fix dual source blending detection",
+                "description": "Also add a `IsSupported` method to volumetric lighting.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/webgpuEngine.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/volumetricLightingTask.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "WebGPU"
+                ]
+            },
+            {
+                "pr": "18080",
+                "title": "WebGPU: Fix wrong selected meshes in the selection outline layer",
+                "description": "This is a follow up to #16842, which was still bugged.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Layers/thinSelectionOutlineLayer.ts",
+                    "packages/dev/core/src/Meshes/instancedMesh.ts",
+                    "packages/dev/core/src/Meshes/mesh.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/Selection-outline-layer-with-instances.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "bug",
+                    "WebGPU"
+                ]
+            },
+            {
+                "pr": "18077",
+                "title": "Removing auto movement of camera because of framing",
+                "description": "Removes the camera movement to a neutral position after rotating it.",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/tools/nodeParticleEditor/src/components/preview/previewManager.ts"
+                ],
+                "tags": [
+                    "npe"
+                ]
+            },
+            {
+                "pr": "18081",
+                "title": "Clustered lights: Limit batch size for mobile devices",
+                "description": "Adjust the batch size based on device type, limiting to 8 for mobile devices.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Lights/Clustered/clusteredLightContainer.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "rendering engine"
+                ]
+            }
+        ],
+        "8.55.0": [
+            {
+                "pr": "18078",
+                "title": "Simplify ColorPicker and TextInput components",
+                "description": "## Code Simplification - March 12, 2026\n\nThis PR simplifies recently modified code in the Inspector V2 ColorPicker and TextInput components to improve clarity, consistency, and maintainability while preserving all functionality.\n\n### Files Simplified\n\n- `packages/dev/sharedUiComponents/src/fluent/primitives/colorPicker.tsx` - Fixed naming inconsistencies and simplified nested ternary\n- `packages/dev/sharedUiComponents/src/fluent/primitives/textInput.tsx` - Removed double negative validation logic\n\n### Improvements Made\n\n#### 1. Enhanced Clarity\n\n**ColorPicker.tsx:**\n- Converted complex nested ternary in `displayColor` useMemo to clear if/else statement for better readability\n- The original: `(isLinear === isPropertyLinear ? color : isLinear ? color.toLinearSpace() : color.toGammaSpace())`\n- Now uses explicit if/else structure that's easier to understand\n\n**TextInput.tsx:**\n- Removed double negative logic in `validateValue` function\n- Changed from `const failsValidator = ... return !failsValidator` to positive logic: `if (!props.validator) return true; return props.validator(val)`\n\n#### 2. Applied Project Standards\n\n- Fixed naming convention inconsistencies to use proper camelCase:\n  - `ispropertyLinear` → `isPropertyLinear`\n  - `displayMismatchesproperty` → `displayMismatchesProperty`\n- These naming fixes ensure consistency with TypeScript/React conventions and prevent confusion\n\n### Changes Based On\n\nRecent changes from:\n- #18074 - [InspectorV2] ColorPicker bug fixes (fix alpha / hex , add dropdown functionality)\n- Commit 9aa29da - Merged on March 11, 2026\n\n### Testing\n\n- ✅ All functionality preserved - no behavioral changes\n- ✅ TypeScript compilation succeeds\n- ✅ Changes are surgical and focused on recently modified code\n- ✅ No unintended side effects\n\n### Review Focus\n\nPlease verify:\n- Functionality is preserved (color picker and text input behavior identical)\n- Simplifications improve code quality and readability\n- Changes align with project naming conventions\n- Nested ternary simplification is clearer\n- Validation logic is more straightforward\n\n---\n\n*Automated by Code Simplifier Agent - analyzing code from the last 24 hours*\n\n\n<!-- gh-aw-tracker-id: code-simplifier -->\n\n\n> AI generated by [Code Simplifier](https://github.com/BabylonJS/Babylon.js/actions/runs/22981442066)\n> - [x] expires <!-- gh-aw-expires: 2026-03-13T00:53:51.812Z --> on Mar 13, 2026, 12:53 AM UTC\n\n<!-- gh-aw-expires-type: pull-request -->\n\n<!-- gh-aw-workflow-id: code-simplifier -->",
+                "author": {
+                    "name": "github-actions[bot]",
+                    "url": "https://github.com/apps/github-actions"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/colorPicker.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/textInput.tsx"
+                ],
+                "tags": [
+                    "refactoring",
+                    "code-quality",
+                    "automation"
+                ]
+            },
+            {
+                "pr": "18074",
+                "title": "ColorPicker bug fixes (fix alpha / hex , add dropdown functionality)",
+                "description": "- Fix bug where changing alpha didn't reflect in the color (simple fix, call onChange)\r\n- Fix bug where changing hex would cause popover to close without proper color (require onblur, either via pressing enter key or navigating away)\r\n- Remove the disabled dropdowns for datatype / colorspace and add in the proper conversion logic\r\n- Fix the infoLabel text to take into account the entity's colorSpace and the dropdown's selected space\r\n- Ensure the copyproperty button copies in the space the entity expects, regardless of what is used in dropdown\r\n<img width=\"296\" height=\"230\" alt=\"image\" src=\"https://github.com/user-attachments/assets/e57d445b-a905-4ef5-b0f0-22489f57280e\" />\r\n<img width=\"307\" height=\"160\" alt=\"image\" src=\"https://github.com/user-attachments/assets/6c3a73cd-58df-4401-a6a5-594cb7a1f310\" />\r\n<img width=\"589\" height=\"24\" alt=\"image\" src=\"https://github.com/user-attachments/assets/e0ef35d8-3b8b-4df3-9797-dc5d1f8e8350\" />\r\n",
+                "author": {
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
+                },
+                "files": [
+                    "packages/dev/inspector-v2/src/components/properties/generateCopyString.ts",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/colorPicker.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/textInput.tsx"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "18076",
+                "title": "Update changelog generation script for additional directories and groupings",
+                "description": "With the recent change #18040, we are relying on our custom changelog generation for the GitHub release notes. However, I noticed that a lot seems to be missing from this changelog, so I looked closer and saw that it appears to be very out of date. It has a mapping of directories to \"friendly\" (feature) names, and anything not in that list is ignored. So this PR changes two things:\r\n- Update the list of directories to include new packages and tools introduced since last time the changelog generator script was updated.\r\n- Change the logic slightly to allow multiple directories to map to one \"friendly\" (feature) name. For example, viewer and viewer-configurator both map to the feature \"Viewer\", and four smart filter related directories map to \"Smart Filters\". I think this is better for keeping the changelog concise and easy to read, but this is subjective and I'm open to other perspectives.\r\n\r\nI tested this locally against the checked in changelog.json (raw PR history for versions) and it looked good to me.",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "scripts/generateChangelog.js"
+                ],
+                "tags": [
+                    "skip changelog"
+                ]
+            },
+            {
+                "pr": "18073",
+                "title": "Improve JSDoc documentation in 3MF serializer",
+                "description": "## Code Simplification - 2026-03-11\n\nThis PR simplifies recently modified code to improve clarity, consistency, and maintainability while preserving all functionality.\n\n### Files Simplified\n\n- `packages/dev/serializers/src/3MF/3mfSerializer.ts` - Removed empty JSDoc comments and added meaningful documentation\n\n### Improvements Made\n\n1. **Enhanced Clarity**\n   - Replaced empty JSDoc comments (`/** */` and `/**\\n     *\\n     */`) with descriptive documentation\n   - Added meaningful class description for `IncrementalIdFactory`\n   - Documented constructor parameters with clear descriptions\n   - Added `@throws` documentation for error conditions\n   - Added method descriptions for `next()` and `reset()`\n   - Added description to `DefaultOptions` static property\n\n2. **Applied Project Standards**\n   - Marked private fields with `private` modifier for better encapsulation\n   - Followed TSDoc/JSDoc syntax as required by contributing guidelines\n\n3. **Reduced Noise**\n   - Removed 9 empty JSDoc comments that provided no value\n   - Replaced with 8 lines of meaningful documentation\n\n### Changes Based On\n\nRecent changes from:\n- #18072 - \"review naming in 3mf serializers\"\n- Commit d4dd787 - \"review naming in 3mf serializers (#18072)\"\n\n### Testing\n\nDocumentation-only changes:\n- ✅ No functional changes - behavior is identical\n- ✅ TypeScript compilation unchanged\n- ✅ No breaking changes to public or private APIs\n\n### Review Focus\n\nPlease verify:\n- Documentation is clear and helpful\n- JSDoc follows project conventions\n- Changes improve code quality without altering functionality\n- No unintended side effects\n\n---\n\n*Automated by Code Simplifier Agent - analyzing code from the last 24 hours*\n\n\n<!-- gh-aw-tracker-id: code-simplifier -->\n\n\n> AI generated by [Code Simplifier](https://github.com/BabylonJS/Babylon.js/actions/runs/22931199806)\n> - [x] expires <!-- gh-aw-expires: 2026-03-12T00:56:19.199Z --> on Mar 12, 2026, 12:56 AM UTC\n\n<!-- gh-aw-expires-type: pull-request -->\n\n<!-- gh-aw-workflow-id: code-simplifier -->",
+                "author": {
+                    "name": "github-actions[bot]",
+                    "url": "https://github.com/apps/github-actions"
+                },
+                "files": [
+                    "packages/dev/serializers/src/3MF/3mfSerializer.ts"
+                ],
+                "tags": [
+                    "refactoring",
+                    "code-quality",
+                    "automation"
+                ]
+            },
+            {
+                "pr": "18075",
+                "title": "Fix source mesh for cloned GaussianSplattingMaterial",
+                "description": "https://forum.babylonjs.com/t/splat-rendering-issues-with-right-handed-system-and-container-loading/62600/9",
+                "author": {
+                    "name": "CedricGuillemet",
+                    "url": "https://github.com/CedricGuillemet"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts",
+                    "packages/dev/core/src/Meshes/GaussianSplatting/gaussianSplattingMesh.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "Gaussian Splatting"
+                ]
+            },
+            {
+                "pr": "18055",
+                "title": "Introducing the Babylon snippet loader package",
+                "description": "## Introducing `@tools/snippet-loader`\n\nA self-contained library that fetches, parses, type-detects, transpiles, and executes Babylon.js snippet server payloads. It replaces the inline snippet-loading logic previously embedded in the Playground with a reusable, strongly-typed package that any consumer (devhost, sandbox, custom apps) can use to load and run playground snippets by ID — handling the full lifecycle from HTTP fetch through engine/scene creation.\n\n---\n\n### Core API\n- **`loadSnippet(snippetId, options?)`** — Fetches a snippet from the snippet server, detects its type, decodes, transpiles, and returns a fully typed and executable result in a single call.\n- **`parseSnippetResponse(response, snippetId, options?)`** — Same pipeline but from an already-fetched response, for consumers with custom fetching strategies or locally saved snippets.\n\n### Snippet Type Detection\n- **Automatic content type detection** for 11 types: `playground`, `nodeMaterial`, `nodeGeometry`, `nodeRenderGraph`, `nodeParticle`, `gui`, `animation`, `particleSystem`, `spriteManager`, `shaderMaterial`, `unknown`.\n- **Playground results** return executable `createEngine`/`createScene` functions. Non-playground results return a `data` object with a `load(parser?)` convenience method.\n\n### TypeScript Transpilation\n- **Built-in browser-safe transpiler** using Monaco's bundled TypeScript compiler — no Node.js dependencies.\n- **`createTypeScriptTranspiler(tsInstance)`** factory for plugging in any external TS compiler.\n- **Pluggable `transpile` option** — consumers can provide their own `(source, fileName) => string` function (sucrase, esbuild-wasm, etc.).\n\n### Module Format Support\n- **ESM mode** (default) — Transpiled to ES modules, loaded via blob URLs + dynamic `import()`.\n- **Script mode** — Transpiled to plain script code (no imports/exports), loaded via `new Function()`. Suitable for UMD/global `BABYLON` setups.\n\n### V1 Legacy & V2 Multi-File Support\n- **V2 multi-file manifests** — Full support for entry files, external import maps, and multi-file source trees.\n- **V1 single-file snippets** — Automatic language guessing (JS vs TS via heuristics), legacy export injection, and context-aware boilerplate stripping (removes hardcoded `canvas`/`engine` var declarations from the preamble).\n\n### ESM Blob URL Loader\n- **Recursive DFS module resolution** — Processes files in dependency order (leaves first).\n- **Bare specifier resolution** — `@babylonjs/*` imports resolved to a synthetic proxy module that re-exports all properties from `globalThis.BABYLON`.\n- **External imports** — V2 manifest `imports` map URLs passed through directly.\n- **Non-JS asset wrapping** — Shaders (`.glsl`, `.fx`, `.wgsl`), JSON, and other text assets wrapped as synthetic ES modules exporting the content as a default string.\n- **Circular dependency handling** — Breaks cycles gracefully by falling back to unrewritten source.\n\n### Function Detection\n- **Automatic scene function detection** with priority-ordered search: `default.CreateScene`, `Playground.CreateScene`, `delayCreateScene`, `delayLoadScene`, `createScene`, and casing variants.\n- **Optional `createEngine` detection** — Uses the snippet's own engine factory when available, otherwise provides a sensible default.\n\n### Default Engine Creation\n- **WebGPU support** — Creates `WebGPUEngine` with `enableAllFeatures: true` and `setMaximumLimits: true` when the snippet's engine type is `\"WebGPU\"`, matching the Playground's behaviour.\n- **WebGL fallback** — Creates a standard `BABYLON.Engine` with antialiasing, preserveDrawingBuffer, and stencil enabled.\n\n### Legacy `this` Binding Proxy\n- **Transparent legacy compatibility** — Wraps `createScene` with a `Proxy`-based `this` binding so old snippets that use `this.scene = ...`, `this.engine`, or `this.canvas` work without modification. Falls back to `globalThis` for any other property access.\n\n### Runtime Feature Detection & Initialization\n- **Automatic source probing** — Scans snippet code for `HavokPlugin`, `AmmoJSPlugin`, `RecastJSPlugin` references and exposes `runtimeFeatures` flags.\n- **`initializeRuntimeAsync(options?)`** — Calls factory functions already on `window` (e.g. `HavokPhysics()` → `window.HK`).\n- **Optional CDN script loading** — Pass `{ loadScripts: true }` to automatically inject `<script>` tags from the Babylon.js CDN for any missing runtime dependency. Custom URLs supported via `scriptUrls`.\n\n### Consumer Integration (babylonServer)\n- **Canvas context switch handling** — Detects WebGL ↔ WebGPU engine type flips and triggers `location.reload()` for a fresh canvas (browser limitation).\n- **Global exposure** — Sets `window.canvas` and `window.engine` for legacy snippet compatibility.\n- **Visualization test mode** — Single-frame deterministic render with `useConstantAnimationDeltaTime`.\n\nTested with many different examples from the playground's examples page. All playgrounds load correctly.",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "package-lock.json",
+                    "package.json",
+                    "packages/tools/babylonServer/package.json",
+                    "packages/tools/babylonServer/public/index.html",
+                    "packages/tools/babylonServer/src/playground.ts",
+                    "packages/tools/babylonServer/src/sceneJs.js",
+                    "packages/tools/babylonServer/webpack.config.js",
+                    "packages/tools/snippetLoader/README.md",
+                    "packages/tools/snippetLoader/package.json",
+                    "packages/tools/snippetLoader/src/fetchSnippet.ts",
+                    "packages/tools/snippetLoader/src/index.ts",
+                    "packages/tools/snippetLoader/src/snippetLoader.ts",
+                    "packages/tools/snippetLoader/src/types.ts",
+                    "packages/tools/snippetLoader/src/typescriptServices.d.ts",
+                    "packages/tools/snippetLoader/test/unit/snippetLoader.test.ts",
+                    "packages/tools/snippetLoader/tsconfig.build.json",
+                    "packages/tools/snippetLoader/tsconfig.json",
+                    "tsconfig.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18054",
+                "title": "GS fixes",
+                "description": "- max part computation based on engine caps\r\n- bit manipulation for more float precision",
+                "author": {
+                    "name": "CedricGuillemet",
+                    "url": "https://github.com/CedricGuillemet"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingGpuPickingMaterialPlugin.ts",
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts",
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingSolidColorMaterialPlugin.ts",
+                    "packages/dev/core/src/Meshes/GaussianSplatting/gaussianSplattingMesh.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18072",
+                "title": "review naming in 3mf serializers",
+                "description": null,
+                "author": {
+                    "name": "sebavan",
+                    "url": "https://github.com/sebavan"
+                },
+                "files": [
+                    "packages/dev/serializers/src/3MF/3mfSerializer.ts",
+                    "packages/dev/serializers/src/3MF/core/model/3mf.serializer.ts"
+                ],
+                "tags": [
+                    "skip changelog"
+                ]
+            },
+            {
+                "pr": "18067",
+                "title": "Selection outline layer: Fix texture type based on capabilities",
+                "description": "This PR should make [this PG](https://playground.babylonjs.com/#LA850M#20) work on a iPhone iOS 26.3.1.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Layers/selectionOutlineLayer.ts",
+                    "packages/dev/core/src/Layers/thinSelectionOutlineLayer.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "rendering engine"
+                ]
+            },
+            {
+                "pr": "18071",
+                "title": "WebGPU: Fix volumetric lighting in WebGPU not working on iPhones",
+                "description": "This is a workaround for iOS 26.3.1 which doesn't implement the spec properly (see comment in code).",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/WebGPU/webgpuTextureManager.ts",
+                    "packages/dev/core/src/ShadersWGSL/lightingVolume.compute.fx"
+                ],
+                "tags": [
+                    "bug",
+                    "WebGPU"
+                ]
+            },
+            {
+                "pr": "18061",
+                "title": "Extrude Node V1",
+                "description": "First pass at an extrude node for NGE",
+                "author": {
+                    "name": "PirateJC",
+                    "url": "https://github.com/PirateJC"
+                },
+                "files": [
+                    "packages/dev/core/src/Meshes/Node/Blocks/extrudeGeometryBlock.ts",
+                    "packages/dev/core/src/Meshes/Node/index.ts",
+                    "packages/tools/nodeGeometryEditor/src/blockTools.ts",
+                    "packages/tools/nodeGeometryEditor/src/components/nodeList/nodeListComponent.tsx"
+                ],
+                "tags": [
+                    "new feature",
+                    "nge"
+                ]
+            },
+            {
+                "pr": "18066",
+                "title": "Inspector: Don't enable SpinButton scrub on touch input",
+                "description": "The scrub functionality in the SpinButton doesn't map well to touch input.\r\n\r\n<img width=\"344\" height=\"59\" alt=\"image\" src=\"https://github.com/user-attachments/assets/5107b9cf-d4a0-4a13-8efe-6eea82e2b7ff\" />\r\n\r\nThe code was previously trying to just handle `onMouseEnter`/`onMouseLeave`, but these still fire on touch input for compatibility. Instead, we should listen to `onPointerEnter`/`onPointerLeave` and only respond to `mouse` input specifically.\r\n\r\nThis is a really low priority bug on mobile, but I think it is also a really low risk change.",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/spinButton.tsx"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18003",
+                "title": "Integrate WebRequest with Web Audio Engine v2",
+                "description": "The Audio Engine v2 has no dependency on other core components. this was intentional. However, it does have the downside of not being able to modify network requests using the same known mechanism used in other Babylon components.\r\nInstead of integrating tools, which is a large dependency, I decided to integrate WebRequest, which is a small standalone dependency. This allows developers to use the WebRequest's static methods to modify request headers and URLs and thus make changes to the audio engine's network request process (for example, adding a token for each request).\r\n\r\nNote - This PR also adds a Fetch-style static method to WebRequest, which falls back to standard XHR request if fetch is not available. This is optional and not a breaking change.\r\n\r\nPlayground to test - https://playground.babylonjs.com/?snapshot=refs/pull/18003/merge#IZ6P6S  and #IZ6P6S#2 for array\r\n\r\nFixes #17989 ",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/dev/core/src/AudioV2/audioUtils.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/webAudioStaticSound.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/webAudioStreamingSound.ts",
+                    "packages/dev/core/src/Misc/webRequest.ts",
+                    "packages/dev/core/test/unit/Audio/helpers/mockedAudioObjects.ts"
+                ],
+                "tags": []
+            }
+        ],
+        "8.54.3": [
+            {
+                "pr": "18068",
+                "title": "Fix incorrect CDN url for draco wasm js (and possibly other CDN resources)",
+                "description": "Some tests are failing because they are trying to download CDN resources like this: `https://cdn.babylonjs.com/v8.54.2/v8.54.2/draco_wasm_wrapper.js`. This fails because the version got added twice. This was a regression from #18047.\r\n\r\nHere is the AI explanation of the regression, which is correct:\r\n\r\n```\r\n  Yes, this is a regression from PR #18047. The root cause is that the Draco wasm wrapper URL gets\r\n  double-processed through GetBabylonScriptURL.\r\n\r\n  The double-processing path\r\n\r\n   1. dracoCodec.ts:118 — URL is processed a first time: url: urlNeeded ? \r\n  Tools.GetBabylonScriptURL(configuration.wasmUrl, true) : \"\",\r\n\r\n   https://cdn.babylonjs.com/draco_wasm_wrapper.js → https://cdn.babylonjs.com/v8.54.2/draco_wasm_wrapper.js\r\n   2. dracoCodec.ts:148 — When numWorkers = 0, the already-rewritten URL is loaded via: await \r\n  Tools.LoadBabylonScriptAsync(codecInfo.url);\r\n   3. tools.ts:573 — LoadBabylonScriptAsync calls GetBabylonScriptURL again: scriptUrl = \r\n  Tools.GetBabylonScriptURL(scriptUrl);\r\n\r\n   https://cdn.babylonjs.com/v8.54.2/draco_wasm_wrapper.js still starts with https://cdn.babylonjs.com, so the \r\n  version is prepended again → https://cdn.babylonjs.com/v8.54.2/v8.54.2/draco_wasm_wrapper.js 💥\r\n\r\n  Why it didn't break before PR #18047\r\n\r\n  Before the PR, GetBabylonScriptURL only rewrote URLs when ScriptBaseUrl was set, which changes the domain (e.g.\r\n  cdn.babylonjs.com → my-cdn.com). After rewriting, the URL no longer starts with _DefaultCdnUrl, making the\r\n  second call a no-op. But the new _CdnVersion logic keeps the same domain, so the startsWith check matches on\r\n  every call.\r\n\r\n  Why it only affects numWorkers = 0\r\n\r\n  When workers are used, the URL goes to initializeWebWorker (line 137), which doesn't call GetBabylonScriptURL\r\n  again. The LoadBabylonScriptAsync path (line 148) is only taken when there are no workers.\r\n```\r\n\r\nAnd here is the AI explanation for why it didn't fail in the PR build for #18047:\r\n\r\n```\r\n● Because _CdnVersion is initialized as \"\" in source code:\r\n\r\n   public static _CdnVersion = \"\";\r\n\r\n  It only gets set to a real version (e.g. \"8.54.2\") when scripts/updateVersion.js runs during the release\r\n  process, not during PR CI. So during the PR's test run, Tools._CdnVersion was falsy, the else if\r\n  (Tools._CdnVersion) branch never executed, and the double-versioning never triggered.\r\n\r\n  The bug only manifests after a version is published and the injected _CdnVersion value is baked into the build.\r\n```",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/core/src/Misc/tools.ts",
+                    "packages/tools/ktx2Decoder/src/transcoder.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18064",
+                "title": "Drop and replace unused npm dependencies",
+                "description": "## Summary\r\n\r\nClean up unused and replaceable npm dependencies across the monorepo. This reduces install size, removes unmaintained/unnecessary packages, and replaces heavy dependencies with native Node.js or inline alternatives.\r\n\r\n## Changes\r\n\r\n### Commit 1: Remove unused deps and replace fs-extra/ts-debounce\r\n\r\n**Removed (no usage found):**\r\n- `mv` / `@types/mv` from buildTools and testTools\r\n- `split.js` from 6 editor packages (guiEditor, nodeEditor, nodeGeometryEditor, nodeParticleEditor, nodeRenderGraphEditor, vsm)\r\n- `dotenv` from testTools (not imported anywhere)\r\n\r\n**Replaced:**\r\n- `fs-extra` replaced with native `node:fs` in buildTools (`prepareEs6Build.ts`) and tests (`generateFileSizes.js`). Removed `fs-extra` / `@types/fs-extra` from root package.json.\r\n- `ts-debounce` replaced with inline `debounce.ts` utility in playground. The new utility supports `cancel()` and `maxWait`, matching the subset of features actually used.\r\n\r\n### Commit 2: Remove unused external dependencies (depcheck scan)\r\n\r\nRan `depcheck` across the entire monorepo and verified each flagged dependency. After filtering out false positives (webpack loaders/plugins, `@types/*`, peer deps, transitive deps), removed:\r\n\r\n- `usehooks-ts` from inspector-v2 (no imports found in source)\r\n- `@babel/core` from sharedUiComponents (no babel config or usage)\r\n- `commondir` from viewer (no imports found in source)\r\n- `https` npm package from reflector (code uses the Node.js built-in `https` module, not the npm stub)\r\n\r\n### What was intentionally kept\r\n\r\nMany packages flagged by depcheck are **false positives** - they are used in webpack configs, as peer deps, or as transitive build requirements:\r\n- Webpack loaders/plugins (ts-loader, sass-loader, css-loader, etc.)\r\n- `dagre` in node editors (peer dep for sharedUiComponents)\r\n- `@recast-navigation/wasm` in addons (runtime import map + transitive dep)\r\n- `babylonjs-gltf2interface` in devHost (webpack alias)\r\n- `react`/`react-dom`/`@fortawesome/*` in smartFilters packages (bundled transitively through smartFiltersEditorControl)\r\n",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "package-lock.json",
+                    "package.json",
+                    "packages/dev/buildTools/package.json",
+                    "packages/dev/buildTools/src/prepareEs6Build.ts",
+                    "packages/dev/inspector-v2/package.json",
+                    "packages/dev/inspector/package.json",
+                    "packages/dev/sharedUiComponents/package.json",
+                    "packages/tools/guiEditor/package.json",
+                    "packages/tools/nodeEditor/package.json",
+                    "packages/tools/nodeGeometryEditor/package.json",
+                    "packages/tools/nodeParticleEditor/package.json",
+                    "packages/tools/nodeRenderGraphEditor/package.json",
+                    "packages/tools/playground/package.json",
+                    "packages/tools/playground/src/components/editor/searchPanelComponent.tsx",
+                    "packages/tools/playground/src/tools/debounce.ts",
+                    "packages/tools/playground/src/tools/monaco/monacoManager.ts",
+                    "packages/tools/reflector/package.json",
+                    "packages/tools/testTools/package.json",
+                    "packages/tools/tests/scripts/generateFileSizes.js",
+                    "packages/tools/viewer/package.json",
+                    "packages/tools/vsm/package.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18062",
+                "title": "Simplify URL normalization logic in CDN utilities",
+                "description": "## Code Simplification - 2026-03-10\n\nThis PR simplifies recently modified code to improve clarity, consistency, and maintainability while preserving all functionality.\n\n### Files Simplified\n\n- `packages/dev/core/src/Misc/tools.ts` - Simplified URL normalization in `GetAssetUrl` and `GetBabylonScriptURL` methods\n- `packages/tools/ktx2Decoder/src/transcoder.ts` - Simplified URL normalization in `GetWasmUrl` method\n\n### Improvements Made\n\n1. **Enhanced Clarity**\n   - Replaced verbose `str[str.length - 1] === \"/\"` checks with cleaner `str.endsWith(\"/\")`\n   - Replaced `substring(0, str.length - 1)` with more concise `slice(0, -1)`\n   - Used template literals instead of string concatenation for versioned URL construction\n\n2. **Improved Consistency**\n   - Applied the same pattern across all three URL normalization methods\n   - Made the code more maintainable with a consistent approach to trailing slash removal\n\n3. **Preserved Functionality**\n   - All changes are purely stylistic - no behavioral changes\n   - Logic flow remains identical\n   - Same error handling and edge cases\n\n### Changes Based On\n\nRecent changes from:\n- #18047 - Add support for versioned CDN URLs in Tools and Transcoder classes\n- Commit 793d073 - Add support for versioned CDN URLs\n\n### Code Examples\n\n**Before:**\n````typescript\nconst baseUrl = Tools.ScriptBaseUrl[Tools.ScriptBaseUrl.length - 1] === \"/\" \n    ? Tools.ScriptBaseUrl.substring(0, Tools.ScriptBaseUrl.length - 1) \n    : Tools.ScriptBaseUrl;\nconst versionedBase = Tools._DefaultCdnUrl + \"/v\" + Tools._CdnVersion;\n````\n\n**After:**\n````typescript\nconst baseUrl = Tools.ScriptBaseUrl.endsWith(\"/\") \n    ? Tools.ScriptBaseUrl.slice(0, -1) \n    : Tools.ScriptBaseUrl;\nconst versionedBase = `\\$\\{Tools._DefaultCdnUrl}/v\\$\\{Tools._CdnVersion}`;\n````\n\n### Testing\n\n- ✅ TypeScript syntax validated\n- ✅ No functional changes - behavior is identical\n- ✅ Simplified code is more readable and maintainable\n\n### Review Focus\n\nPlease verify:\n- Functionality is preserved (string operations produce identical results)\n- Simplifications improve code quality\n- Changes align with project conventions\n- No unintended side effects\n\n---\n\n*Automated by Code Simplifier Agent - analyzing code from the last 24 hours*\n\n\n<!-- gh-aw-tracker-id: code-simplifier -->\n\n\n> AI generated by [Code Simplifier](https://github.com/BabylonJS/Babylon.js/actions/runs/22881770005)\n> - [x] expires <!-- gh-aw-expires: 2026-03-11T00:55:19.220Z --> on Mar 11, 2026, 12:55 AM UTC\n\n<!-- gh-aw-expires-type: pull-request -->\n\n<!-- gh-aw-workflow-id: code-simplifier -->",
+                "author": {
+                    "name": "github-actions[bot]",
+                    "url": "https://github.com/apps/github-actions"
+                },
+                "files": [
+                    "packages/dev/core/src/Misc/tools.ts",
+                    "packages/tools/ktx2Decoder/src/transcoder.ts"
+                ],
+                "tags": [
+                    "refactoring",
+                    "code-quality",
+                    "automation"
+                ]
+            }
+        ],
+        "8.54.2": [
+            {
+                "pr": "18047",
+                "title": "Add support for versioned CDN URLs in Tools and Transcoder classes",
+                "description": "- Introduced _CdnVersion in Tools and Transcoder to manage versioned CDN URLs.\n- Updated FetchToRef and GetWasmUrl methods to rewrite URLs based on the version.\n- Implemented updateCdnVersion function in updateVersion.js to automate version updates.\n\nThis assumes that a current version of any package is working with the same version of all other packages. And it is overridable.\n\nForum disucssion for more context:\nhttps://forum.babylonjs.com/t/how-to-inject-babylonjs-ktx2decoder-into-babylon/62160/26",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/dev/core/src/Misc/tools.ts",
+                    "packages/tools/ktx2Decoder/src/transcoder.ts",
+                    "scripts/updateVersion.js"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18057",
+                "title": "Option for GPU particles to behave like CPU particles",
+                "description": "This updates adds a new option to update the lifecycle of GPU particles so they die properly like CPU particles do. From these forum questions:\r\n\r\n[Different behaviour for cpu and gpu particles regarding emit rate - Bugs - Babylon.js](https://forum.babylonjs.com/t/different-behaviour-for-cpu-and-gpu-particles-regarding-emit-rate/62655/3)\r\n[Different behaviour for cpu and gpu particles after stop() call - Bugs - Babylon.js](https://forum.babylonjs.com/t/different-behaviour-for-cpu-and-gpu-particles-after-stop-call/62654/5)\r\n\r\nThe behavior to update the GPU particles is behind a constructor option: emitRateControl. This is false by default to not break backwards compatibility.",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/core/src/Particles/computeShaderParticleSystem.ts",
+                    "packages/dev/core/src/Particles/gpuParticleSystem.ts",
+                    "packages/dev/core/src/Particles/webgl2ParticleSystem.ts",
+                    "packages/dev/core/src/Shaders/gpuRenderParticles.vertex.fx",
+                    "packages/dev/core/src/Shaders/gpuUpdateParticles.vertex.fx",
+                    "packages/dev/core/src/ShadersWGSL/gpuUpdateParticles.compute.fx"
+                ],
+                "tags": [
+                    "particles"
+                ]
+            },
+            {
+                "pr": "18058",
+                "title": "NPE Texture block .texture updates",
+                "description": "This PR updates:\r\n- get texture is now get textureOutput.\r\n- get/set texture that just call sourceTexture to align with texture property in NME.\r\n- Updates internal code that was using texture to use textureOutput.\r\n\r\nThis is a public API breaking change.",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/core/src/Particles/Node/Blocks/Update/updateNoiseBlock.ts",
+                    "packages/dev/core/src/Particles/Node/Blocks/particleSourceTextureBlock.ts",
+                    "packages/dev/core/src/Particles/Node/nodeParticleSystemSet.helper.ts",
+                    "packages/dev/core/src/Particles/Node/nodeParticleSystemSet.ts"
+                ],
+                "tags": [
+                    "particles",
+                    "breaking change"
+                ]
+            },
+            {
+                "pr": "18059",
+                "title": "Add eslint rule to catch downlevelIteration errors in UMD builds",
+                "description": "Adds a new 'babylonjs/no-downlevel-iteration' eslint rule that flags for...of loops and spread syntax on non-array iterables (Set, Map, generators, etc.) in source files that feed into UMD bundles targeting ES5.\n\nWithout --downlevelIteration, TypeScript compiles for...of to a .length/[i] loop which silently breaks on non-array iterables. This rule catches those patterns at lint time so developers don't have to wait for the CI UMD build to discover them.\n\nThe rule uses type information from typescript-eslint to distinguish:\n- Safe: arrays, tuples, strings, types with numeric index + length (TypedArrays, NodeList)\n- Unsafe: Set, Map, IterableIterator, generators, custom iterables\n\nApplied to packages compiled into UMD ES5: core, gui, loaders, materials, serializers, postProcesses, proceduralTextures, addons.",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "eslint.config.mjs",
+                    "packages/tools/eslintBabylonPlugin/src/index.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18060",
+                "title": "Inspector v2: Fix section flickering when filtering",
+                "description": "In a #17866, `AccordionSection`s became conditional based on whether they are empty. However, the Accordion internally keeps track of \"registered sections\" (the unique id of sections in the Accordion), and making the sections conditional means they can be removed from that collection. When this happens, we get into an oscillating state where each time the Accordion renders, it goes back and forth between showing and hiding the empty sections, and it looks like it is flickering. The fix here is to not make the sections conditional, but rather just make the styling conditional, such that empty sections are not displayed (though they still exist as children of the Accordion).",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/accordion.tsx"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "18056",
+                "title": "Inspector v2: Fix color picker layout bug",
+                "description": "I'm not sure when this regression happened (maybe with the SpinButton rework, or maybe with uniform sizing on input fields in the properties pane, maybe something else), but the Color Picker RGBA and HSV fields are too wide and overlapping each other:\r\n\r\n<img width=\"481\" height=\"715\" alt=\"image\" src=\"https://github.com/user-attachments/assets/0e3be63d-b5ce-4098-b471-2694b406cf21\" />\r\n\r\nThis PR fixes this regression by moving the min width for the \"value\" side (e.g. left side label, right side value) of the common PropertyLines to the PropertyLine layer rather than the primitive layer. This way the primitives can be used outside of PropertyLine and naturally have narrower widths. I fixed this for SpinButton and a couple other cases. There are some additional cases that should be fixed, but are a little trickier (like ComboBox due to the way sizing works with the text input area and the drop down button). We can revisit that later.\r\n\r\n<img width=\"426\" height=\"728\" alt=\"image\" src=\"https://github.com/user-attachments/assets/c7b1c085-dca8-4042-8cbb-225c0bd973c5\" />\r\n",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/sharedUiComponents/src/fluent/hoc/propertyLines/inputPropertyLine.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/hoc/propertyLines/spinButtonPropertyLine.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/hoc/propertyLines/syncedSliderPropertyLine.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/comboBox.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/spinButton.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/syncedSlider.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/textInput.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/utils.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "18051",
+                "title": "Fix setAndStartTimer: onAborted and onEnded both firing, missing data arg, onTick on terminal tick",
+                "description": "## Problem\n\n`setAndStartTimer` in `packages/dev/core/src/Misc/timer.ts` has three bugs, all inconsistent with the `AdvancedTimer` class in the same file:\n\n### 1. Both `onAborted` and `onEnded` fire in the same tick\n\nWhen `breakCondition` returns `true` at the same tick that `timer >= timeout`, both callbacks fire. The JSDoc explicitly states:\n\n> *\"An optional break condition that will stop the times prematurely. In this case **onEnded will not be triggered!**\"*\n\n**Before:**\n```typescript\nif (options.breakCondition && options.breakCondition()) {\n    options.contextObservable.remove(observer);\n    options.onAborted && options.onAborted(data);\n}\nif (timer >= options.timeout) {          // still executes after abort!\n    options.contextObservable.remove(observer);\n    options.onEnded && options.onEnded(data);\n}\n```\n\n### 2. `breakCondition` called without `data`\n\nThe `data` object is constructed but not passed to `breakCondition()`. `AdvancedTimer` correctly calls `this._breakCondition(data)`.\n\n### 3. `onTick` fires on terminal ticks\n\n`onTick` was called before the abort/timeout checks, so it fired even on the tick that ended the timer. `AdvancedTimer` only calls `onEachCountObservable` on intermediate ticks.\n\n## Fix\n\n```typescript\nif (options.breakCondition && options.breakCondition(data)) {\n    options.contextObservable.remove(observer);\n    options.onAborted && options.onAborted(data);\n    return;  // prevents onEnded from firing\n}\nif (timer >= options.timeout) {\n    options.contextObservable.remove(observer);\n    options.onEnded && options.onEnded(data);\n    return;\n}\noptions.onTick && options.onTick(data);  // only on intermediate ticks\n```\n\n## Tests\n\nAdded `packages/dev/core/test/unit/Misc/babylon.timer.test.ts` with 7 tests covering:\n- Normal timeout → `onEnded` fires, `onAborted` does not\n- Break condition → `onAborted` fires, `onEnded` does not\n- Break condition at timeout → only `onAborted` fires (the core bug)\n- `breakCondition` receives `data`\n- `onTick` does not fire on the terminal tick\n- `onTick` fires on intermediate ticks\n- Observer is removed after timeout (no double-fire)",
+                "author": {
+                    "name": "sgottschlich",
+                    "url": "https://github.com/sgottschlich"
+                },
+                "files": [
+                    "packages/dev/core/src/Misc/timer.ts",
+                    "packages/dev/core/test/unit/Misc/babylon.timer.test.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18050",
+                "title": "WebGPU: Fix implementation of debug markers",
+                "description": "See https://forum.babylonjs.com/t/webgpu-issue-in-mac-chrome-starting-in-v8-54-1/62686\r\n\r\n#18004 was still bugged, trying a new one with AI help!\r\n\r\nThis time, I added visualization tests...\r\n\r\nI also fixed a bug where shadows were missing when using CSM and lods (I updated the visu test, because the code was broken since 8.16.0, but the visu test didn't catch it).",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/WebGPU/Extensions/engine.debugging.ts",
+                    "packages/dev/core/src/Engines/thinWebGPUEngine.ts",
+                    "packages/dev/core/src/Engines/webgpuEngine.ts",
+                    "packages/dev/core/src/Materials/Textures/renderTargetTexture.ts",
+                    "packages/dev/core/src/Rendering/depthRenderer.ts",
+                    "packages/dev/core/src/Rendering/objectRenderer.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/CSM-FrameGraph---debug-markers.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/Clustered-lights---debug-markers.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/Depth-Renderer-and-RTT---debug-markers.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/Pending-pop---debug-markers.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/Reflection-Probes---debug-markers.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/Unbalanced-push-pop---debug-markers.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/shadowscsmandlod.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "bug",
+                    "WebGPU"
+                ]
+            },
+            {
+                "pr": "18052",
+                "title": "Update to latest atmosphere test playgrounds",
+                "description": "Updating playground IDs to fix incorrect variable name. It should not affect visual results.",
+                "author": {
+                    "name": "kircher1",
+                    "url": "https://github.com/kircher1"
+                },
+                "files": [
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18048",
+                "title": "Inspector v2: GLTF loader optional options",
+                "description": "The gltf loader options tool in the tools pane currently overrides options passed to the gltf loader unconditionally. This isn't what you want in the Playground (or your own app) since your code may be specifying options. This fixes #18042.\r\n\r\nThis PR changes the tool so that the options are all nullable, and null by default. When they are checked (so they are non-null), they get the default value we define in the gltf loader options tool (if defined). Same goes for gltf extensions. This makes it so you can choose which options to explicitly specify and override those coming from load calls made in app code. This replaces PR #18043.\r\n\r\n<img width=\"360\" height=\"772\" alt=\"image\" src=\"https://github.com/user-attachments/assets/7768fad9-906c-4e2f-963f-425860868480\" />\r\n\r\nAlso included a couple other small fixes in this PR:\r\n- The disabled prop was not flowing down into the SpinButton.\r\n- There was a regression that broke PropertyLine label truncation.",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/inspector-v2/src/components/tools/import/gltfLoaderOptionsTool.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/tools/import/gltfLoaderOptionsDefaults.ts",
+                    "packages/dev/inspector-v2/src/services/panes/tools/import/gltfLoaderOptionsService.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/hoc/propertyLines/propertyLine.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/infoLabel.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/spinButton.tsx",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/syncedSlider.tsx",
+                    "packages/tools/tests/test/visualization/ReferenceImages/inspector-is-opened-when-clicking-on-the-button-1.png"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "18046",
+                "title": "Refactor visualization test configurations",
+                "description": "Engine can now be configured per test and not per project. so flags like \"useLargeWorldRendering\" or \"useReverseDepthBuffer\" will work on per-case scenario.",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/tools/tests/playwright.utils.ts",
+                    "packages/tools/tests/test/playwright/visualization.webgl1.test.ts",
+                    "packages/tools/tests/test/playwright/visualization.webgl2-largeWorld.test.ts",
+                    "packages/tools/tests/test/playwright/visualization.webgl2.test.ts",
+                    "packages/tools/tests/test/playwright/visualization.webgpu-largeWorld.test.ts",
+                    "packages/tools/tests/test/playwright/visualization.webgpu.test.ts",
+                    "packages/tools/tests/test/playwright/visualizationPlaywright.utils.ts",
+                    "packages/tools/tests/test/playwright/vr.webxr.test.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18044",
+                "title": "More geo math helpers",
+                "description": "- Defines the WGS84 Ellipsoid via new interface\r\n- Adds LatLonAlt -> ECEF conversion\r\n- Corresponding unit tests",
+                "author": {
+                    "name": "kircher1",
+                    "url": "https://github.com/kircher1"
+                },
+                "files": [
+                    "packages/dev/core/src/Maths/math.geospatial.functions.ts",
+                    "packages/dev/core/src/Maths/math.geospatial.ts",
+                    "packages/dev/core/test/unit/Math/babylon.math.geospatial.functions.test.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18025",
+                "title": "Upgrade ESLint to 10",
+                "description": "as part of a long standing major dependencies upgrade, this is the eslint 10 upgrade including changes to files due to eslint 10's strict checking of existing rules.\r\n\r\nIn Draft Mode so to not merge it before 9 is released. The file changes are mostly the rule no unneeded initialization of variables.",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "package-lock.json",
+                    "package.json",
+                    "packages/dev/addons/src/msdfText/textRenderer.ts",
+                    "packages/dev/buildTools/src/generateDeclaration.ts",
+                    "packages/dev/buildTools/src/utils.ts",
+                    "packages/dev/core/src/Animations/animatable.core.ts",
+                    "packages/dev/core/src/Animations/animatorAvatar.ts",
+                    "packages/dev/core/src/Animations/runtimeAnimation.ts",
+                    "packages/dev/core/src/Audio/audioSceneComponent.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/subNodes/webAudioBusAndSoundSubGraph.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/webAudioEngine.ts",
+                    "packages/dev/core/src/Behaviors/Meshes/followBehavior.ts",
+                    "packages/dev/core/src/Behaviors/Meshes/pointerDragBehavior.ts",
+                    "packages/dev/core/src/Bones/boneLookController.ts",
+                    "packages/dev/core/src/Buffers/buffer.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraMouseWheelInput.ts",
+                    "packages/dev/core/src/Cameras/camera.ts",
+                    "packages/dev/core/src/Engines/Extensions/engine.query.ts",
+                    "packages/dev/core/src/Engines/Processors/shaderProcessor.ts",
+                    "packages/dev/core/src/Engines/WebGL/webGLRenderTargetWrapper.ts",
+                    "packages/dev/core/src/Engines/WebGPU/webgpuBufferManager.ts",
+                    "packages/dev/core/src/Engines/WebGPU/webgpuShaderProcessor.ts",
+                    "packages/dev/core/src/Engines/WebGPU/webgpuShaderProcessorsGLSL.ts",
+                    "packages/dev/core/src/Engines/WebGPU/webgpuShaderProcessorsWGSL.ts",
+                    "packages/dev/core/src/Engines/WebGPU/webgpuTextureManager.ts",
+                    "packages/dev/core/src/Engines/engine.common.ts",
+                    "packages/dev/core/src/Engines/engine.ts",
+                    "packages/dev/core/src/Engines/thinEngine.functions.ts",
+                    "packages/dev/core/src/Engines/thinEngine.ts",
+                    "packages/dev/core/src/Engines/thinNativeEngine.ts",
+                    "packages/dev/core/src/Engines/webgpuEngine.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraph.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraphBlock.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraphContext.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraphCoordinator.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/Layers/baseLayerTask.ts",
+                    "packages/dev/core/src/Layers/glowLayer.ts",
+                    "packages/dev/core/src/Layers/highlightLayer.ts",
+                    "packages/dev/core/src/Lights/lightingVolume.ts",
+                    "packages/dev/core/src/Materials/Node/Blocks/Dual/fogBlock.ts",
+                    "packages/dev/core/src/Materials/Node/Blocks/Dual/imageSourceBlock.ts",
+                    "packages/dev/core/src/Materials/Node/Blocks/PBR/sheenBlock.ts",
+                    "packages/dev/core/src/Materials/Node/Blocks/cloudBlock.ts",
+                    "packages/dev/core/src/Materials/Node/Blocks/curveBlock.ts",
+                    "packages/dev/core/src/Materials/Node/nodeMaterial.ts",
+                    "packages/dev/core/src/Materials/PBR/openpbrMaterial.ts",
+                    "packages/dev/core/src/Materials/PBR/pbrBaseMaterial.ts",
+                    "packages/dev/core/src/Materials/Textures/cubeTexture.ts",
+                    "packages/dev/core/src/Materials/Textures/htmlElementTexture.ts",
+                    "packages/dev/core/src/Materials/Textures/multiRenderTarget.ts",
+                    "packages/dev/core/src/Materials/effect.ts",
+                    "packages/dev/core/src/Materials/materialHelper.functions.ts",
+                    "packages/dev/core/src/Materials/multiMaterial.ts",
+                    "packages/dev/core/src/Materials/standardMaterial.ts",
+                    "packages/dev/core/src/Maths/math.path.ts",
+                    "packages/dev/core/src/Maths/math.scalar.functions.ts",
+                    "packages/dev/core/src/Maths/math.vector.ts",
+                    "packages/dev/core/src/Meshes/Builders/boxBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/cylinderBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/decalBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/latheBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/linesBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/polygonBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/polyhedronBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/ribbonBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/shapeBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/tiledBoxBuilder.ts",
+                    "packages/dev/core/src/Meshes/Builders/tiledPlaneBuilder.ts",
+                    "packages/dev/core/src/Meshes/GreasedLine/greasedLineMesh.ts",
+                    "packages/dev/core/src/Meshes/GreasedLine/greasedLineRibbonMesh.ts",
+                    "packages/dev/core/src/Meshes/Node/Blocks/Instances/instantiateOnFacesBlock.ts",
+                    "packages/dev/core/src/Meshes/Node/Blocks/Instances/instantiateOnVolumeBlock.ts",
+                    "packages/dev/core/src/Meshes/Node/Blocks/mappingBlock.ts",
+                    "packages/dev/core/src/Meshes/abstractMesh.ts",
+                    "packages/dev/core/src/Meshes/csg.ts",
+                    "packages/dev/core/src/Meshes/csg2.ts",
+                    "packages/dev/core/src/Meshes/geodesicMesh.ts",
+                    "packages/dev/core/src/Meshes/geometry.ts",
+                    "packages/dev/core/src/Meshes/groundMesh.ts",
+                    "packages/dev/core/src/Meshes/mesh.ts",
+                    "packages/dev/core/src/Meshes/mesh.vertexData.ts",
+                    "packages/dev/core/src/Meshes/meshSimplification.ts",
+                    "packages/dev/core/src/Meshes/polygonMesh.ts",
+                    "packages/dev/core/src/Meshes/trailMesh.ts",
+                    "packages/dev/core/src/Misc/HighDynamicRange/hdr.ts",
+                    "packages/dev/core/src/Misc/HighDynamicRange/panoramaToCubemap.ts",
+                    "packages/dev/core/src/Misc/basisWorker.ts",
+                    "packages/dev/core/src/Misc/environmentTextureTools.ts",
+                    "packages/dev/core/src/Misc/meshExploder.ts",
+                    "packages/dev/core/src/Misc/tga.ts",
+                    "packages/dev/core/src/Morph/morphTargetManager.ts",
+                    "packages/dev/core/src/Particles/Node/nodeParticleSystemSet.helper.ts",
+                    "packages/dev/core/src/Particles/gpuParticleSystem.ts",
+                    "packages/dev/core/src/Particles/pointsCloudSystem.ts",
+                    "packages/dev/core/src/Particles/solidParticleSystem.ts",
+                    "packages/dev/core/src/Particles/thinParticleSystem.ts",
+                    "packages/dev/core/src/Particles/webgl2ParticleSystem.ts",
+                    "packages/dev/core/src/Physics/v1/Plugins/ammoJSPlugin.ts",
+                    "packages/dev/core/src/Physics/v2/characterController.ts",
+                    "packages/dev/core/src/PostProcesses/postProcess.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18045",
+                "title": "Inspector: Use \"Unnamed\" for unnamed entities in scene explorer",
+                "description": "This addresses two issues:\r\n1. If you create an entity (like a `Material`) and don't pass the *required* name (e.g. from JS), then `name` is undefined and it causes an unhandled error in scene explorer. This is a case of incorrectly using the Babylon.js API, but we've found this is a common misuse in Playground, so let's not crash Inspector when it happens.\r\n2. If you create an entity with an empty name (`\"\"`), instead of seeing a blank line you will see something like \"Unnamed PBRMaterial\".",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "packages/dev/inspector-v2/src/services/panes/scene/animationGroupExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/atmosphereExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/effectLayersExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/frameGraphExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/guiExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/materialExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/nodeExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/particleSystemExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/postProcessExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/renderingPipelinesExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/skeletonExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/soundExplorerService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/scene/spriteManagerExplorerService.tsx"
+                ],
+                "tags": [
+                    "inspector",
+                    "skip changelog"
+                ]
+            },
+            {
+                "pr": "18039",
+                "title": "fix: gltf export dropping animations on meshless nodes in right-handed scenes",
+                "description": "Root TransformNodes with identity transforms and no geometry were being\r\nremoved as \"noop\" nodes during export, even when targeted by animation\r\ngroups. This caused animations to silently disappear in right-handed\r\nscenes (where these nodes don't carry a handedness-conversion transform).\r\n\r\nSkip noop removal for any root node that is an animation group target.\r\n\r\n## Summary\r\nFix: glTF exporter no longer strips root nodes that are animation group targets during noop node removal\r\nIn right-handed scenes, meshless root TransformNodes with identity transforms were classified as \"noop\" and removed, causing their animations to be silently dropped\r\nIn left-handed scenes this didn't surface because those nodes typically carry a handedness-conversion transform, so they weren't considered noop\r\n\r\n## Test plan\r\nAdded integration test: export an animation group targeting a meshless TransformNode in a right-handed scene, verify the node and animation channel appear in the output\r\nVerified test fails without the fix (nodes is undefined) and passes with it",
+                "author": {
+                    "name": "marns",
+                    "url": "https://github.com/marns"
+                },
+                "files": [
+                    "packages/dev/serializers/src/glTF/2.0/glTFExporter.ts",
+                    "packages/dev/serializers/test/integration/glTFSerializer.test.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18036",
+                "title": "Inspector v2: Fix change camera when a frame graph is defined at scene level",
+                "description": null,
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/FrameGraph/Node/nodeRenderGraph.ts",
+                    "packages/dev/inspector-v2/src/services/panes/scene/nodeExplorerService.tsx"
+                ],
+                "tags": [
+                    "bug",
+                    "inspector"
+                ]
+            },
+            {
+                "pr": "18000",
+                "title": "Scene ready check for atmosphere add-on",
+                "description": "Adds a Scene API to enable objects to plug in to the scene ready check.\r\n\r\nThe atmosphere uses this to ensure EffectWrappers/RenderTargets are created/rendered before isReady() returns true.\r\n\r\nAllows the visualization tests for atmosphere to remove the increased `renderCount`.",
+                "author": {
+                    "name": "kircher1",
+                    "url": "https://github.com/kircher1"
+                },
+                "files": [
+                    "packages/dev/addons/src/atmosphere/atmosphere.ts",
+                    "packages/dev/addons/src/atmosphere/atmospherePBRMaterialPlugin.ts",
+                    "packages/dev/core/src/scene.ts",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": []
+            }
+        ],
+        "8.54.1": [
+            {
+                "pr": "18040",
+                "title": "Dump the latest entry in CHANGELOG.md to a release-notes.md file",
+                "description": "This PR includes some small refactors to our scripts that update CHANGELOG.md to dump the notes for the **current** release only into a release-notes.md file. Once this PR is merged, we can disable the autogenerated change log in the build pipeline's GitHub Release action, and instead point to this new release-notes.md file. This way, our releases will show release notes that exactly matches what we add into CHANGELOG.md. Having them be identical is an improvement, but most importantly it should address:\r\n\r\n- https://forum.babylonjs.com/t/old-issue-referenced-in-latest-release/58999\r\n- https://github.com/microsoft/azure-pipelines-tasks/issues/21112",
+                "author": {
+                    "name": "ryantrem",
+                    "url": "https://github.com/ryantrem"
+                },
+                "files": [
+                    "scripts/generateChangelog.js",
+                    "scripts/updateVersion.js"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18037",
+                "title": "FrameGraph: miscellaneous fixes",
+                "description": "In this PR:\r\n* Fix camera change propagation in SSAO, SSR and volumetric lightings tasks\r\n* Don't recreate the shadow generator after it has been created once. That's because we need that the **shadowGenerator** output property of the shadow generator task doesn't change during the lifetime of the task, because other tasks may depend on it.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/WebGPU/webgpuTextureManager.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/ssao2RenderingPipelineTask.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/ssrRenderingPipelineTask.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/volumetricLightingTask.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/Rendering/csmShadowGeneratorTask.ts",
+                    "packages/dev/core/src/FrameGraph/Tasks/Rendering/shadowGeneratorTask.ts",
+                    "packages/dev/core/src/Lights/Shadows/cascadedShadowGenerator.ts",
+                    "packages/dev/core/src/Lights/Shadows/shadowGenerator.ts",
+                    "packages/dev/core/src/Lights/lightingVolume.ts",
+                    "packages/dev/core/src/Materials/Textures/Procedurals/proceduralTexture.ts",
+                    "packages/dev/core/src/Probes/reflectionProbe.ts",
+                    "packages/dev/core/src/Rendering/depthRenderer.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "frame graph"
+                ]
+            },
+            {
+                "pr": "18038",
+                "title": "Update deps",
+                "description": "Another day, another security issue :-)",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "package-lock.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18026",
+                "title": "Upgrade Jest",
+                "description": "Upgrading Jest to the next major version, including all of its dependencies.\r\nSome tests needed to be modified to get the compilation to work. This also includes a few changes to the jest configuration to allow faster unit test startup\r\n\r\nNote that this also removes puppeteer as a dependency. Awesome!",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "jest-puppeteer.config.js",
+                    "jest.config.ts",
+                    "package-lock.json",
+                    "package.json",
+                    "packages/dev/core/src/Loading/sceneLoader.ts",
+                    "packages/dev/core/src/Particles/pointsCloudSystem.ts",
+                    "packages/dev/core/src/Particles/solidParticleSystem.ts",
+                    "packages/dev/core/src/Physics/v2/characterController.ts",
+                    "packages/dev/core/src/Physics/v2/ragdoll.ts",
+                    "packages/dev/core/src/PostProcesses/postProcess.ts",
+                    "packages/dev/core/src/Rendering/thinDepthPeelingRenderer.ts",
+                    "packages/dev/core/src/Sprites/spriteManager.ts",
+                    "packages/dev/core/src/assetContainer.ts",
+                    "packages/dev/core/test/unit/Animations/babylon.vertexAnimationBaker.test.ts",
+                    "packages/dev/core/test/unit/Audio/audioEngine.test.ts",
+                    "packages/dev/core/test/unit/Audio/helpers/audioTestHelper.ts",
+                    "packages/dev/core/test/unit/Audio/sound.test.ts",
+                    "packages/dev/core/test/unit/DeviceInput/babylon.deviceInput.test.ts",
+                    "packages/dev/core/test/unit/DeviceInput/babylon.inputManager.test.ts",
+                    "packages/dev/core/test/unit/DeviceInput/babylon.webDeviceInputSystem.test.ts",
+                    "packages/dev/core/test/unit/FlowGraph/flowGraphExecutionNodes.test.ts",
+                    "packages/dev/core/test/unit/Materials/PBR/babylon.PBRMaterial.test.ts",
+                    "packages/dev/core/test/unit/Meshes/babylon.mesh.lod.test.ts",
+                    "packages/dev/core/test/unit/Meshes/babylon.mesh.vertexData.test.ts",
+                    "packages/dev/core/test/unit/Meshes/babylon.positionAndRotation.test.ts",
+                    "packages/dev/core/test/unit/Meshes/babylon.transformNode.test.ts",
+                    "packages/dev/core/test/unit/Misc/babylon.arrayTools.test.ts",
+                    "packages/dev/core/test/unit/Particles/babylon.cloudPoint.test.ts",
+                    "packages/dev/core/test/unit/PostProcesses/babylon.postProcess.test.ts",
+                    "packages/dev/core/test/unit/XR/webXRFeaturesManager.test.ts",
+                    "packages/dev/core/test/unit/babylon.scene.materials.test.ts",
+                    "packages/dev/loaders/test/unit/Interactivity/flow nodes.test.ts",
+                    "packages/public/@babylonjs/test-tools/package.json",
+                    "packages/public/umd/babylonjs-testproject/tsconfig.json",
+                    "packages/tools/testTools/src/utils.ts",
+                    "packages/tools/tests/package.json",
+                    "packages/tools/tests/test/unit/moduleFileSize.test.ts",
+                    "scripts/tsPuppeteer.js",
+                    "tsconfig.build.json",
+                    "tsconfig.test.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18033",
+                "title": "Particle System: Set a default position if emitter mesh is not found during parsing",
+                "description": "See https://forum.babylonjs.com/t/particle-clone-method-is-not-working-locally-on-pg-it-works/62673",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Particles/particleSystem.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "particles"
+                ]
+            }
+        ],
         "8.54.0": [
             {
                 "pr": "18029",
@@ -158,130 +1061,6 @@
                 ],
                 "tags": [
                     "camera"
-                ]
-            }
-        ],
-        "8.54.1": [
-            {
-                "pr": "18040",
-                "title": "Dump the latest entry in CHANGELOG.md to a release-notes.md file",
-                "description": "This PR includes some small refactors to our scripts that update CHANGELOG.md to dump the notes for the **current** release only into a release-notes.md file. Once this PR is merged, we can disable the autogenerated change log in the build pipeline's GitHub Release action, and instead point to this new release-notes.md file. This way, our releases will show release notes that exactly matches what we add into CHANGELOG.md. Having them be identical is an improvement, but most importantly it should address:\r\n\r\n- https://forum.babylonjs.com/t/old-issue-referenced-in-latest-release/58999\r\n- https://github.com/microsoft/azure-pipelines-tasks/issues/21112",
-                "author": {
-                    "name": "ryantrem",
-                    "url": "https://github.com/ryantrem"
-                },
-                "files": [
-                    "scripts/generateChangelog.js",
-                    "scripts/updateVersion.js"
-                ],
-                "tags": []
-            },
-            {
-                "pr": "18037",
-                "title": "FrameGraph: miscellaneous fixes",
-                "description": "In this PR:\r\n* Fix camera change propagation in SSAO, SSR and volumetric lightings tasks\r\n* Don't recreate the shadow generator after it has been created once. That's because we need that the **shadowGenerator** output property of the shadow generator task doesn't change during the lifetime of the task, because other tasks may depend on it.",
-                "author": {
-                    "name": "Popov72",
-                    "url": "https://github.com/Popov72"
-                },
-                "files": [
-                    "packages/dev/core/src/Engines/WebGPU/webgpuTextureManager.ts",
-                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/ssao2RenderingPipelineTask.ts",
-                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/ssrRenderingPipelineTask.ts",
-                    "packages/dev/core/src/FrameGraph/Tasks/PostProcesses/volumetricLightingTask.ts",
-                    "packages/dev/core/src/FrameGraph/Tasks/Rendering/csmShadowGeneratorTask.ts",
-                    "packages/dev/core/src/FrameGraph/Tasks/Rendering/shadowGeneratorTask.ts",
-                    "packages/dev/core/src/Lights/Shadows/cascadedShadowGenerator.ts",
-                    "packages/dev/core/src/Lights/Shadows/shadowGenerator.ts",
-                    "packages/dev/core/src/Lights/lightingVolume.ts",
-                    "packages/dev/core/src/Materials/Textures/Procedurals/proceduralTexture.ts",
-                    "packages/dev/core/src/Probes/reflectionProbe.ts",
-                    "packages/dev/core/src/Rendering/depthRenderer.ts"
-                ],
-                "tags": [
-                    "bug",
-                    "frame graph"
-                ]
-            },
-            {
-                "pr": "18038",
-                "title": "Update deps",
-                "description": "Another day, another security issue :-)",
-                "author": {
-                    "name": "RaananW",
-                    "url": "https://github.com/RaananW"
-                },
-                "files": [
-                    "package-lock.json"
-                ],
-                "tags": []
-            },
-            {
-                "pr": "18026",
-                "title": "Upgrade Jest",
-                "description": "Upgrading Jest to the next major version, including all of its dependencies.\r\nSome tests needed to be modified to get the compilation to work. This also includes a few changes to the jest configuration to allow faster unit test startup\r\n\r\nNote that this also removes puppeteer as a dependency. Awesome!",
-                "author": {
-                    "name": "RaananW",
-                    "url": "https://github.com/RaananW"
-                },
-                "files": [
-                    "jest-puppeteer.config.js",
-                    "jest.config.ts",
-                    "package-lock.json",
-                    "package.json",
-                    "packages/dev/core/src/Loading/sceneLoader.ts",
-                    "packages/dev/core/src/Particles/pointsCloudSystem.ts",
-                    "packages/dev/core/src/Particles/solidParticleSystem.ts",
-                    "packages/dev/core/src/Physics/v2/characterController.ts",
-                    "packages/dev/core/src/Physics/v2/ragdoll.ts",
-                    "packages/dev/core/src/PostProcesses/postProcess.ts",
-                    "packages/dev/core/src/Rendering/thinDepthPeelingRenderer.ts",
-                    "packages/dev/core/src/Sprites/spriteManager.ts",
-                    "packages/dev/core/src/assetContainer.ts",
-                    "packages/dev/core/test/unit/Animations/babylon.vertexAnimationBaker.test.ts",
-                    "packages/dev/core/test/unit/Audio/audioEngine.test.ts",
-                    "packages/dev/core/test/unit/Audio/helpers/audioTestHelper.ts",
-                    "packages/dev/core/test/unit/Audio/sound.test.ts",
-                    "packages/dev/core/test/unit/DeviceInput/babylon.deviceInput.test.ts",
-                    "packages/dev/core/test/unit/DeviceInput/babylon.inputManager.test.ts",
-                    "packages/dev/core/test/unit/DeviceInput/babylon.webDeviceInputSystem.test.ts",
-                    "packages/dev/core/test/unit/FlowGraph/flowGraphExecutionNodes.test.ts",
-                    "packages/dev/core/test/unit/Materials/PBR/babylon.PBRMaterial.test.ts",
-                    "packages/dev/core/test/unit/Meshes/babylon.mesh.lod.test.ts",
-                    "packages/dev/core/test/unit/Meshes/babylon.mesh.vertexData.test.ts",
-                    "packages/dev/core/test/unit/Meshes/babylon.positionAndRotation.test.ts",
-                    "packages/dev/core/test/unit/Meshes/babylon.transformNode.test.ts",
-                    "packages/dev/core/test/unit/Misc/babylon.arrayTools.test.ts",
-                    "packages/dev/core/test/unit/Particles/babylon.cloudPoint.test.ts",
-                    "packages/dev/core/test/unit/PostProcesses/babylon.postProcess.test.ts",
-                    "packages/dev/core/test/unit/XR/webXRFeaturesManager.test.ts",
-                    "packages/dev/core/test/unit/babylon.scene.materials.test.ts",
-                    "packages/dev/loaders/test/unit/Interactivity/flow nodes.test.ts",
-                    "packages/public/@babylonjs/test-tools/package.json",
-                    "packages/public/umd/babylonjs-testproject/tsconfig.json",
-                    "packages/tools/testTools/src/utils.ts",
-                    "packages/tools/tests/package.json",
-                    "packages/tools/tests/test/unit/moduleFileSize.test.ts",
-                    "scripts/tsPuppeteer.js",
-                    "tsconfig.build.json",
-                    "tsconfig.test.json"
-                ],
-                "tags": []
-            },
-            {
-                "pr": "18033",
-                "title": "Particle System: Set a default position if emitter mesh is not found during parsing",
-                "description": "See https://forum.babylonjs.com/t/particle-clone-method-is-not-working-locally-on-pg-it-works/62673",
-                "author": {
-                    "name": "Popov72",
-                    "url": "https://github.com/Popov72"
-                },
-                "files": [
-                    "packages/dev/core/src/Particles/particleSystem.ts"
-                ],
-                "tags": [
-                    "bug",
-                    "particles"
                 ]
             }
         ],
