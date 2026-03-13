@@ -32,6 +32,88 @@
             "playgroundId": "#JKVCPP",
             "renderCount": 30,
             "referenceImage": "2d-camera2d.png"
+        },
+        {
+            "title": "2D - Collision Detection",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-collision.png"
+        },
+        {
+            "title": "2D - Masking",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-masking.png"
+        },
+        {
+            "title": "2D - Sprite Atlas Loading",
+            "playgroundId": "",
+            "renderCount": 10,
+            "referenceImage": "2d-sprite-atlas-loading.png"
+        },
+        {
+            "title": "2D - Scene Transitions",
+            "playgroundId": "",
+            "renderCount": 60,
+            "referenceImage": "2d-scene-transitions.png"
+        },
+        {
+            "title": "2D - State Machine",
+            "playgroundId": "",
+            "renderCount": 60,
+            "referenceImage": "2d-state-machine.png"
+        },
+        {
+            "title": "2D - Pathfinding",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-pathfinding.png"
+        },
+        {
+            "title": "2D - Grid System",
+            "playgroundId": "",
+            "referenceImage": "2d-grid-system.png"
+        },
+        {
+            "title": "2D - Isometric Grid",
+            "playgroundId": "",
+            "referenceImage": "2d-isometric.png"
+        },
+        {
+            "title": "2D - Spatial Audio",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-audio.png"
+        },
+        {
+            "title": "2D - RenderTexture",
+            "playgroundId": "",
+            "renderCount": 10,
+            "referenceImage": "2d-render-texture.png"
+        },
+        {
+            "title": "2D - Sprite Atlas Builder",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-sprite-atlas-builder.png"
+        },
+        {
+            "title": "2D - Turn-Based Movement",
+            "playgroundId": "",
+            "renderCount": 60,
+            "referenceImage": "2d-turn-based.png"
+        },
+        {
+            "title": "2D - Debug Rendering",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-debug-rendering.png"
+        },
+        {
+            "title": "2D - Object Pool",
+            "playgroundId": "",
+            "renderCount": 30,
+            "referenceImage": "2d-object-pool.png"
         }
     ]
 }

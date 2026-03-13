@@ -1,7 +1,6 @@
 import { SceneTransition2D } from "2d/Transition/sceneTransition2D";
 import { Scene2D } from "2d/Scene2D/scene2D";
 import { Camera2D } from "2d/Camera2D/camera2D";
-import { Easing } from "2d/Tween/easing";
 import { Color4 } from "core/Maths/math.color";
 import { Vector2 } from "core/Maths/math.vector";
 
@@ -18,6 +17,12 @@ function mockEngine() {
         setAlphaMode: () => {},
         setDepthBuffer: () => {},
         enableEffect: () => {},
+        createDynamicVertexBuffer: () => ({}),
+        updateDynamicVertexBuffer: () => {},
+        createIndexBuffer: () => ({}),
+        createDrawContext: () => ({ reset: () => {}, dispose: () => {}, useInstancing: false }),
+        createMaterialContext: () => ({}),
+        _releaseBuffer: () => {},
         getCaps: () => ({ instancedArrays: false, standardDerivatives: false }),
         createEffect: () => ({ isReady: () => false, onCompiled: null }),
     } as any;

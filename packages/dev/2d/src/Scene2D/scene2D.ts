@@ -42,7 +42,25 @@ export class Scene2D {
     /**
      * The active 2D camera. If null, renders with identity view (no scroll/zoom).
      */
-    public camera: Camera2D | null = null;
+    public get camera(): Camera2D | null {
+        return this._camera;
+    }
+
+    public set camera(value: Camera2D | null) {
+        if (this._camera === value) {
+            return;
+        }
+
+        if (this._camera) {
+            this._camera._setScene(null);
+        }
+
+        this._camera = value;
+
+        if (this._camera) {
+            this._camera._setScene(this);
+        }
+    }
 
     /**
      * Optional lighting manager for GPU-based 2D lighting.
@@ -86,6 +104,7 @@ export class Scene2D {
      */
     public onReadyObservable: Observable<Scene2D> = new Observable<Scene2D>();
 
+    private _camera: Camera2D | null = null;
     private _rootNodes: Node2D[] = [];
     private _allNodes: Map<string, Node2D> = new Map();
     private _isDisposed: boolean = false;
@@ -622,7 +641,7 @@ export class Scene2D {
     public render(): void {
         const dt = this._computeDeltaTime();
         if (this.camera) {
-            this.camera.update(dt);
+            this.camera.update(dt, this.engine.getRenderWidth(), this.engine.getRenderHeight());
         }
         this.update(dt);
         const engine = this.engine;
@@ -647,7 +666,7 @@ export class Scene2D {
         if (autoUpdate) {
             const dt = this._computeDeltaTime();
             if (this.camera) {
-                this.camera.update(dt);
+                this.camera.update(dt, this.engine.getRenderWidth(), this.engine.getRenderHeight());
             }
             this.update(dt);
         }
@@ -785,6 +804,12 @@ export class Scene2D {
         this._overlayNodes.length = 0;
         this._allNodes.clear();
 
+        if (this._camera) {
+            this._camera._setScene(null);
+            this._camera = null;
+        }
+
+
         if (this._batchRenderer) {
             this._batchRenderer.dispose();
             this._batchRenderer = null;
@@ -818,3 +843,7 @@ export class Scene2D {
         this._isDisposed = true;
     }
 }
+
+
+
+

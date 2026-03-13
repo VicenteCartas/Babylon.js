@@ -1,4 +1,4 @@
-import { Camera2D } from "2d/Camera2D/camera2D";
+import { Camera2D, ScaleMode } from "2d/Camera2D/camera2D";
 import { Node2D } from "2d/Node2D/node2D";
 import { Rectangle2D } from "2d/Math/rectangle2D";
 import { Vector2 } from "core/Maths/math.vector";
@@ -91,6 +91,82 @@ describe("Camera2D", () => {
 
         expect(camera.position.x).toBeCloseTo(150, 1);
         expect(camera.position.y).toBeCloseTo(70, 1);
+    });
+
+    it("should keep the camera still while the target remains inside the dead zone", () => {
+        const target = new Node2D("target");
+        camera.lockedTarget = target;
+        camera.deadZone = new Rectangle2D(-50, -25, 100, 50);
+
+        target.position = new Vector2(20, 10);
+        camera.update(0.016);
+        expect(camera.position.x).toBeCloseTo(0);
+        expect(camera.position.y).toBeCloseTo(0);
+
+        target.position = new Vector2(90, 10);
+        camera.update(0.016);
+        expect(camera.position.x).toBeCloseTo(40);
+        expect(camera.position.y).toBeCloseTo(0);
+    });
+
+    it("should apply look-ahead in the target movement direction", () => {
+        const target = new Node2D("target");
+        camera.lockedTarget = target;
+        camera.lerpSpeed = 0;
+        camera.lookAheadDistance = 50;
+        camera.lookAheadLerpSpeed = 0;
+
+        target.position = new Vector2(0, 0);
+        camera.update(0.016);
+        expect(camera.position.x).toBeCloseTo(0);
+
+        target.position = new Vector2(100, 0);
+        camera.update(1);
+        expect(camera.position.x).toBeCloseTo(150);
+        expect(camera.position.y).toBeCloseTo(0);
+    });
+
+    it("should support integer design resolution scaling", () => {
+        camera.setDesignResolution(320, 180, ScaleMode.INTEGER_SCALE);
+        camera.update(0, 1000, 700);
+
+        expect(camera.hasDesignResolution).toBe(true);
+        expect(camera.effectiveScale.scaleX).toBe(3);
+        expect(camera.effectiveScale.scaleY).toBe(3);
+    });
+
+    it("should clear the design resolution state", () => {
+        camera.setDesignResolution(320, 180, ScaleMode.FIT);
+        expect(camera.hasDesignResolution).toBe(true);
+
+        camera.clearDesignResolution();
+        expect(camera.hasDesignResolution).toBe(false);
+        expect(camera.effectiveScale.scaleX).toBe(1);
+        expect(camera.effectiveScale.scaleY).toBe(1);
+    });
+
+    it("should support zero-allocation coordinate conversion overloads", () => {
+        camera.position = new Vector2(120, 80);
+
+        const worldOut = new Vector2(-1, -1);
+        const worldResult = camera.screenToWorld(new Vector2(400, 300), worldOut);
+        expect(worldResult).toBe(worldOut);
+        expect(worldOut.x).toBeCloseTo(120);
+        expect(worldOut.y).toBeCloseTo(80);
+
+        const screenOut = new Vector2(-1, -1);
+        const screenResult = camera.worldToScreen(new Vector2(120, 80), screenOut);
+        expect(screenResult).toBe(screenOut);
+        expect(screenOut.x).toBeCloseTo(400);
+        expect(screenOut.y).toBeCloseTo(300);
+    });
+
+    it("should expose shake lifecycle helpers", () => {
+        camera.shake(8, 0.5, () => 0.5);
+        expect(camera.isShaking).toBe(true);
+
+        camera.stopShake();
+        expect(camera.isShaking).toBe(false);
     });
 });
 

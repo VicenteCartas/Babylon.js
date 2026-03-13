@@ -243,7 +243,7 @@ export class SceneTransition2D {
     // -----------------------------------------------------------------------
 
     private _setupFadeOverlay(scene: Scene2D): void {
-        this._overlay = new Sprite2D("__transition_overlay__");
+        this._overlay = new Sprite2D("__transition_overlay__", null);
         this._overlay.tint = new Color4(this._fadeColor.r, this._fadeColor.g, this._fadeColor.b, 0);
         this._overlay.sortingLayer = 0x7FFFFFFF; // Render on top of everything
         this._overlay.width = 99999;

@@ -60,6 +60,7 @@ export class InputMap2D {
     private _actions: Map<string, IActionState> = new Map();
     private _keysDown: Set<string> = new Set();
     private _pointerScreenPosition: Vector2 = Vector2.Zero();
+    private _pointerWorldPosition: Vector2 = Vector2.Zero();
     private _camera: Camera2D | null = null;
     private _canvas: HTMLCanvasElement;
     private _disposed: boolean = false;
@@ -206,13 +207,16 @@ export class InputMap2D {
     }
 
     /**
-     * Current pointer position in world coordinates (requires camera)
+     * Current pointer position in world coordinates (requires camera).
+     * Returns a reused internal Vector2 that is updated on each access.
      */
     public get pointerWorldPosition(): Vector2 {
         if (this._camera) {
-            return this._camera.screenToWorld(this._pointerScreenPosition);
+            return this._camera.screenToWorld(this._pointerScreenPosition, this._pointerWorldPosition);
         }
-        return this._pointerScreenPosition.clone();
+        this._pointerWorldPosition.x = this._pointerScreenPosition.x;
+        this._pointerWorldPosition.y = this._pointerScreenPosition.y;
+        return this._pointerWorldPosition;
     }
 
     /**
@@ -336,3 +340,5 @@ export class InputMap2D {
         this._disposed = true;
     }
 }
+
+
