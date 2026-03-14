@@ -1,5 +1,4 @@
 import { NineSliceSprite2D } from "2d/NineSlice/nineSliceSprite2D";
-import { Matrix2D } from "2d/Math/matrix2D";
 import type { ISprite2DRenderData } from "2d/Rendering/spriteBatchRenderer";
 
 // Mock texture with known size
@@ -244,7 +243,7 @@ describe("NineSliceSprite2D", () => {
             // Rotate parent 90 degrees
             sprite.rotation = Math.PI / 2;
             // Force worldTransform recalculation
-            const _ = sprite.worldTransform;
+            void sprite.worldTransform;
 
             const list: ISprite2DRenderData[] = [];
             sprite._collectRenderData(list, whiteTex);

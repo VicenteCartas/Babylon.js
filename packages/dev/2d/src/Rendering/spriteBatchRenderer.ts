@@ -822,6 +822,11 @@ export interface ISprite2DRenderData {
      * Optional — defaults to 1 if omitted.
      */
     scrollFactorY?: number;
+    /**
+     * Stable insertion-order tiebreaker used to preserve deterministic sort order.
+     * Optional for backward compatibility with older render-data producers.
+     */
+    insertionOrder?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1572,3 +1577,11 @@ export class SpriteBatchRenderer {
         this._resetTextureSlots();
     }
 }
+
+
+
+
+
+
+
+

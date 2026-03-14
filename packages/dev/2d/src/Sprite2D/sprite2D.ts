@@ -3,17 +3,17 @@ import { Texture } from "core/Materials/Textures/texture";
 import { Color4 } from "core/Maths/math.color";
 import { Constants } from "core/Engines/constants";
 
-import { Node2D } from "../Node2D/node2D";
+import { RenderableNode2D } from "../Node2D/renderableNode2D";
 import { Rectangle2D } from "../Math/rectangle2D";
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
 import type { Scene2D } from "../Scene2D/scene2D";
 
 /**
  * A 2D sprite that renders a textured quad.
- * Extends Node2D with texture, tint, flip, and alpha blending properties.
  */
-export class Sprite2D extends Node2D {
+export class Sprite2D extends RenderableNode2D {
     private static _uvScratch: [number, number, number, number] = [0, 0, 1, 1];
+    private _compatRenderDataPool: ISprite2DRenderData[] = [];
 
     /**
      * The texture to render.
@@ -29,17 +29,17 @@ export class Sprite2D extends Node2D {
     public sourceRect: Rectangle2D | null = null;
 
     /**
-     * Color tint applied to the sprite (multiplied with texture color)
+     * Color tint applied to the sprite (multiplied with texture color).
      */
     public tint: Color4 = new Color4(1, 1, 1, 1);
 
     /**
-     * Whether to flip the sprite horizontally
+     * Whether to flip the sprite horizontally.
      */
     public flipX: boolean = false;
 
     /**
-     * Whether to flip the sprite vertically
+     * Whether to flip the sprite vertically.
      */
     public flipY: boolean = false;
 
@@ -62,8 +62,8 @@ export class Sprite2D extends Node2D {
     public height: number = 0;
 
     /**
-     * Creates a new Sprite2D
-     * @param name - Name of the sprite
+     * Creates a new Sprite2D.
+     * @param name - Name of the sprite.
      * @param scene - Optional Scene2D. If omitted, uses the last created Scene2D.
      */
     constructor(name: string, scene?: Scene2D | null) {
@@ -71,8 +71,8 @@ export class Sprite2D extends Node2D {
     }
 
     /**
-     * Gets the effective display width (accounting for sourceRect and texture size)
-     * @returns The display width in pixels
+     * Gets the effective display width (accounting for sourceRect and texture size).
+     * @returns The display width in pixels.
      */
     public getDisplayWidth(): number {
         if (this.width > 0) {
@@ -89,8 +89,8 @@ export class Sprite2D extends Node2D {
     }
 
     /**
-     * Gets the effective display height (accounting for sourceRect and texture size)
-     * @returns The display height in pixels
+     * Gets the effective display height (accounting for sourceRect and texture size).
+     * @returns The display height in pixels.
      */
     public getDisplayHeight(): number {
         if (this.height > 0) {
@@ -109,7 +109,7 @@ export class Sprite2D extends Node2D {
     /**
      * Gets the source UV rectangle in normalized texture coordinates [u, v, uWidth, vHeight].
      * If sourceRect is null, returns [0, 0, 1, 1] (entire texture).
-     * @returns An array of [u, v, uWidth, vHeight]
+     * @returns An array of [u, v, uWidth, vHeight].
      */
     public getSourceUV(): [number, number, number, number] {
         if (!this.sourceRect || !this.texture) {
@@ -124,9 +124,7 @@ export class Sprite2D extends Node2D {
 
     /**
      * Writes the source UV rectangle in normalized texture coordinates into the provided array.
-     * If sourceRect is null, writes [0, 0, 1, 1] (entire texture).
-     * This is the allocation-free alternative to {@link getSourceUV}.
-     * @param result - A 4-element tuple to write [u, v, uWidth, vHeight] into
+     * @param result - A 4-element tuple to write [u, v, uWidth, vHeight] into.
      */
     public getSourceUVToRef(result: [number, number, number, number]): void {
         if (!this.sourceRect || !this.texture) {
@@ -152,39 +150,74 @@ export class Sprite2D extends Node2D {
 
     /**
      * Collects render data for this sprite into the provided list.
-     * Override in subclasses (e.g., NineSliceSprite2D) to emit multiple quads.
-     * @param list - Array to push render data into
-     * @param fallbackTexture - White texture fallback when sprite has no texture
+     * @param list - Array to push render data into.
+     * @param fallbackTexture - White texture fallback when sprite has no texture.
      * @internal
      */
-    public _collectRenderData(list: ISprite2DRenderData[], fallbackTexture: ThinTexture): void {
-        const w = this.getDisplayWidth();
-        const h = this.getDisplayHeight();
-        if (w <= 0 || h <= 0) {
+    public override _collectRenderData(list: ISprite2DRenderData[], fallbackTexture: ThinTexture): void {
+        let renderData = this._compatRenderDataPool[list.length];
+        if (!renderData) {
+            renderData = {} as ISprite2DRenderData;
+            this._compatRenderDataPool[list.length] = renderData;
+        }
+
+        if (!this._writeRenderDataTo(renderData, fallbackTexture, this.worldAlpha, this.worldScrollFactorX, this.worldScrollFactorY, this.worldZIndex, 0)) {
             return;
         }
+
+        list.push(renderData);
+    }
+
+    /**
+     * Writes this sprite's render data into a reusable struct.
+     * @param target - The render-data struct to populate.
+     * @param fallbackTexture - White fallback texture.
+     * @param worldAlpha - Resolved world alpha.
+     * @param worldScrollFactorX - Resolved world scroll factor X.
+     * @param worldScrollFactorY - Resolved world scroll factor Y.
+     * @param worldZIndex - Resolved world z-index.
+     * @param insertionOrder - Stable insertion-order tiebreaker.
+     * @returns True when render data was written.
+     * @internal
+     */
+    public _writeRenderDataTo(
+        target: ISprite2DRenderData,
+        fallbackTexture: ThinTexture,
+        worldAlpha: number,
+        worldScrollFactorX: number,
+        worldScrollFactorY: number,
+        worldZIndex: number,
+        insertionOrder: number
+    ): boolean {
+        const width = this.getDisplayWidth();
+        const height = this.getDisplayHeight();
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+
         const uv = Sprite2D._uvScratch;
         this.getSourceUVToRef(uv);
-        list.push({
-            worldTransform: this.worldTransform,
-            width: w,
-            height: h,
-            r: this.tint.r,
-            g: this.tint.g,
-            b: this.tint.b,
-            a: this.tint.a * this.worldAlpha,
-            cellU: uv[0],
-            cellV: uv[1],
-            cellW: uv[2],
-            cellH: uv[3],
-            flipX: this.flipX,
-            flipY: this.flipY,
-            invertY: this.texture instanceof Texture ? this.texture.invertY : true,
-            texture: this.texture ?? fallbackTexture,
-            zIndex: this.worldZIndex,
-            sortingLayer: this.sortingLayer,
-            scrollFactorX: this.worldScrollFactorX,
-            scrollFactorY: this.worldScrollFactorY,
-        });
+
+        target.worldTransform = this.worldTransform;
+        target.width = width;
+        target.height = height;
+        target.r = this.tint.r;
+        target.g = this.tint.g;
+        target.b = this.tint.b;
+        target.a = this.tint.a * worldAlpha;
+        target.cellU = uv[0];
+        target.cellV = uv[1];
+        target.cellW = uv[2];
+        target.cellH = uv[3];
+        target.flipX = this.flipX;
+        target.flipY = this.flipY;
+        target.invertY = this.texture instanceof Texture ? this.texture.invertY : true;
+        target.texture = this.texture ?? fallbackTexture;
+        target.zIndex = worldZIndex;
+        target.sortingLayer = this.sortingLayer;
+        target.scrollFactorX = worldScrollFactorX;
+        target.scrollFactorY = worldScrollFactorY;
+        target.insertionOrder = insertionOrder;
+        return true;
     }
 }

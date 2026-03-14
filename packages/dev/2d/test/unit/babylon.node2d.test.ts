@@ -1,4 +1,5 @@
 import { Node2D } from "2d/Node2D/node2D";
+import { RenderableNode2D } from "2d/Node2D/renderableNode2D";
 import { Vector2 } from "core/Maths/math.vector";
 
 describe("Node2D", () => {
@@ -101,12 +102,12 @@ describe("Node2D", () => {
         });
     });
 
-    describe("alpha inheritance", () => {
+    describe("renderable alpha inheritance", () => {
         it("should multiply alpha through hierarchy", () => {
-            const parent = new Node2D("parent");
+            const parent = new RenderableNode2D("parent");
             parent.alpha = 0.5;
 
-            const child = new Node2D("child");
+            const child = new RenderableNode2D("child");
             child.alpha = 0.8;
             child.parent = parent;
 
@@ -114,14 +115,14 @@ describe("Node2D", () => {
         });
     });
 
-    describe("z-index sorting", () => {
+    describe("renderable z-index sorting", () => {
         it("should sort children by zIndex", () => {
-            const parent = new Node2D("parent");
-            const a = new Node2D("a");
+            const parent = new RenderableNode2D("parent");
+            const a = new RenderableNode2D("a");
             a.zIndex = 3;
-            const b = new Node2D("b");
+            const b = new RenderableNode2D("b");
             b.zIndex = 1;
-            const c = new Node2D("c");
+            const c = new RenderableNode2D("c");
             c.zIndex = 2;
 
             parent.addChild(a);

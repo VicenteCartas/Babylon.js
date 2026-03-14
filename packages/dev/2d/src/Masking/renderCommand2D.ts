@@ -1,5 +1,5 @@
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
-import type { Node2D } from "../Node2D/node2D";
+import type { RenderableNode2D } from "../Node2D/renderableNode2D";
 import type { RectMask2D } from "./rectMask2D";
 import type { SpriteMask2D } from "./spriteMask2D";
 
@@ -37,7 +37,7 @@ export interface IPushRectMaskCommand {
     /** The rectangle mask to push */
     rectMask: RectMask2D;
     /** The node that owns the mask (needed for world transform → viewport rect) */
-    maskOwner: Node2D;
+    maskOwner: RenderableNode2D;
 }
 
 /**
@@ -49,7 +49,7 @@ export interface IPushSpriteMaskCommand {
     /** The sprite mask to push */
     spriteMask: SpriteMask2D;
     /** The node that owns the mask (needed for world transform context) */
-    maskOwner: Node2D;
+    maskOwner: RenderableNode2D;
 }
 
 /**
@@ -70,3 +70,4 @@ export interface IPopMaskCommand {
  * @internal
  */
 export type RenderCommand2D = ISpriteRenderCommand | IPushRectMaskCommand | IPushSpriteMaskCommand | IPopMaskCommand;
+

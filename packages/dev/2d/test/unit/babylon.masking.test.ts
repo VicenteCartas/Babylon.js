@@ -2,7 +2,7 @@ import { RectMask2D } from "2d/Masking/rectMask2D";
 import { SpriteMask2D } from "2d/Masking/spriteMask2D";
 import { MaskStateManager } from "2d/Masking/maskStateManager";
 import { Rectangle2D } from "2d/Math/rectangle2D";
-import { Node2D } from "2d/Node2D/node2D";
+import { RenderableNode2D } from "2d/Node2D/renderableNode2D";
 import { Constants } from "core/Engines/constants";
 
 // ---------------------------------------------------------------------------
@@ -673,7 +673,7 @@ describe("RenderCommand2D types", () => {
 
     it("should hold correct references in PushRectMask command", () => {
         const mask = new RectMask2D(10, 20, 300, 400);
-        const owner = new Node2D("owner", null);
+        const owner = new RenderableNode2D("owner", null);
         const cmd = { type: 1 as const, rectMask: mask, maskOwner: owner };
         expect(cmd.rectMask).toBe(mask);
         expect(cmd.maskOwner).toBe(owner);
@@ -683,7 +683,7 @@ describe("RenderCommand2D types", () => {
     it("should hold correct references in PushSpriteMask command", () => {
         const sprite = { name: "maskSprite" } as any;
         const mask = new SpriteMask2D(sprite, 0.7);
-        const owner = new Node2D("owner", null);
+        const owner = new RenderableNode2D("owner", null);
         const cmd = { type: 2 as const, spriteMask: mask, maskOwner: owner };
         expect(cmd.spriteMask.sprite).toBe(sprite);
         expect(cmd.spriteMask.alphaThreshold).toBe(0.7);
@@ -835,45 +835,45 @@ describe("Rectangle2D.IntersectToRef", () => {
 });
 
 // ╔═════════════════════════════════════════════════════════════════════════╗
-// ║  Node2D.mask                                                          ║
+// ║  RenderableNode2D.mask                                                          ║
 // ╚═════════════════════════════════════════════════════════════════════════╝
 
-describe("Node2D.mask", () => {
+describe("RenderableNode2D.mask", () => {
     it("should default to null", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         expect(node.mask).toBeNull();
     });
 
     it("should accept a RectMask2D", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         const mask = new RectMask2D(0, 0, 100, 100);
         node.mask = mask;
         expect(node.mask).toBe(mask);
     });
 
     it("should accept a SpriteMask2D", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         const mask = new SpriteMask2D({} as any);
         node.mask = mask;
         expect(node.mask).toBe(mask);
     });
 
     it("should null mask on dispose", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         node.mask = new RectMask2D(0, 0, 100, 100);
         node.dispose();
         expect(node.mask).toBeNull();
     });
 
     it("should allow clearing mask by setting to null", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         node.mask = new RectMask2D(0, 0, 100, 100);
         node.mask = null;
         expect(node.mask).toBeNull();
     });
 
     it("should allow replacing one mask with another", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         const mask1 = new RectMask2D(0, 0, 100, 100);
         const mask2 = new RectMask2D(10, 10, 200, 200);
         node.mask = mask1;
@@ -883,7 +883,7 @@ describe("Node2D.mask", () => {
     });
 
     it("should allow switching from RectMask2D to SpriteMask2D", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         const rectMask = new RectMask2D(0, 0, 100, 100);
         const spriteMask = new SpriteMask2D({} as any);
         node.mask = rectMask;
@@ -893,8 +893,8 @@ describe("Node2D.mask", () => {
     });
 
     it("should null masks on all children when parent is disposed", () => {
-        const parent = new Node2D("parent", null);
-        const child = new Node2D("child", null);
+        const parent = new RenderableNode2D("parent", null);
+        const child = new RenderableNode2D("child", null);
         child.parent = parent;
 
         parent.mask = new RectMask2D(0, 0, 200, 200);
@@ -907,9 +907,9 @@ describe("Node2D.mask", () => {
     });
 
     it("should not affect sibling nodes when one child has a mask", () => {
-        const parent = new Node2D("parent", null);
-        const child1 = new Node2D("child1", null);
-        const child2 = new Node2D("child2", null);
+        const parent = new RenderableNode2D("parent", null);
+        const child1 = new RenderableNode2D("child1", null);
+        const child2 = new RenderableNode2D("child2", null);
         child1.parent = parent;
         child2.parent = parent;
 
@@ -919,9 +919,9 @@ describe("Node2D.mask", () => {
     });
 
     it("should allow a mask on a grandchild node", () => {
-        const root = new Node2D("root", null);
-        const mid = new Node2D("mid", null);
-        const leaf = new Node2D("leaf", null);
+        const root = new RenderableNode2D("root", null);
+        const mid = new RenderableNode2D("mid", null);
+        const leaf = new RenderableNode2D("leaf", null);
         mid.parent = root;
         leaf.parent = mid;
 
@@ -931,7 +931,7 @@ describe("Node2D.mask", () => {
     });
 
     it("should allow setting a disabled mask", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         const mask = new RectMask2D(0, 0, 100, 100);
         mask.enabled = false;
         node.mask = mask;
@@ -940,7 +940,7 @@ describe("Node2D.mask", () => {
     });
 
     it("should allow modifying the mask after assignment", () => {
-        const node = new Node2D("test", null);
+        const node = new RenderableNode2D("test", null);
         const mask = new RectMask2D(0, 0, 100, 100);
         node.mask = mask;
         mask.padding = 5;
@@ -1119,3 +1119,4 @@ describe("IMask2D interface conformance", () => {
         }
     });
 });
+

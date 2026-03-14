@@ -8,7 +8,9 @@ import { Constants } from "core/Engines/constants";
 import type { Nullable } from "core/types";
 
 import { Node2D } from "../Node2D/node2D";
+import { RenderableNode2D } from "../Node2D/renderableNode2D";
 import { Sprite2D } from "../Sprite2D/sprite2D";
+import { NineSliceSprite2D } from "../NineSlice/nineSliceSprite2D";
 import { Camera2D } from "../Camera2D/camera2D";
 import { Matrix2D } from "../Math/matrix2D";
 import { Rectangle2D } from "../Math/rectangle2D";
@@ -20,9 +22,40 @@ import { Scene2DStore } from "./scene2DStore";
 import { RectMask2D } from "../Masking/rectMask2D";
 import { SpriteMask2D } from "../Masking/spriteMask2D";
 import { RenderCommandType } from "../Masking/renderCommand2D";
-import type { RenderCommand2D, ISpriteRenderCommand, IPushRectMaskCommand, IPushSpriteMaskCommand } from "../Masking/renderCommand2D";
+import type { RenderCommand2D, IPushRectMaskCommand, IPushSpriteMaskCommand } from "../Masking/renderCommand2D";
 import { MaskStateManager } from "../Masking/maskStateManager";
 
+interface IRenderEntry2D {
+    type: "sprite" | "group";
+    sortingLayer: number;
+    zIndex: number;
+    insertionOrder: number;
+    spriteData: ISprite2DRenderData | null;
+    pushCommand: IPushRectMaskCommand | IPushSpriteMaskCommand | null;
+    children: IRenderEntry2D[];
+}
+
+const _identityViewTransform = Matrix2D.Identity();
+
+function _compareRenderEntries(left: IRenderEntry2D, right: IRenderEntry2D): number {
+    if (left.sortingLayer !== right.sortingLayer) {
+        return left.sortingLayer - right.sortingLayer;
+    }
+    if (left.zIndex !== right.zIndex) {
+        return left.zIndex - right.zIndex;
+    }
+    return left.insertionOrder - right.insertionOrder;
+}
+
+function _compareSpriteRenderData(left: ISprite2DRenderData, right: ISprite2DRenderData): number {
+    if (left.sortingLayer !== right.sortingLayer) {
+        return left.sortingLayer - right.sortingLayer;
+    }
+    if (left.zIndex !== right.zIndex) {
+        return left.zIndex - right.zIndex;
+    }
+    return (left.insertionOrder ?? 0) - (right.insertionOrder ?? 0);
+}
 /**
  * Represents a 2D scene that manages a hierarchy of Node2D entities.
  * Uses Y-down, top-left origin coordinate system.
@@ -111,14 +144,25 @@ export class Scene2D {
     private _batchRenderer: SpriteBatchRenderer | null = null;
     private _whiteTexture: RawTexture | null = null;
     private _spriteDataPool: ISprite2DRenderData[] = [];
+    private _spriteDataCount: number = 0;
     private _executeWhenReadyTimeoutId: Nullable<ReturnType<typeof setTimeout>> = null;
     private _hasMasks: boolean = false;
     private _hasMasksLastFrame: boolean = false;
     private _renderCommands: RenderCommand2D[] = [];
+    private _renderEntries: IRenderEntry2D[] = [];
+    private _renderEntryPool: IRenderEntry2D[] = [];
+    private _renderEntryCount: number = 0;
+    private _nextRenderInsertionOrder: number = 0;
     /** Reusable array for sprite batch in _processRenderCommands (W3: avoid per-frame allocation) */
     private _spriteBatchTemp: ISprite2DRenderData[] = [];
     /** Reusable array for mask sprite data in _processRenderCommands */
     private _maskSpriteDataTemp: ISprite2DRenderData[] = [];
+    /** Reusable sorted sprite buffer for the no-mask fast path. */
+    private _sortedSpriteDataTemp: ISprite2DRenderData[] = [];
+    /** Reusable lit sprite buffer for the no-mask fast path. */
+    private _litSpriteDataTemp: ISprite2DRenderData[] = [];
+    /** Reusable unlit sprite buffer for the no-mask fast path. */
+    private _unlitSpriteDataTemp: ISprite2DRenderData[] = [];
     private _maskStateManager: MaskStateManager | null = null;
     /** Timestamp (ms) of the last auto-update, for computing dt independently of the 3D engine */
     private _lastAutoUpdateTime: number = -1;
@@ -141,7 +185,11 @@ export class Scene2D {
         this.engine = engine;
         Scene2DStore._LastCreatedScene = this;
         // Eagerly create the batch renderer so shader compilation starts immediately
-        this._batchRenderer = new SpriteBatchRenderer(engine);
+        // when the caller provides a real Babylon engine. Unit tests frequently use
+        // minimal mock objects that do not implement the rendering surface area.
+        if (this._canCreateBatchRenderer()) {
+            this._batchRenderer = new SpriteBatchRenderer(engine);
+        }
 
         // Link readiness to the 3D scene if provided
         if (linkedScene) {
@@ -160,7 +208,7 @@ export class Scene2D {
     }
 
     /**
-     * Whether this scene has been disposed
+     * Whether this scene has been disposed.
      */
     public get isDisposed(): boolean {
         return this._isDisposed;
@@ -168,16 +216,18 @@ export class Scene2D {
 
     /**
      * Whether the scene is ready to render (all shaders compiled).
-     * @returns true when the batch renderer's effects are compiled
+     * @returns true when the batch renderer's effects are compiled.
      */
     public isReady(): boolean {
-        return this._getBatchRenderer().isReady;
+        if (!this._batchRenderer) {
+            return false;
+        }
+        return this._batchRenderer.isReady;
     }
 
     /**
      * Registers a callback to execute as soon as the scene is ready.
-     * If the scene is already ready, the callback fires on the next check cycle.
-     * @param func - The callback to execute when ready
+     * @param func - The callback to execute when ready.
      */
     public executeWhenReady(func: () => void): void {
         this.onReadyObservable.addOnce(func);
@@ -191,7 +241,7 @@ export class Scene2D {
 
     /**
      * Returns a promise that resolves when the scene is ready to render.
-     * @returns A promise that resolves when all shaders are compiled
+     * @returns A promise that resolves when all shaders are compiled.
      */
     public whenReadyAsync(): Promise<void> {
         return new Promise((resolve) => {
@@ -220,55 +270,79 @@ export class Scene2D {
     }
 
     /**
-     * Adds a root node to the scene
-     * @param node - The node to add
+     * Adds a root node to the scene.
+     * @param node - The node to add.
      */
-    public addNode(node: Node2D): void {
+    public addRootNode(node: Node2D): void {
         if (node.parent) {
             return;
         }
 
-        // Remove from previous scene if different
         if (node.scene && node.scene !== this) {
-            node.scene.removeNode(node);
+            node.scene.removeRootNode(node);
         }
 
-        if (this._rootNodes.indexOf(node) === -1) {
-            this._rootNodes.push(node);
-        }
-        node._setScene(this);
-        this._registerNode(node);
+        this._addRootNodeDirect(node);
+        this._attachNodeTree(node);
     }
 
     /**
-     * Removes a root node from the scene
-     * @param node - The node to remove
+     * Backward-compatible alias for addRootNode.
+     * @param node - The node to add.
+     */
+    public addNode(node: Node2D): void {
+        this.addRootNode(node);
+    }
+
+    /**
+     * Removes a root node from the scene without disposing it.
+     * @param node - The node to remove.
+     */
+    public removeRootNode(node: Node2D): void {
+        if (node.parent) {
+            return;
+        }
+
+        this._removeRootNodeDirect(node);
+        this._detachNodeTree(node);
+    }
+
+    /**
+     * Backward-compatible alias for removeRootNode.
+     * @param node - The node to remove.
      */
     public removeNode(node: Node2D): void {
-        const index = this._rootNodes.indexOf(node);
-        if (index !== -1) {
-            this._rootNodes.splice(index, 1);
-        }
-        node._setScene(null);
-        this._unregisterNode(node);
+        this.removeRootNode(node);
     }
 
     /**
      * Adds an internal overlay node that renders on top of the scene but is
-     * not included in the public `rootNodes` array.
-     * @param node - The overlay node to add
+     * not included in the public rootNodes array.
+     * @param node - The overlay node to add.
      * @internal
      */
     public _addOverlay(node: Node2D): void {
+        if (node.parent) {
+            node.parent.removeChild(node);
+        }
+
+        if (node.scene && node.scene !== this) {
+            if (node.scene._isOverlayNode(node)) {
+                node.scene._removeOverlay(node);
+            } else {
+                node.scene.removeRootNode(node);
+            }
+        }
+
         if (this._overlayNodes.indexOf(node) === -1) {
             this._overlayNodes.push(node);
         }
-        node._setScene(this);
+        this._attachNodeTree(node);
     }
 
     /**
-     * Removes an internal overlay node previously added with `_addOverlay`.
-     * @param node - The overlay node to remove
+     * Removes an internal overlay node previously added with _addOverlay.
+     * @param node - The overlay node to remove.
      * @internal
      */
     public _removeOverlay(node: Node2D): void {
@@ -276,60 +350,110 @@ export class Scene2D {
         if (index !== -1) {
             this._overlayNodes.splice(index, 1);
         }
-        node._setScene(null);
+        this._detachNodeTree(node);
     }
 
     /**
-     * Registers a node in the scene's lookup table
-     * @param node - The node to register
-     */
-    private _registerNode(node: Node2D): void {
-        this._allNodes.set(node.id, node);
-        for (const child of node.children) {
-            this._registerNode(child);
-        }
-    }
-
-    /**
-     * Unregisters a node from the scene's lookup table
-     * @param node - The node to unregister
-     */
-    private _unregisterNode(node: Node2D): void {
-        this._allNodes.delete(node.id);
-        for (const child of node.children) {
-            this._unregisterNode(child);
-        }
-    }
-
-    /**
-     * Finds a node by its unique id
-     * @param id - The id to search for
-     * @returns The node if found, or null
+     * Finds a node by its unique id.
+     * @param id - The id to search for.
+     * @returns The node if found, or null.
      */
     public getNodeById(id: string): Node2D | null {
         return this._allNodes.get(id) ?? null;
     }
 
     /**
-     * Gets all registered nodes in the scene
-     * @returns An array of all nodes
+     * Finds all nodes matching a predicate.
+     * @param predicate - Predicate used to select nodes.
+     * @returns Matching nodes.
+     */
+    public findNodes(predicate: (node: Node2D) => boolean): Node2D[] {
+        const matches: Node2D[] = [];
+        this._allNodes.forEach((node) => {
+            if (predicate(node)) {
+                matches.push(node);
+            }
+        });
+        return matches;
+    }
+
+    /**
+     * Gets all registered nodes in the scene.
+     * @returns An array of all nodes.
      */
     public getAllNodes(): Node2D[] {
         return Array.from(this._allNodes.values());
     }
 
     /**
-     * Updates all nodes in the scene
-     * @param deltaTime - Time elapsed since last frame in seconds
+     * Updates all nodes in the scene.
+     * @param deltaTime - Time elapsed since last frame in seconds.
      */
     public update(deltaTime: number): void {
         for (const node of this._rootNodes) {
-            node.update(deltaTime);
+            this._updateNodeRecursive(node, deltaTime);
+        }
+        for (const overlayNode of this._overlayNodes) {
+            this._updateNodeRecursive(overlayNode, deltaTime);
         }
     }
 
     /**
-     * Gets or creates the 1x1 white fallback texture (for untextured sprites)
+     * @internal
+     */
+    public _attachNodeTree(node: Node2D): void {
+        if (node.scene !== this) {
+            node._setScene(this);
+        }
+        this._allNodes.set(node.id, node);
+        node._markWorldTransformDirty();
+        node._markWorldRenderStateDirty();
+        for (const child of node.children) {
+            this._attachNodeTree(child);
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public _detachNodeTree(node: Node2D): void {
+        this._allNodes.delete(node.id);
+        node._setScene(null);
+        node._markWorldTransformDirty();
+        node._markWorldRenderStateDirty();
+        for (const child of node.children) {
+            this._detachNodeTree(child);
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public _addRootNodeDirect(node: Node2D): void {
+        if (this._rootNodes.indexOf(node) === -1) {
+            this._rootNodes.push(node);
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public _removeRootNodeDirect(node: Node2D): void {
+        const index = this._rootNodes.indexOf(node);
+        if (index !== -1) {
+            this._rootNodes.splice(index, 1);
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public _isOverlayNode(node: Node2D): boolean {
+        return this._overlayNodes.indexOf(node) !== -1;
+    }
+
+    /**
+     * Gets or creates the 1x1 white fallback texture (for untextured sprites).
      */
     private _getWhiteTexture(): ThinTexture {
         if (!this._whiteTexture) {
@@ -338,104 +462,212 @@ export class Scene2D {
         return this._whiteTexture;
     }
 
-    /**
-     * Gets the batch renderer (always initialized in constructor)
-     */
-    private _getBatchRenderer(): SpriteBatchRenderer {
-        return this._batchRenderer!;
+    private _canCreateBatchRenderer(): boolean {
+        const engine = this.engine as AbstractEngine & { getCaps?: () => unknown };
+        return typeof engine.getCaps === "function";
     }
 
     /**
-     * Recursively collects render commands including mask push/pop boundaries.
-     * Sprites within each mask group are sorted locally.
+     * Gets or lazily creates the batch renderer.
      */
-    private _collectRenderCommands(node: Node2D, commands: RenderCommand2D[]): void {
-        if (!node.visible || node.worldAlpha <= 0) {
+    private _getBatchRenderer(): SpriteBatchRenderer {
+        if (!this._batchRenderer) {
+            if (!this._canCreateBatchRenderer()) {
+                throw new Error("Scene2D rendering requires an engine with getCaps().");
+            }
+            this._batchRenderer = new SpriteBatchRenderer(this.engine);
+        }
+        return this._batchRenderer;
+    }
+
+    private _allocateSpriteRenderData(): ISprite2DRenderData {
+        if (this._spriteDataCount >= this._spriteDataPool.length) {
+            this._spriteDataPool.push({} as ISprite2DRenderData);
+        }
+        const renderData = this._spriteDataPool[this._spriteDataCount];
+        this._spriteDataCount++;
+        return renderData;
+    }
+
+    private _acquireRenderEntry(): IRenderEntry2D {
+        if (this._renderEntryCount >= this._renderEntryPool.length) {
+            this._renderEntryPool.push({
+                type: "sprite",
+                sortingLayer: 0,
+                zIndex: 0,
+                insertionOrder: 0,
+                spriteData: null,
+                pushCommand: null,
+                children: [],
+            });
+        }
+
+        const entry = this._renderEntryPool[this._renderEntryCount];
+        this._renderEntryCount++;
+        entry.type = "sprite";
+        entry.sortingLayer = 0;
+        entry.zIndex = 0;
+        entry.insertionOrder = 0;
+        entry.spriteData = null;
+        entry.pushCommand = null;
+        entry.children.length = 0;
+        return entry;
+    }
+
+    private _updateNodeRecursive(node: Node2D, deltaTime: number): void {
+        if (node instanceof RenderableNode2D && !node.visible) {
             return;
         }
 
-        const mask = node.mask;
-        const hasMask = mask !== null && mask.enabled;
-        let pushCommand: IPushRectMaskCommand | IPushSpriteMaskCommand | null = null;
-        let groupStartIndex = -1;
-
-        if (hasMask) {
-            this._hasMasks = true;
-            groupStartIndex = commands.length;
-
-            if (mask instanceof RectMask2D) {
-                pushCommand = { type: RenderCommandType.PushRectMask, rectMask: mask, maskOwner: node };
-                commands.push(pushCommand);
-            } else if (mask instanceof SpriteMask2D) {
-                pushCommand = { type: RenderCommandType.PushSpriteMask, spriteMask: mask, maskOwner: node };
-                commands.push(pushCommand);
-            }
-        }
-
-        // Collect this node's sprite data
-        if (node instanceof Sprite2D) {
-            const beforeLen = this._spriteDataPool.length;
-            node._collectRenderData(this._spriteDataPool, this._getWhiteTexture());
-            // Emit sprite commands for any new entries
-            for (let i = beforeLen; i < this._spriteDataPool.length; i++) {
-                commands.push({ type: RenderCommandType.Sprite, spriteData: this._spriteDataPool[i] });
-            }
-        }
-
-        // Recurse children
+        node._updateForScene(deltaTime);
         for (const child of node.children) {
-            this._collectRenderCommands(child, commands);
+            this._updateNodeRecursive(child, deltaTime);
+        }
+    }
+
+    private _appendSpriteEntry(entries: IRenderEntry2D[], sprite: Sprite2D, worldAlpha: number, worldScrollFactorX: number, worldScrollFactorY: number): void {
+        const fallbackTexture = this._getWhiteTexture();
+        const worldZIndex = sprite.worldZIndex;
+
+        if (sprite instanceof NineSliceSprite2D) {
+            const emittedCount = sprite._appendRenderData(this._spriteDataPool, fallbackTexture, worldAlpha, worldScrollFactorX, worldScrollFactorY, worldZIndex, this._nextRenderInsertionOrder, (_index: number) => {
+                return this._allocateSpriteRenderData();
+            });
+
+            for (let i = 0; i < emittedCount; i++) {
+                const spriteData = this._spriteDataPool[this._spriteDataCount - emittedCount + i];
+                const entry = this._acquireRenderEntry();
+                entry.type = "sprite";
+                entry.spriteData = spriteData;
+                entry.sortingLayer = spriteData.sortingLayer;
+                entry.zIndex = spriteData.zIndex;
+                entry.insertionOrder = spriteData.insertionOrder ?? 0;
+                entries.push(entry);
+            }
+
+            this._nextRenderInsertionOrder += emittedCount;
+            return;
         }
 
-        if (hasMask && groupStartIndex >= 0 && pushCommand) {
-            // Sort sprite commands within this mask group (between push and pop)
-            const pushIdx = groupStartIndex;
-            const popIdx = commands.length;
-            // Count sprite-only vs other commands in this range
-            let hasOther = false;
-            let spriteCount = 0;
-            for (let i = pushIdx + 1; i < popIdx; i++) {
-                if (commands[i].type === RenderCommandType.Sprite) {
-                    spriteCount++;
-                } else {
-                    hasOther = true;
-                    break;
-                }
+        const spriteData = this._allocateSpriteRenderData();
+        const insertionOrder = this._nextRenderInsertionOrder++;
+        if (!sprite._writeRenderDataTo(spriteData, fallbackTexture, worldAlpha, worldScrollFactorX, worldScrollFactorY, worldZIndex, insertionOrder)) {
+            this._spriteDataCount--;
+            return;
+        }
+
+        const entry = this._acquireRenderEntry();
+        entry.type = "sprite";
+        entry.spriteData = spriteData;
+        entry.sortingLayer = spriteData.sortingLayer;
+        entry.zIndex = spriteData.zIndex;
+        entry.insertionOrder = insertionOrder;
+        entries.push(entry);
+    }
+
+    private _collectRenderEntries(node: Node2D, entries: IRenderEntry2D[], parentAlpha: number, parentScrollFactorX: number, parentScrollFactorY: number): void {
+        let worldAlpha = parentAlpha;
+        let worldScrollFactorX = parentScrollFactorX;
+        let worldScrollFactorY = parentScrollFactorY;
+
+        let targetEntries = entries;
+        let groupEntry: IRenderEntry2D | null = null;
+
+        if (node instanceof RenderableNode2D) {
+            if (!node.visible) {
+                return;
             }
 
-            // Only sort if there are no nested masks (simple case)
-            if (!hasOther && spriteCount > 1) {
-                // All commands in this range are sprites — safe to sort in-place
-                const start = pushIdx + 1;
-                const subArray = commands as ISpriteRenderCommand[];
-                // In-place insertion sort (fast for small arrays, no allocation)
-                for (let i = start + 1; i < popIdx; i++) {
-                    const cmd = subArray[i];
-                    const sd = cmd.spriteData;
-                    let j = i - 1;
-                    while (j >= start) {
-                        const prev = subArray[j];
-                        const pd = prev.spriteData;
-                        if (pd.sortingLayer !== sd.sortingLayer ? pd.sortingLayer > sd.sortingLayer : pd.zIndex > sd.zIndex) {
-                            subArray[j + 1] = prev;
-                            j--;
-                        } else {
-                            break;
-                        }
-                    }
-                    subArray[j + 1] = cmd;
-                }
+            worldAlpha *= node.alpha;
+            if (worldAlpha <= 0) {
+                return;
             }
 
+            worldScrollFactorX *= node.scrollFactorX;
+            worldScrollFactorY *= node.scrollFactorY;
+
+            const mask = node.mask;
+            if (mask && mask.enabled) {
+                groupEntry = this._acquireRenderEntry();
+                groupEntry.type = "group";
+                groupEntry.sortingLayer = node.sortingLayer;
+                groupEntry.zIndex = node.worldZIndex;
+                groupEntry.insertionOrder = this._nextRenderInsertionOrder++;
+                groupEntry.pushCommand = mask instanceof RectMask2D ? { type: RenderCommandType.PushRectMask, rectMask: mask, maskOwner: node } : { type: RenderCommandType.PushSpriteMask, spriteMask: mask as SpriteMask2D, maskOwner: node };
+                targetEntries = groupEntry.children;
+                this._hasMasks = true;
+            }
+        }
+
+        if (node instanceof Sprite2D) {
+            this._appendSpriteEntry(targetEntries, node, worldAlpha, worldScrollFactorX, worldScrollFactorY);
+        }
+
+        for (const child of node.children) {
+            this._collectRenderEntries(child, targetEntries, worldAlpha, worldScrollFactorX, worldScrollFactorY);
+        }
+
+        if (groupEntry) {
+            entries.push(groupEntry);
+        }
+    }
+
+    private _sortRenderEntries(entries: IRenderEntry2D[]): void {
+        for (const entry of entries) {
+            if (entry.type === "group") {
+                this._sortRenderEntries(entry.children);
+            }
+        }
+
+        entries.sort(_compareRenderEntries);
+    }
+
+    private _flattenRenderEntries(entries: IRenderEntry2D[], commands: RenderCommand2D[]): void {
+        for (const entry of entries) {
+            if (entry.type === "sprite") {
+                commands.push({ type: RenderCommandType.Sprite, spriteData: entry.spriteData! });
+                continue;
+            }
+
+            const pushCommand = entry.pushCommand!;
+            commands.push(pushCommand);
+            this._flattenRenderEntries(entry.children, commands);
             commands.push({ type: RenderCommandType.PopMask, pushCommand });
         }
     }
 
-    /**
-     * Processes the render command list, executing mask push/pop and sprite batching.
-     * This method owns the global engine state (depth, alpha, cull) for the entire
-     * command sequence. Uses renderer.renderBatch() to avoid state conflicts.
-     */
+    private _collectMaskSpriteData(sprite: Sprite2D): ISprite2DRenderData[] {
+        const maskSpriteData = this._maskSpriteDataTemp;
+        const fallbackTexture = this._getWhiteTexture();
+
+        if (sprite instanceof NineSliceSprite2D) {
+            const emittedCount = sprite._appendRenderData(maskSpriteData, fallbackTexture, sprite.worldAlpha, sprite.worldScrollFactorX, sprite.worldScrollFactorY, sprite.worldZIndex, 0, (index: number) => {
+                let renderData = maskSpriteData[index];
+                if (!renderData) {
+                    renderData = {} as ISprite2DRenderData;
+                    maskSpriteData[index] = renderData;
+                }
+                return renderData;
+            });
+            maskSpriteData.length = emittedCount;
+            return maskSpriteData;
+        }
+
+        let renderData = maskSpriteData[0];
+        if (!renderData) {
+            renderData = {} as ISprite2DRenderData;
+            maskSpriteData[0] = renderData;
+        }
+
+        if (sprite._writeRenderDataTo(renderData, fallbackTexture, sprite.worldAlpha, sprite.worldScrollFactorX, sprite.worldScrollFactorY, sprite.worldZIndex, 0)) {
+            maskSpriteData.length = 1;
+        } else {
+            maskSpriteData.length = 0;
+        }
+
+        return maskSpriteData;
+    }
+
     private _processRenderCommands(
         commands: RenderCommand2D[],
         renderer: SpriteBatchRenderer,
@@ -506,9 +738,7 @@ export class Scene2D {
                     const sprite = mask.sprite;
 
                     // Collect the mask sprite's render data
-                    const maskSpriteData = this._maskSpriteDataTemp;
-                    maskSpriteData.length = 0;
-                    sprite._collectRenderData(maskSpriteData, this._getWhiteTexture());
+                    const maskSpriteData = this._collectMaskSpriteData(sprite);
 
                     if (maskSpriteData.length > 0) {
                         // Configure stencil for mask writing (INCR)
@@ -531,9 +761,7 @@ export class Scene2D {
                     if (pushCmd.type === RenderCommandType.PushSpriteMask) {
                         const mask = pushCmd.spriteMask;
                         const sprite = mask.sprite;
-                        const maskSpriteData = this._maskSpriteDataTemp;
-                        maskSpriteData.length = 0;
-                        sprite._collectRenderData(maskSpriteData, this._getWhiteTexture());
+                        const maskSpriteData = this._collectMaskSpriteData(sprite);
 
                         if (maskSpriteData.length > 0) {
                             // Configure stencil for mask erasing (DECR)
@@ -589,7 +817,7 @@ export class Scene2D {
             parallaxDy = camPos.y * (1 - sfy);
         }
 
-        // Compute AABB of transformed corners (unrolled — no temp arrays)
+        // Compute AABB of transformed corners (unrolled ΓÇö no temp arrays)
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         const cx0 = lx, cy0 = ly;
         const cx1 = lx + lw, cy1 = ly;
@@ -634,129 +862,110 @@ export class Scene2D {
     }
 
     /**
-     * Renders the 2D scene (standalone mode — owns the full frame).
+     * Renders the 2D scene (standalone mode ΓÇö owns the full frame).
      * Computes delta time, updates the camera and all nodes, then renders.
      * This is the simplest render loop: just call `scene2D.render()` each frame.
      */
-    public render(): void {
-        const dt = this._computeDeltaTime();
-        if (this.camera) {
-            this.camera.update(dt, this.engine.getRenderWidth(), this.engine.getRenderHeight());
-        }
-        this.update(dt);
+    public render(): void;
+    public render(deltaTime: number): void;
+    public render(deltaTime?: number): void {
         const engine = this.engine;
         engine.beginFrame();
-        this.renderContent(true, false);
+        this.renderContent(true, true, deltaTime);
         engine.endFrame();
     }
 
     /**
-     * Renders the scene content (clear, collect sprites, draw) without
-     * calling engine.beginFrame()/endFrame(). Useful for compositing
-     * multiple scenes in a single frame (e.g., 2D overlay on top of 3D).
-     *
-     * If `autoUpdate` is true (default), computes delta time and updates the
-     * camera and all nodes before rendering. Set to false only if you need
-     * manual control over the update step.
-     *
-     * @param clear - Whether to clear the framebuffer before rendering. Default: true.
-     * @param autoUpdate - Whether to automatically call camera.update() and scene.update(). Default: true.
+     * Renders the scene content without calling engine.beginFrame/endFrame.
+     * @param clear - Whether to clear the framebuffer before rendering.
+     * @param autoUpdate - Whether to automatically update camera and nodes.
+     * @param deltaTime - Optional caller-supplied delta time in seconds.
      */
-    public renderContent(clear: boolean = true, autoUpdate: boolean = true): void {
-        if (autoUpdate) {
-            const dt = this._computeDeltaTime();
-            if (this.camera) {
-                this.camera.update(dt, this.engine.getRenderWidth(), this.engine.getRenderHeight());
-            }
-            this.update(dt);
-        }
+    public renderContent(clear: boolean = true, autoUpdate: boolean = true, deltaTime?: number): void {
         const engine = this.engine;
 
         this.onBeforeRender.notifyObservers(this);
 
-        // Set GL viewport to full canvas (critical — without this, rendering uses stale viewport)
+        if (autoUpdate) {
+            const resolvedDeltaTime = deltaTime ?? this._computeDeltaTime();
+            if (this.camera) {
+                this.camera.update(resolvedDeltaTime, engine.getRenderWidth(), engine.getRenderHeight());
+            }
+            this.update(resolvedDeltaTime);
+        }
+
         engine.setViewport({ x: 0, y: 0, width: 1, height: 1 });
 
         const renderer = this._getBatchRenderer();
-
         if (clear) {
             engine.clear(this.backgroundColor, true, true, this._hasMasksLastFrame);
         }
 
         if (renderer.isReady) {
-            // Provide fallback texture for unused WebGPU texture slots
             renderer.fallbackTexture = this._getWhiteTexture();
-
-            // Reset mask tracking for this frame
             this._hasMasks = false;
-
-            // Collect visible sprites and detect masks
-            this._spriteDataPool.length = 0;
+            this._spriteDataCount = 0;
+            this._renderEntryCount = 0;
+            this._nextRenderInsertionOrder = 0;
+            this._renderEntries.length = 0;
             this._renderCommands.length = 0;
 
-            // First pass: collect render commands (detects masks)
             for (const root of this._rootNodes) {
-                this._collectRenderCommands(root, this._renderCommands);
+                this._collectRenderEntries(root, this._renderEntries, 1, 1, 1);
             }
-
-            // Collect overlay nodes (internal, not in rootNodes — e.g. transition overlays)
             for (const overlay of this._overlayNodes) {
-                this._collectRenderCommands(overlay, this._renderCommands);
+                this._collectRenderEntries(overlay, this._renderEntries, 1, 1, 1);
             }
 
-            // Always use the actual engine render dimensions for the projection
             const vpWidth = engine.getRenderWidth();
             const vpHeight = engine.getRenderHeight();
+            const viewTransform = this.camera ? this.camera.getViewTransform() : _identityViewTransform;
+            const camPos = this.camera ? this.camera.position : null;
+            const unlitMin = this.unlitSortingLayerMin;
 
             if (this._hasMasks) {
-                // Mask path: process render commands with push/pop mask orchestration
-                const viewTransform = this.camera ? this.camera.getViewTransform() : Matrix2D.Identity();
+                this._sortRenderEntries(this._renderEntries);
+                this._flattenRenderEntries(this._renderEntries, this._renderCommands);
 
-                // Pack light uniforms for the mask path
                 if (this.lightingManager) {
                     this.lightingManager.packLightUniforms(viewTransform.m);
                 }
 
-                const camPos = this.camera ? this.camera.position : null;
-                const unlitMin = this.unlitSortingLayerMin;
                 this._processRenderCommands(this._renderCommands, renderer, viewTransform, vpWidth, vpHeight, camPos, unlitMin);
-            } else if (this._spriteDataPool.length > 0) {
-                // Fast path (no masks): existing flat sort + batch render
-                this._spriteDataPool.sort((a, b) => {
-                    return a.sortingLayer !== b.sortingLayer ? a.sortingLayer - b.sortingLayer : a.zIndex - b.zIndex;
-                });
+            } else if (this._spriteDataCount > 0) {
+                const sortedSprites = this._sortedSpriteDataTemp;
+                sortedSprites.length = this._spriteDataCount;
+                for (let i = 0; i < this._spriteDataCount; i++) {
+                    sortedSprites[i] = this._spriteDataPool[i];
+                }
+                sortedSprites.sort(_compareSpriteRenderData);
 
-                const viewTransform = this.camera ? this.camera.getViewTransform() : Matrix2D.Identity();
-                const camPos = this.camera ? this.camera.position : null;
-
-                // Split lit / unlit sprites at the unlitSortingLayerMin boundary.
-                // Because the pool is sorted by sortingLayer, a binary search finds
-                // the first unlit sprite and we render two contiguous slices.
-                const unlitMin = this.unlitSortingLayerMin;
                 const hasLighting = this.lightingManager !== null;
                 const needsSplit = hasLighting && unlitMin !== Infinity;
-
                 if (needsSplit) {
-                    // Find first sprite at or above the unlit threshold
-                    let splitIdx = this._spriteDataPool.length;
-                    for (let i = 0; i < this._spriteDataPool.length; i++) {
-                        if (this._spriteDataPool[i].sortingLayer >= unlitMin) {
-                            splitIdx = i;
-                            break;
+                    const litSprites = this._litSpriteDataTemp;
+                    const unlitSprites = this._unlitSpriteDataTemp;
+                    litSprites.length = 0;
+                    unlitSprites.length = 0;
+
+                    for (let i = 0; i < sortedSprites.length; i++) {
+                        const sprite = sortedSprites[i];
+                        if (sprite.sortingLayer < unlitMin) {
+                            litSprites.push(sprite);
+                        } else {
+                            unlitSprites.push(sprite);
                         }
                     }
 
-                    // Render lit sprites
-                    if (splitIdx > 0) {
+                    if (litSprites.length > 0) {
                         this.lightingManager!.packLightUniforms(viewTransform.m);
                         renderer.lightingManager = this.lightingManager;
-                        renderer.render(this._spriteDataPool.slice(0, splitIdx), vpWidth, vpHeight, viewTransform, camPos);
+                        renderer.render(litSprites, vpWidth, vpHeight, viewTransform, camPos);
                     }
 
-                    // Render unlit sprites (HUD etc.)
-                    if (splitIdx < this._spriteDataPool.length) {
+                    if (unlitSprites.length > 0) {
                         renderer.lightingManager = null;
-                        renderer.render(this._spriteDataPool.slice(splitIdx), vpWidth, vpHeight, viewTransform, camPos);
+                        renderer.render(unlitSprites, vpWidth, vpHeight, viewTransform, camPos);
                     }
                 } else {
                     if (hasLighting) {
@@ -765,50 +974,55 @@ export class Scene2D {
                     } else {
                         renderer.lightingManager = null;
                     }
-                    renderer.render(this._spriteDataPool, vpWidth, vpHeight, viewTransform, camPos);
+                    renderer.render(sortedSprites, vpWidth, vpHeight, viewTransform, camPos);
                 }
             }
 
-            // Render debug overlays (after sprites, before onAfterRender)
             if (this.debugRenderer && this.debugRenderer.enabled) {
-                const debugViewTransform = this.camera ? this.camera.getViewTransform() : Matrix2D.Identity();
-                this.debugRenderer.render(debugViewTransform, vpWidth, vpHeight);
+                this.debugRenderer.render(viewTransform, vpWidth, vpHeight);
             }
         }
 
         this._hasMasksLastFrame = this._hasMasks;
         this.onAfterRender.notifyObservers(this);
     }
-
-    /**
-     * Disposes the scene and all its nodes
-     */
     public dispose(): void {
         if (this._isDisposed) {
             return;
         }
 
-        // Clear readiness polling
         if (this._executeWhenReadyTimeoutId !== null) {
             clearTimeout(this._executeWhenReadyTimeoutId);
             this._executeWhenReadyTimeoutId = null;
         }
 
-        // Dispose all root nodes (which will recursively dispose children)
         const rootsCopy = [...this._rootNodes];
         for (const node of rootsCopy) {
             node.dispose();
         }
 
+        const overlaysCopy = [...this._overlayNodes];
+        for (const overlay of overlaysCopy) {
+            overlay.dispose();
+        }
+
         this._rootNodes.length = 0;
         this._overlayNodes.length = 0;
         this._allNodes.clear();
+        this._renderEntries.length = 0;
+        this._renderCommands.length = 0;
+        this._sortedSpriteDataTemp.length = 0;
+        this._litSpriteDataTemp.length = 0;
+        this._unlitSpriteDataTemp.length = 0;
+        this._spriteBatchTemp.length = 0;
+        this._maskSpriteDataTemp.length = 0;
+        this._spriteDataCount = 0;
+        this._renderEntryCount = 0;
 
         if (this._camera) {
             this._camera._setScene(null);
             this._camera = null;
         }
-
 
         if (this._batchRenderer) {
             this._batchRenderer.dispose();
@@ -843,6 +1057,9 @@ export class Scene2D {
         this._isDisposed = true;
     }
 }
+
+
+
 
 
 

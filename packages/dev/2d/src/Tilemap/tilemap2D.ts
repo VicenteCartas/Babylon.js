@@ -1,7 +1,7 @@
 import type { BaseTexture } from "core/Materials/Textures/baseTexture";
 import { Logger } from "core/Misc/logger";
 
-import { Node2D } from "../Node2D/node2D";
+import { RenderableNode2D } from "../Node2D/renderableNode2D";
 import { Rectangle2D } from "../Math/rectangle2D";
 
 /**
@@ -29,10 +29,10 @@ export interface ITileAnimation {
 }
 
 /**
- * Represents a single layer of a tilemap. Extends Node2D so it participates
+ * Represents a single layer of a tilemap. Extends RenderableNode2D so it participates
  * in the scene graph with z-ordering.
  */
-export class TilemapLayer2D extends Node2D {
+export class TilemapLayer2D extends RenderableNode2D {
     /**
      * 2D array of tile IDs. 0 means empty/no tile.
      * Indexed as [row][col].
@@ -449,3 +449,4 @@ export class Tilemap2D {
         return new Rectangle2D(col * this.tileWidth, row * this.tileHeight, this.tileWidth, this.tileHeight);
     }
 }
+
