@@ -435,7 +435,7 @@ export class Node2D implements INode2D {
     }
 
     private _updateWorldTransform(): void {
-        Matrix2D.ComposeToRef(this.position, this._rotation, this.scale, this.pivot, this._skewX, this._skewY, this._localTransform);
+        Matrix2D._ComposeWithSkewToRef(this.position, this._rotation, this.scale, this.pivot, this._skewX, this._skewY, this._localTransform);
 
         if (this._parent) {
             this._parent.worldTransform.multiplyToRef(this._localTransform, this._worldTransform);

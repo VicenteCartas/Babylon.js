@@ -1,6 +1,7 @@
 import { Camera2D, ScaleMode } from "2d/Camera2D/camera2D";
 import { Node2D } from "2d/Node2D/node2D";
 import { Rectangle2D } from "2d/Math/rectangle2D";
+import { SpriteSheet } from "2d/SpriteSheet/spriteSheet";
 import { Vector2 } from "core/Maths/math.vector";
 
 describe("Camera2D", () => {
@@ -170,53 +171,52 @@ describe("Camera2D", () => {
     });
 });
 
-describe("SpriteSheet and AnimatedSprite2D", () => {
-    it("should define and retrieve animations from SpriteSheet", () => {
-        // SpriteSheet needs a texture, but we can test the animation definitions
-        // without actually rendering by using the API directly
-        const { SpriteSheet } = require("2d/SpriteSheet/spriteSheet");
+describe("SpriteSheet", () => {
+    it("should get correct frame rectangles from a grid sheet", () => {
+        const mockTexture = { getSize: () => ({ width: 40, height: 40 }) } as any;
+        const sheet = SpriteSheet.fromGrid(mockTexture, 16, 16, 2, 2);
 
-        // Create a mock texture with getSize
-        const mockTexture = { getSize: () => ({ width: 128, height: 128 }) };
-        const sheet = SpriteSheet.FromGrid(mockTexture, 32, 32);
+        expect(sheet.frameCount).toBe(4);
 
-        expect(sheet.frameCount).toBe(16); // 4x4 grid
+        const frame0 = sheet.getFrameRect(0, new Rectangle2D());
+        expect(frame0.x).toBe(2);
+        expect(frame0.y).toBe(2);
+        expect(frame0.width).toBe(16);
+        expect(frame0.height).toBe(16);
 
-        sheet.defineAnimation("walk", [0, 1, 2, 3], 10);
-        sheet.defineAnimation("idle", [4, 5], 5);
-
-        expect(sheet.getAnimationNames()).toContain("walk");
-        expect(sheet.getAnimationNames()).toContain("idle");
-
-        const walk = sheet.getAnimation("walk");
-        expect(walk).toBeDefined();
-        expect(walk!.frames).toEqual([0, 1, 2, 3]);
-        expect(walk!.frameRate).toBe(10);
+        const frame3 = sheet.getFrameRect(3, new Rectangle2D());
+        expect(frame3.x).toBe(20);
+        expect(frame3.y).toBe(20);
     });
 
-    it("should get correct frame rectangles from grid", () => {
-        const { SpriteSheet } = require("2d/SpriteSheet/spriteSheet");
-        const mockTexture = { getSize: () => ({ width: 128, height: 64 }) };
-        const sheet = SpriteSheet.FromGrid(mockTexture, 32, 32);
+    it("should preserve named atlas frames", () => {
+        const mockTexture = { getSize: () => ({ width: 128, height: 128 }) } as any;
+        const sheet = SpriteSheet.fromAtlasJson(mockTexture, {
+            frames: {
+                idle: { frame: { x: 4, y: 8, w: 16, h: 24 } },
+                run: { frame: { x: 32, y: 40, w: 20, h: 12 } },
+            },
+        } as any);
 
-        expect(sheet.frameCount).toBe(8); // 4 cols x 2 rows
-
-        const frame0 = sheet.getFrame(0);
-        expect(frame0.x).toBe(0);
-        expect(frame0.y).toBe(0);
-        expect(frame0.width).toBe(32);
-
-        const frame5 = sheet.getFrame(5); // row 1, col 1
-        expect(frame5.x).toBe(32);
-        expect(frame5.y).toBe(32);
+        const idle = sheet.getNamedFrameRect("idle", new Rectangle2D());
+        expect(idle).not.toBeNull();
+        expect(idle!.x).toBe(4);
+        expect(idle!.y).toBe(8);
+        expect(idle!.width).toBe(16);
+        expect(idle!.height).toBe(24);
     });
 
-    it("should return empty rectangle for out-of-bounds frame", () => {
-        const { SpriteSheet } = require("2d/SpriteSheet/spriteSheet");
-        const mockTexture = { getSize: () => ({ width: 64, height: 64 }) };
-        const sheet = SpriteSheet.FromGrid(mockTexture, 32, 32);
+    it("should return null for unknown named frames and zero rectangles for out-of-range indices", () => {
+        const mockTexture = { getSize: () => ({ width: 64, height: 64 }) } as any;
+        const sheet = SpriteSheet.fromGrid(mockTexture, 32, 32);
 
-        const frame = sheet.getFrame(99);
-        expect(frame.width).toBe(0);
+        const missingNameOut = new Rectangle2D(1, 2, 3, 4);
+        expect(sheet.getNamedFrameRect("missing", missingNameOut)).toBeNull();
+        expect(missingNameOut.width).toBe(0);
+        expect(missingNameOut.height).toBe(0);
+
+        const missingFrame = sheet.getFrameRect(99, new Rectangle2D(1, 2, 3, 4));
+        expect(missingFrame.width).toBe(0);
+        expect(missingFrame.height).toBe(0);
     });
 });

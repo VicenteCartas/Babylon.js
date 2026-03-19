@@ -19,34 +19,42 @@ interface IScissorEngine {
  */
 export class MaskStateManager {
     private _engine: AbstractEngine | null;
-    /** Stack tracking which type of mask was pushed (for correct pop behavior) */
-    private _maskTypeStack: ("rect" | "sprite")[] = [];
+    /** Stack tracking which mask backend was pushed (for correct pop behavior). */
+    private _maskTypeStack: ("rect" | "stencil")[] = [];
+    /** Stack of stencil inversion flags for restoring parent stencil state. */
+    private _stencilInversionStack: boolean[] = [];
     private _stencilLevel: number = 0;
-    /** Stack of active scissor rects in viewport pixels (Y-down) */
+    /** Stack of active scissor rects in viewport pixels (Y-down). */
     private _scissorRectStack: Rectangle2D[] = [];
-    /** Viewport height — needed for Y-down → GL-Y-up conversion in scissor calls */
+    /** Reusable scissor rect instances to avoid per-frame allocations. */
+    private _scissorRectPool: Rectangle2D[] = [];
+    /** Viewport height — needed for Y-down → GL-Y-up conversion in scissor calls. */
     private _viewportHeight: number = 0;
-    /** Whether the engine supports scissor test */
-    private _hasScissor: boolean;
-    /** Whether a stencil unavailability warning has been shown */
+    /** Engine scissor support, when available. */
+    private _scissorEngine: IScissorEngine | null;
+    /** Whether a stencil unavailability warning has been shown. */
     private _stencilWarnShown: boolean = false;
-    /** Reusable scratch Rectangle2D to avoid per-frame allocations */
-    private _tempRect: Rectangle2D = new Rectangle2D();
 
+    /**
+     * Creates a new mask state manager.
+     * @param engine - The engine whose GPU mask state will be managed.
+     */
     constructor(engine: AbstractEngine) {
         this._engine = engine;
-        this._hasScissor = "enableScissor" in engine;
+        this._scissorEngine = this._getScissorEngine(engine);
     }
 
     /**
-     * Whether any mask is currently active (used for fast-path branching)
+     * Whether any mask is currently active.
+     * @returns True when any mask is active.
      */
     public get hasMasks(): boolean {
         return this._maskTypeStack.length > 0;
     }
 
     /**
-     * Current stencil nesting depth (0 = no stencil masks active)
+     * Current stencil nesting depth (0 = no stencil masks active).
+     * @returns The active stencil nesting depth.
      */
     public get stencilLevel(): number {
         return this._stencilLevel;
@@ -55,59 +63,53 @@ export class MaskStateManager {
     /**
      * Sets the viewport height for scissor Y-flip calculations.
      * Must be called before any push operations each frame.
-     * @param height - Viewport height in pixels
+     * @param height - Viewport height in pixels.
+     * @returns Nothing.
      */
     public setViewportHeight(height: number): void {
         this._viewportHeight = height;
     }
 
     /**
-     * Push a rectangle mask. Enables scissor test with the intersection
-     * of the new rect and any currently active scissor rect.
-     * @param rect - The rectangle in viewport pixels (Y-down)
-     * @param inverted - Whether the mask is inverted (falls back to stencil)
+     * Pushes a rectangle mask.
+     * Non-inverted rect masks use the scissor stack; inverted rect masks use stencil.
+     * @param rect - The rectangle in viewport pixels (Y-down).
+     * @param inverted - Whether the mask is inverted.
+     * @returns Nothing.
      */
     public pushRectMask(rect: Rectangle2D, inverted: boolean): void {
         if (inverted) {
-            // Inverted rect masks use stencil (scissor can't clip AWAY from a rect)
-            this._pushStencilMask(inverted);
-            this._maskTypeStack.push("sprite"); // Uses stencil path for pop
+            this._pushStencilMask(true);
+            this._maskTypeStack.push("stencil");
             return;
         }
 
-        // Compute the effective scissor rect (intersection with current stack top)
-        let effectiveRect: Rectangle2D;
+        const effectiveRect = this._acquireScissorRect();
         if (this._scissorRectStack.length > 0) {
-            Rectangle2D.IntersectToRef(this._scissorRectStack[this._scissorRectStack.length - 1], rect, this._tempRect);
-            effectiveRect = this._tempRect.clone();
+            this._scissorRectStack[this._scissorRectStack.length - 1].intersectToRef(rect, effectiveRect);
         } else {
-            effectiveRect = rect.clone();
+            effectiveRect.copyFrom(rect);
         }
 
         this._scissorRectStack.push(effectiveRect);
         this._maskTypeStack.push("rect");
-
-        // Apply the scissor rect (convert Y-down to GL Y-up)
         this._applyScissor(effectiveRect);
     }
 
     /**
-     * Push a sprite stencil mask. Expects the caller to have already:
-     * 1. Flushed the current sprite batch
-     * 2. Rendered the mask sprite into the stencil buffer with INCR
-     *
-     * This method configures stencil state for the subsequent masked content.
-     * @param inverted - Whether the mask is inverted
+     * Pushes a sprite stencil mask. The caller must already have flushed the batch
+     * and rendered the mask shape into the stencil buffer.
+     * @param inverted - Whether the mask is inverted.
+     * @returns Nothing.
      */
     public pushSpriteMask(inverted: boolean): void {
         this._pushStencilMask(inverted);
-        this._maskTypeStack.push("sprite");
+        this._maskTypeStack.push("stencil");
     }
 
     /**
-     * Pop the most recent mask. The caller must flush the sprite batch
-     * before calling this. For sprite masks, the caller must also
-     * re-render the mask sprite with DECR before calling this.
+     * Pops the most recent mask and restores the previous GPU mask state.
+     * @returns Nothing.
      */
     public popMask(): void {
         if (this._maskTypeStack.length === 0) {
@@ -115,130 +117,177 @@ export class MaskStateManager {
         }
 
         const maskType = this._maskTypeStack.pop()!;
-
         if (maskType === "rect") {
-            this._scissorRectStack.pop();
+            const rect = this._scissorRectStack.pop();
+            if (rect) {
+                this._scissorRectPool.push(rect);
+            }
+
             if (this._scissorRectStack.length > 0) {
-                // Restore the parent scissor rect
                 this._applyScissor(this._scissorRectStack[this._scissorRectStack.length - 1]);
             } else {
-                // No more scissor masks — disable
                 this._disableScissor();
             }
+            return;
+        }
+
+        this._stencilInversionStack.pop();
+        this._stencilLevel--;
+
+        const engine = this._engine;
+        if (!engine) {
+            return;
+        }
+
+        if (this._stencilLevel > 0) {
+            this._applyStencilContentState(this._stencilLevel, this._stencilInversionStack[this._stencilInversionStack.length - 1]);
         } else {
-            // Sprite mask — decrement stencil level
-            this._stencilLevel--;
-            const engine = this._engine!;
-            if (this._stencilLevel > 0) {
-                // Restore stencil test for the parent mask level
-                engine.setStencilBuffer(true);
-                engine.setStencilMask(0x00);
-                engine.setStencilFunction(Constants.EQUAL);
-                engine.setStencilFunctionReference(this._stencilLevel);
-                engine.setStencilOperationPass(Constants.KEEP);
-                engine.setStencilOperationFail(Constants.KEEP);
-                engine.setStencilOperationDepthFail(Constants.KEEP);
-            } else {
-                // No more stencil masks — disable stencil test
-                engine.setStencilBuffer(false);
-            }
+            engine.setStencilBuffer(false);
         }
     }
 
     /**
-     * Configure stencil state for rendering a mask sprite INTO the stencil buffer.
-     * Call this BEFORE rendering the mask sprite. After rendering, call pushSpriteMask().
+     * Configures stencil state for writing the next mask shape into stencil.
+     * Nested mask writes are clipped by the current stencil-visible region.
+     * @returns Nothing.
      * @internal
      */
     public beginStencilMaskWrite(): void {
-        const engine = this._engine!;
-
-        // Check stencil buffer availability
-        if (!this._stencilWarnShown && !(engine as any).isStencilEnable) {
-            Logger.Warn("SpriteMask2D requires a stencil buffer. Enable stencil in the engine options.");
-            this._stencilWarnShown = true;
+        const engine = this._engine;
+        if (!engine) {
+            return;
         }
 
+        this._warnIfStencilUnavailable();
+
         engine.setStencilBuffer(true);
-        engine.setStencilFunctionReference(this._stencilLevel);
-        engine.setStencilFunction(Constants.ALWAYS);
+        engine.setStencilMask(0xff);
+
+        if (this._stencilLevel > 0) {
+            engine.setStencilFunction(this._stencilInversionStack[this._stencilInversionStack.length - 1] ? Constants.NOTEQUAL : Constants.EQUAL);
+            engine.setStencilFunctionReference(this._stencilLevel);
+        } else {
+            engine.setStencilFunction(Constants.ALWAYS);
+            engine.setStencilFunctionReference(0);
+        }
+
         engine.setStencilOperationPass(Constants.INCR);
         engine.setStencilOperationFail(Constants.KEEP);
         engine.setStencilOperationDepthFail(Constants.KEEP);
-        engine.setStencilMask(0xff);
     }
 
     /**
-     * Configure stencil state for erasing a mask sprite FROM the stencil buffer.
-     * Call this BEFORE re-rendering the mask sprite on pop. The stencil operation
-     * uses DECR to undo the INCR from the original write.
+     * Configures stencil state for erasing the current mask shape from stencil.
+     * @returns Nothing.
      * @internal
      */
     public beginStencilMaskErase(): void {
-        const engine = this._engine!;
+        const engine = this._engine;
+        if (!engine) {
+            return;
+        }
+
+        this._warnIfStencilUnavailable();
+
         engine.setStencilBuffer(true);
+        engine.setStencilMask(0xff);
+        engine.setStencilFunction(Constants.EQUAL);
         engine.setStencilFunctionReference(this._stencilLevel);
-        engine.setStencilFunction(Constants.ALWAYS);
         engine.setStencilOperationPass(Constants.DECR);
         engine.setStencilOperationFail(Constants.KEEP);
         engine.setStencilOperationDepthFail(Constants.KEEP);
-        engine.setStencilMask(0xff);
     }
 
     /**
-     * Reset all mask state. Called at the start of each frame.
+     * Resets all mask state. Called at the start of each frame.
+     * @returns Nothing.
      */
     public reset(): void {
         this._maskTypeStack.length = 0;
-        this._scissorRectStack.length = 0;
+        this._stencilInversionStack.length = 0;
+        while (this._scissorRectStack.length > 0) {
+            this._scissorRectPool.push(this._scissorRectStack.pop()!);
+        }
         this._stencilLevel = 0;
         this._disableScissor();
-        this._engine!.setStencilBuffer(false);
+
+        const engine = this._engine;
+        if (!engine) {
+            return;
+        }
+
+        engine.setStencilBuffer(false);
     }
 
     /**
-     * Dispose and release references.
+     * Disposes and releases references.
+     * @returns Nothing.
      */
     public dispose(): void {
-        this._maskTypeStack.length = 0;
-        this._scissorRectStack.length = 0;
-        this._stencilLevel = 0;
+        this.reset();
         this._engine = null;
+        this._scissorEngine = null;
     }
 
-    // -----------------------------------------------------------------------
-    // Internals
-    // -----------------------------------------------------------------------
-
     private _pushStencilMask(inverted: boolean): void {
+        this._warnIfStencilUnavailable();
+        this._stencilInversionStack.push(inverted);
         this._stencilLevel++;
-        const engine = this._engine!;
-        engine.setStencilBuffer(true);
-        engine.setStencilMask(0x00); // Don't write during content rendering
-        if (inverted) {
-            engine.setStencilFunction(Constants.NOTEQUAL);
-        } else {
-            engine.setStencilFunction(Constants.EQUAL);
+        this._applyStencilContentState(this._stencilLevel, inverted);
+    }
+
+    private _applyStencilContentState(level: number, inverted: boolean): void {
+        const engine = this._engine;
+        if (!engine) {
+            return;
         }
-        engine.setStencilFunctionReference(this._stencilLevel);
+
+        engine.setStencilBuffer(true);
+        engine.setStencilMask(0x00);
+        engine.setStencilFunction(inverted ? Constants.NOTEQUAL : Constants.EQUAL);
+        engine.setStencilFunctionReference(level);
         engine.setStencilOperationPass(Constants.KEEP);
         engine.setStencilOperationFail(Constants.KEEP);
         engine.setStencilOperationDepthFail(Constants.KEEP);
     }
 
     private _applyScissor(rect: Rectangle2D): void {
-        if (!this._hasScissor) {
+        if (!this._scissorEngine) {
             return;
         }
-        // Convert Y-down viewport coords to GL Y-up
+
         const glY = this._viewportHeight - rect.y - rect.height;
-        (this._engine as unknown as IScissorEngine).enableScissor(rect.x, glY, rect.width, rect.height);
+        this._scissorEngine.enableScissor(rect.x, glY, rect.width, rect.height);
     }
 
     private _disableScissor(): void {
-        if (!this._hasScissor) {
+        if (!this._scissorEngine) {
             return;
         }
-        (this._engine as unknown as IScissorEngine).disableScissor();
+
+        this._scissorEngine.disableScissor();
+    }
+
+    private _acquireScissorRect(): Rectangle2D {
+        return this._scissorRectPool.pop() ?? new Rectangle2D();
+    }
+
+    private _warnIfStencilUnavailable(): void {
+        const engine = this._engine;
+        if (!engine || this._stencilWarnShown || engine.isStencilEnable) {
+            return;
+        }
+
+        Logger.Warn("2D masking requires a stencil buffer for SpriteMask2D and inverted RectMask2D. Enable stencil in the engine options.");
+        this._stencilWarnShown = true;
+    }
+
+    private _getScissorEngine(engine: AbstractEngine): IScissorEngine | null {
+        const scissorEngine = engine as AbstractEngine & Partial<IScissorEngine>;
+        if (typeof scissorEngine.enableScissor !== "function" || typeof scissorEngine.disableScissor !== "function") {
+            return null;
+        }
+
+        return scissorEngine as AbstractEngine & IScissorEngine;
     }
 }

@@ -1,217 +1,395 @@
+import type { AbstractEngine } from "core/Engines/abstractEngine";
 import type { Effect } from "core/Materials/effect";
-import { Vector2 } from "core/Maths/math.vector";
 import { Color4 } from "core/Maths/math.color";
+import { Vector2 } from "core/Maths/math.vector";
 
 /**
- * Types of 2D lights
+ * Types of 2D lights.
  */
 export enum LightType2D {
     /**
-     * Point light — radiates in all directions from a position
+     * Point light — radiates in all directions from a position.
      */
     Point = 0,
     /**
-     * Spotlight — a cone-shaped light
+     * Spotlight — a cone-shaped light.
      */
     Spot = 1,
     /**
-     * Ambient light — uniform light everywhere (no position, no falloff)
+     * Ambient light — uniform light everywhere (no position, no falloff).
      */
     Ambient = 2,
 }
 
 /**
- * Lighting rendering mode
+ * Lighting rendering mode.
  */
 export enum LightingMode2D {
     /**
-     * Forward: lights computed in the sprite fragment shader (fast, max 16 lights)
+     * Forward: lights computed in the sprite fragment shader.
      */
     Forward = 0,
     /**
-     * Deferred: sprites render to RT, then a fullscreen lighting pass composites
+     * Deferred: reserved for a future fullscreen lighting pass.
      */
     Deferred = 1,
 }
 
 /**
  * Maximum number of lights supported in forward mode.
- * Each light requires 4 uniform vec4s, so 16 lights = 64 vec4s.
  */
 export const MAX_FORWARD_LIGHTS = 16;
 
+const _FLOATS_PER_LIGHT = 16;
+const _DEFAULT_LIGHT_RADIUS = 200;
+const _DEFAULT_SPOT_CONE_ANGLE = Math.PI / 6;
+const _DEFAULT_SPOT_DIRECTION_X = 1;
+const _DEFAULT_SPOT_DIRECTION_Y = 0;
+const _DEFAULT_Z_HEIGHT = 50;
+
+function _clamp01(value: number): number {
+    return Math.min(1, Math.max(0, value));
+}
+
 /**
- * A 2D light source for dynamic lighting effects.
- * Supports point lights, spotlights, and ambient lighting.
- * Light data is packed into GPU uniforms for shader-based rendering.
+ * A dynamic 2D light source.
  */
 export class Light2D {
     /**
-     * World position of the light
+     * World-space position (Y-down, pixels). Ignored for ambient lights.
      */
-    public position: Vector2 = Vector2.Zero();
+    public position: Vector2;
 
     /**
-     * Light color and intensity (alpha channel controls intensity)
+     * Light color. Alpha is not used for brightness.
      */
-    public color: Color4 = new Color4(1, 1, 1, 1);
+    public color: Color4;
 
     /**
-     * Maximum reach of the light in pixels. Beyond this distance, intensity is zero.
+     * Maximum radius in pixels. Ignored for ambient lights.
      */
-    public radius: number = 200;
+    public radius: number;
 
     /**
-     * Type of light (point, spot, ambient)
+     * Light type.
      */
-    public type: LightType2D = LightType2D.Point;
+    public type: LightType2D;
 
     /**
-     * Intensity multiplier (0-∞). Default: 1
+     * Brightness multiplier [0..∞].
      */
-    public intensity: number = 1;
+    public intensity: number;
 
     /**
-     * Falloff exponent. Higher values = sharper falloff. Default: 2 (quadratic)
+     * Falloff exponent. Ignored for ambient lights.
      */
-    public falloff: number = 2;
+    public falloff: number;
 
     /**
-     * Whether this light is active
+     * Whether the light is active.
      */
-    public enabled: boolean = true;
+    public enabled: boolean;
 
     /**
-     * For spotlights: the direction the light points (normalized)
+     * Compatibility layer bitmask retained for backward compatibility.
      */
-    public direction: Vector2 = new Vector2(0, 1);
+    public layer: number;
 
     /**
-     * For spotlights: the inner cone angle in radians (full intensity)
+     * Z-height of the light above the sprite plane.
      */
-    public innerAngle: number = Math.PI / 6;
+    public zHeight: number;
+
+    private _spotAngle: number;
+    private _spotConeAngle: number;
+    private _spotSoftness: number;
+    private _direction: Vector2;
+    private _innerAngle: number;
+    private _outerAngle: number;
 
     /**
-     * For spotlights: the outer cone angle in radians (fades to zero)
+     * Direction of the spotlight cone in radians.
      */
-    public outerAngle: number = Math.PI / 4;
+    public get spotAngle(): number {
+        return this._spotAngle;
+    }
+
+    public set spotAngle(value: number) {
+        this._spotAngle = value;
+        this._syncDirectionFromAngle();
+    }
 
     /**
-     * Collision layer bitmask — only affects sprites on matching layers
+     * Half-angle of the spot cone in radians.
      */
-    public layer: number = 0xffffffff;
+    public get spotConeAngle(): number {
+        return this._spotConeAngle;
+    }
+
+    public set spotConeAngle(value: number) {
+        this._spotConeAngle = value;
+        this._outerAngle = value;
+        this._innerAngle = value * (1 - this._spotSoftness);
+    }
 
     /**
-     * Creates a new Light2D
-     * @param type - The type of light
-     * @param position - World position
-     * @param color - Light color
-     * @param radius - Light radius in pixels
+     * Softness of the spot cone edge [0..1].
      */
-    constructor(type: LightType2D = LightType2D.Point, position: Vector2 = Vector2.Zero(), color: Color4 = new Color4(1, 1, 1, 1), radius: number = 200) {
-        this.type = type;
+    public get spotSoftness(): number {
+        return this._spotSoftness;
+    }
+
+    public set spotSoftness(value: number) {
+        this._spotSoftness = _clamp01(value);
+        this._innerAngle = this._outerAngle * (1 - this._spotSoftness);
+        this._spotConeAngle = this._outerAngle;
+    }
+
+    /**
+     * Backward-compatible spotlight direction vector.
+     */
+    public get direction(): Vector2 {
+        return this._direction;
+    }
+
+    public set direction(value: Vector2) {
+        this._direction.copyFrom(value);
+        this._spotAngle = Math.atan2(value.y, value.x);
+    }
+
+    /**
+     * Backward-compatible inner spotlight angle.
+     */
+    public get innerAngle(): number {
+        return this._innerAngle;
+    }
+
+    public set innerAngle(value: number) {
+        this._innerAngle = value;
+        this._spotSoftness = this._outerAngle > 0 ? _clamp01(1 - value / this._outerAngle) : 0;
+    }
+
+    /**
+     * Backward-compatible outer spotlight angle.
+     */
+    public get outerAngle(): number {
+        return this._outerAngle;
+    }
+
+    public set outerAngle(value: number) {
+        this._outerAngle = value;
+        this._spotConeAngle = value;
+        this._spotSoftness = value > 0 ? _clamp01(1 - this._innerAngle / value) : 0;
+    }
+
+    /**
+     * Creates a new light.
+     * @param type - Optional light type.
+     * @param position - Optional initial world position.
+     * @param color - Optional initial light color.
+     * @param radius - Optional initial light radius.
+     */
+    constructor(
+        type: LightType2D = LightType2D.Point,
+        position: Vector2 = Vector2.Zero(),
+        color: Color4 = new Color4(1, 1, 1, 1),
+        radius: number = _DEFAULT_LIGHT_RADIUS
+    ) {
         this.position = position;
         this.color = color;
         this.radius = radius;
+        this.type = type;
+        this.intensity = 1;
+        this.falloff = 2;
+        this.enabled = true;
+        this.layer = 0xffffffff;
+        this.zHeight = _DEFAULT_Z_HEIGHT;
+        this._spotAngle = 0;
+        this._spotConeAngle = _DEFAULT_SPOT_CONE_ANGLE;
+        this._spotSoftness = 0;
+        this._direction = new Vector2(_DEFAULT_SPOT_DIRECTION_X, _DEFAULT_SPOT_DIRECTION_Y);
+        this._innerAngle = _DEFAULT_SPOT_CONE_ANGLE;
+        this._outerAngle = _DEFAULT_SPOT_CONE_ANGLE;
+        this._syncDirectionFromAngle();
+    }
+
+    /**
+     * Disposes the light.
+     * @returns Nothing.
+     */
+    public dispose(): void {
+        // No GPU resources are owned by individual lights today.
+    }
+
+    private _syncDirectionFromAngle(): void {
+        this._direction.x = Math.cos(this._spotAngle);
+        this._direction.y = Math.sin(this._spotAngle);
     }
 }
 
 /**
- * Packed light data for GPU upload.
- * Each light is encoded into 4 vec4 uniforms:
- * - lightData[i*4+0]: (posX, posY, radius, type)
- * - lightData[i*4+1]: (colorR, colorG, colorB, intensity)
- * - lightData[i*4+2]: (dirX, dirY, innerAngle, outerAngle)
- * - lightData[i*4+3]: (falloff, 0, 0, 0)
- */
-const _FLOATS_PER_LIGHT = 16; // 4 vec4s
-
-/**
- * Manages a collection of 2D lights and uploads their data to GPU uniforms.
- * Supports two rendering modes:
- * - **Forward**: light calculations happen in the sprite fragment shader (max 16 lights)
- * - **Deferred**: sprites render to a render target, then a fullscreen lighting pass composites
+ * Manages a collection of Light2D instances and uploads their data to the GPU.
  */
 export class LightingManager2D {
     /**
-     * Ambient light color applied to everything. Default: dark gray
+     * Rendering mode.
      */
-    public ambientColor: Color4 = new Color4(0.2, 0.2, 0.2, 1);
+    public mode: LightingMode2D;
 
     /**
-     * Lighting rendering mode
+     * Ambient light color applied when no ambient light exists.
      */
-    public mode: LightingMode2D = LightingMode2D.Forward;
-
-    private _lights: Light2D[] = [];
+    public ambientColor: Color4;
 
     /**
-     * Pre-allocated float array for light uniform data (max 16 lights × 16 floats)
+     * Darkening factor applied to unlit areas [0..1].
      */
-    private _lightUniformData: Float32Array = new Float32Array(MAX_FORWARD_LIGHTS * _FLOATS_PER_LIGHT);
+    public get shadowStrength(): number {
+        return this._shadowStrength;
+    }
+
+    public set shadowStrength(value: number) {
+        this._shadowStrength = _clamp01(value);
+    }
+
+    private _activeLightCount: number;
+    private _lightDataArray: Float32Array;
+    private _lights: Light2D[];
+    private _lightRegistrationOrder: Map<Light2D, number>;
+    private _nextLightRegistrationOrder: number;
+    private _shadowStrength: number;
+    private _sortedLights: Light2D[];
 
     /**
-     * Number of active lights packed into the uniform data
+     * All registered lights.
      */
-    private _activeLightCount: number = 0;
-
-    /**
-     * All lights in the scene
-     */
-    public get lights(): readonly Light2D[] {
+    public get lights(): ReadonlyArray<Light2D> {
         return this._lights;
     }
 
     /**
-     * Number of active (enabled) lights, clamped to MAX_FORWARD_LIGHTS in forward mode
+     * Number of active lights selected for forward rendering.
      */
     public get activeLightCount(): number {
         return this._activeLightCount;
     }
 
     /**
-     * Adds a light to the manager
-     * @param light - The light to add
+     * Creates a new lighting manager.
+     * @param engine - Optional engine reference retained for future GPU resource ownership.
+     */
+    constructor(engine?: AbstractEngine) {
+        void engine;
+        this.mode = LightingMode2D.Forward;
+        this.ambientColor = new Color4(0, 0, 0, 1);
+        this.shadowStrength = 0;
+        this._activeLightCount = 0;
+        this._lightDataArray = new Float32Array(MAX_FORWARD_LIGHTS * _FLOATS_PER_LIGHT);
+        this._lights = [];
+        this._lightRegistrationOrder = new Map();
+        this._nextLightRegistrationOrder = 0;
+        this._shadowStrength = 0;
+        this._sortedLights = [];
+    }
+
+    /**
+     * Registers a light.
+     * @param light - The light to register.
+     * @returns Nothing.
      */
     public addLight(light: Light2D): void {
+        if (this._lights.indexOf(light) !== -1) {
+            return;
+        }
+
         this._lights.push(light);
+        this._lightRegistrationOrder.set(light, this._nextLightRegistrationOrder++);
     }
 
     /**
-     * Removes a light from the manager
-     * @param light - The light to remove
+     * Removes a light.
+     * @param light - The light to remove.
+     * @returns Nothing.
      */
     public removeLight(light: Light2D): void {
-        const idx = this._lights.indexOf(light);
-        if (idx !== -1) {
-            this._lights.splice(idx, 1);
+        const index = this._lights.indexOf(light);
+        if (index === -1) {
+            return;
         }
+
+        this._lights.splice(index, 1);
+        this._lightRegistrationOrder.delete(light);
     }
 
     /**
-     * Creates a point light and adds it to the manager
-     * @param x - World X position
-     * @param y - World Y position
-     * @param color - Light color
-     * @param radius - Light radius
-     * @returns The created light
+     * Uploads spec-aligned light uniforms to an effect.
+     * @param effect - The effect receiving the uniform data.
+     * @param cameraPosition - Camera center in world space for light prioritization.
+     * @returns Nothing.
      */
-    public createPointLight(x: number, y: number, color: Color4 = new Color4(1, 1, 1, 1), radius: number = 200): Light2D {
+    public uploadUniforms(effect: Effect, cameraPosition: Vector2): void {
+        const selectedLights = this._selectLights(cameraPosition);
+        const data = this._lightDataArray;
+        data.fill(0);
+
+        let count = 0;
+        for (let i = 0; i < selectedLights.length && count < MAX_FORWARD_LIGHTS; i++) {
+            const light = selectedLights[i];
+            const offset = count * _FLOATS_PER_LIGHT;
+
+            data[offset] = light.position.x;
+            data[offset + 1] = light.position.y;
+            data[offset + 2] = light.radius;
+            data[offset + 3] = light.type;
+
+            data[offset + 4] = light.color.r;
+            data[offset + 5] = light.color.g;
+            data[offset + 6] = light.color.b;
+            data[offset + 7] = light.intensity;
+
+            data[offset + 8] = light.falloff;
+            data[offset + 9] = light.spotAngle;
+            data[offset + 10] = light.spotConeAngle;
+            data[offset + 11] = light.spotSoftness;
+
+            data[offset + 12] = light.zHeight;
+            data[offset + 13] = 0;
+            data[offset + 14] = 0;
+            data[offset + 15] = 0;
+            count++;
+        }
+
+        this._activeLightCount = count;
+        effect.setInt("activeLightCount", count);
+        effect.setFloat3("ambientColor", this.ambientColor.r, this.ambientColor.g, this.ambientColor.b);
+        effect.setFloat("shadowStrength", this.shadowStrength);
+        effect.setFloatArray("lightData", data);
+    }
+
+    /**
+     * Creates and registers a point light.
+     * @param x - World X position.
+     * @param y - World Y position.
+     * @param color - Optional light color.
+     * @param radius - Optional light radius.
+     * @returns The created light.
+     */
+    public createPointLight(x: number, y: number, color: Color4 = new Color4(1, 1, 1, 1), radius: number = _DEFAULT_LIGHT_RADIUS): Light2D {
         const light = new Light2D(LightType2D.Point, new Vector2(x, y), color, radius);
         this.addLight(light);
         return light;
     }
 
     /**
-     * Creates a spotlight and adds it to the manager
-     * @param x - World X position
-     * @param y - World Y position
-     * @param direction - Light direction
-     * @param color - Light color
-     * @param radius - Light radius
-     * @param innerAngle - Inner cone angle in radians
-     * @param outerAngle - Outer cone angle in radians
-     * @returns The created light
+     * Creates and registers a spotlight.
+     * @param x - World X position.
+     * @param y - World Y position.
+     * @param direction - Spotlight direction vector.
+     * @param color - Optional light color.
+     * @param radius - Optional light radius.
+     * @param innerAngle - Optional inner cone angle.
+     * @param outerAngle - Optional outer cone angle.
+     * @returns The created light.
      */
     public createSpotLight(
         x: number,
@@ -219,8 +397,8 @@ export class LightingManager2D {
         direction: Vector2,
         color: Color4 = new Color4(1, 1, 1, 1),
         radius: number = 300,
-        innerAngle: number = Math.PI / 6,
-        outerAngle: number = Math.PI / 4
+        innerAngle: number = _DEFAULT_SPOT_CONE_ANGLE,
+        outerAngle: number = _DEFAULT_SPOT_CONE_ANGLE
     ): Light2D {
         const light = new Light2D(LightType2D.Spot, new Vector2(x, y), color, radius);
         light.direction = direction;
@@ -231,97 +409,71 @@ export class LightingManager2D {
     }
 
     /**
-     * Packs enabled light data into a float array for GPU upload.
-     * Call this once per frame before rendering.
-     * @param cameraM - Optional 3x2 camera view matrix (Float32Array of 6 elements).
-     *                  When provided, light positions are transformed to view space.
-     * @returns The number of active lights packed
+     * Removes all registered lights.
+     * @returns Nothing.
      */
-    public packLightUniforms(cameraM?: Float32Array): number {
-        const data = this._lightUniformData;
-        let count = 0;
-        const maxLights = MAX_FORWARD_LIGHTS;
+    public clear(): void {
+        this._lights.length = 0;
+        this._lightRegistrationOrder.clear();
+        this._nextLightRegistrationOrder = 0;
+        this._sortedLights.length = 0;
+        this._activeLightCount = 0;
+        this._lightDataArray.fill(0);
+    }
 
-        for (let i = 0; i < this._lights.length && count < maxLights; i++) {
+    /**
+     * Disposes the manager.
+     * @returns Nothing.
+     */
+    public dispose(): void {
+        this.clear();
+    }
+
+    private _selectLights(cameraPosition?: Vector2): Light2D[] {
+        const sortedLights = this._sortedLights;
+        sortedLights.length = 0;
+
+        for (let i = 0; i < this._lights.length; i++) {
             const light = this._lights[i];
             if (!light.enabled) {
                 continue;
             }
 
-            const offset = count * _FLOATS_PER_LIGHT;
-
-            // Transform position to view space if camera provided
-            let px = light.position.x;
-            let py = light.position.y;
-            if (cameraM) {
-                px = cameraM[0] * light.position.x + cameraM[2] * light.position.y + cameraM[4];
-                py = cameraM[1] * light.position.x + cameraM[3] * light.position.y + cameraM[5];
-            }
-
-            // vec4 0: (posX, posY, radius, type)
-            data[offset] = px;
-            data[offset + 1] = py;
-            data[offset + 2] = light.radius;
-            data[offset + 3] = light.type;
-
-            // vec4 1: (colorR, colorG, colorB, intensity)
-            data[offset + 4] = light.color.r;
-            data[offset + 5] = light.color.g;
-            data[offset + 6] = light.color.b;
-            data[offset + 7] = light.intensity;
-
-            // vec4 2: (dirX, dirY, innerAngle, outerAngle) — direction also needs rotation
-            let dx = light.direction.x;
-            let dy = light.direction.y;
-            if (cameraM) {
-                // Transform direction (rotation only, no translation)
-                dx = cameraM[0] * light.direction.x + cameraM[2] * light.direction.y;
-                dy = cameraM[1] * light.direction.x + cameraM[3] * light.direction.y;
-            }
-            data[offset + 8] = dx;
-            data[offset + 9] = dy;
-            data[offset + 10] = light.innerAngle;
-            data[offset + 11] = light.outerAngle;
-
-            // vec4 3: (falloff, 0, 0, 0)
-            data[offset + 12] = light.falloff;
-            data[offset + 13] = 0;
-            data[offset + 14] = 0;
-            data[offset + 15] = 0;
-
-            count++;
+            sortedLights.push(light);
         }
 
-        this._activeLightCount = count;
-        return count;
-    }
-
-    /**
-     * Binds light uniform data to an Effect for forward rendering.
-     * Must call packLightUniforms() first.
-     * @param effect - The shader effect to bind uniforms to
-     */
-    public bindToEffect(effect: Effect): void {
-        effect.setInt("lightCount", this._activeLightCount);
-        effect.setFloat4("ambientLight", this.ambientColor.r, this.ambientColor.g, this.ambientColor.b, this.ambientColor.a);
-
-        if (this._activeLightCount > 0) {
-            effect.setArray4("lightData", Array.from(this._lightUniformData.subarray(0, this._activeLightCount * _FLOATS_PER_LIGHT)));
+        if (sortedLights.length <= MAX_FORWARD_LIGHTS) {
+            return sortedLights;
         }
+
+        sortedLights.sort((left, right) => {
+            const leftDistance = this._getPriorityDistanceSquared(left, cameraPosition);
+            const rightDistance = this._getPriorityDistanceSquared(right, cameraPosition);
+            if (leftDistance !== rightDistance) {
+                return leftDistance - rightDistance;
+            }
+
+            if (left.intensity !== right.intensity) {
+                return right.intensity - left.intensity;
+            }
+
+            return this._getLightRegistrationOrder(left) - this._getLightRegistrationOrder(right);
+        });
+
+        return sortedLights;
     }
 
-    /**
-     * Removes all lights
-     */
-    public clear(): void {
-        this._lights.length = 0;
-        this._activeLightCount = 0;
+    private _getLightRegistrationOrder(light: Light2D): number {
+        return this._lightRegistrationOrder.get(light) ?? Number.MAX_SAFE_INTEGER;
     }
 
-    /**
-     * Disposes the lighting manager
-     */
-    public dispose(): void {
-        this.clear();
+    private _getPriorityDistanceSquared(light: Light2D, cameraPosition?: Vector2): number {
+        if (light.type === LightType2D.Ambient || !cameraPosition) {
+            return 0;
+        }
+
+        const dx = light.position.x - cameraPosition.x;
+        const dy = light.position.y - cameraPosition.y;
+        return dx * dx + dy * dy;
     }
 }

@@ -1,251 +1,299 @@
 import { Vector2 } from "core/Maths/math.vector";
 
 /**
- * A 3x2 affine transformation matrix for 2D operations.
- * Stored as [a, b, c, d, tx, ty] representing:
- * | a  c  tx |
- * | b  d  ty |
- * | 0  0  1  |
+ * A 3×3 2D affine transformation matrix stored as 6 values in column-major order.
+ * Layout: [m00, m10, m01, m11, m02, m12].
  */
 export class Matrix2D {
     /**
-     * The matrix values in column-major order: [a, b, c, d, tx, ty]
+     * The matrix values in column-major order.
      */
-    public m: Float32Array;
+    public readonly m: Float32Array;
 
     /**
-     * Creates a new Matrix2D
-     * @param a - Scale X / Rotation component
-     * @param b - Skew Y component
-     * @param c - Skew X component
-     * @param d - Scale Y / Rotation component
-     * @param tx - Translation X
-     * @param ty - Translation Y
+     * Creates a new Matrix2D.
+     * @param m00 - First column X component.
+     * @param m10 - First column Y component.
+     * @param m01 - Second column X component.
+     * @param m11 - Second column Y component.
+     * @param m02 - Translation X component.
+     * @param m12 - Translation Y component.
      */
-    constructor(a: number = 1, b: number = 0, c: number = 0, d: number = 1, tx: number = 0, ty: number = 0) {
-        this.m = new Float32Array([a, b, c, d, tx, ty]);
+    constructor(m00: number = 1, m10: number = 0, m01: number = 0, m11: number = 1, m02: number = 0, m12: number = 0) {
+        this.m = new Float32Array(6);
+        this.m[0] = m00;
+        this.m[1] = m10;
+        this.m[2] = m01;
+        this.m[3] = m11;
+        this.m[4] = m02;
+        this.m[5] = m12;
     }
 
     /**
-     * Returns the value at the specified index
-     * @param index - The index (0-5)
-     * @returns The value at the given index
-     */
-    public get(index: number): number {
-        return this.m[index];
-    }
-
-    /**
-     * Creates an identity matrix
-     * @returns A new identity Matrix2D
+     * Returns a new identity matrix.
+     * @returns A new identity matrix.
      */
     public static Identity(): Matrix2D {
-        return new Matrix2D(1, 0, 0, 1, 0, 0);
+        return new Matrix2D();
     }
 
     /**
-     * Creates a translation matrix
-     * @param x - Translation along X
-     * @param y - Translation along Y
-     * @returns A new translation Matrix2D
+     * Returns a new zero matrix.
+     * @returns A new zero matrix.
      */
-    public static Translation(x: number, y: number): Matrix2D {
-        return new Matrix2D(1, 0, 0, 1, x, y);
+    public static Zero(): Matrix2D {
+        return new Matrix2D(0, 0, 0, 0, 0, 0);
     }
 
     /**
-     * Creates a rotation matrix (clockwise in Y-down coordinate system)
-     * @param angle - Rotation angle in radians
-     * @returns A new rotation Matrix2D
+     * Composes a matrix from translation, rotation, scale, and pivot.
+     * @param position - Translation.
+     * @param rotation - Rotation angle in radians.
+     * @param scale - Scale factors.
+     * @param pivot - Pivot point in local space.
+     * @returns A new composed matrix.
      */
-    public static Rotation(angle: number): Matrix2D {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        return new Matrix2D(cos, sin, -sin, cos, 0, 0);
+    public static Compose(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2): Matrix2D {
+        return new Matrix2D().compose(position, rotation, scale, pivot);
     }
 
     /**
-     * Creates a scaling matrix
-     * @param x - Scale factor along X
-     * @param y - Scale factor along Y
-     * @returns A new scaling Matrix2D
+     * @internal
+     * Composes a matrix from translation, rotation, scale, pivot, and skew into `out`.
+     * @param position - Translation.
+     * @param rotation - Rotation angle in radians.
+     * @param scale - Scale factors.
+     * @param pivot - Pivot point in local space.
+     * @param skewX - Skew along the local X axis in radians.
+     * @param skewY - Skew along the local Y axis in radians.
+     * @param out - Matrix receiving the result.
+     * @returns The `out` matrix.
      */
-    public static Scaling(x: number, y: number): Matrix2D {
-        return new Matrix2D(x, 0, 0, y, 0, 0);
+    public static _ComposeWithSkewToRef(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2, skewX: number, skewY: number, out: Matrix2D): Matrix2D {
+        const m = out.m;
+
+        if (skewX === 0 && skewY === 0) {
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+
+            m[0] = scale.x * cos;
+            m[1] = scale.x * sin;
+            m[2] = -scale.y * sin;
+            m[3] = scale.y * cos;
+        } else {
+            m[0] = Math.cos(rotation + skewY) * scale.x;
+            m[1] = Math.sin(rotation + skewY) * scale.x;
+            m[2] = -Math.sin(rotation + skewX) * scale.y;
+            m[3] = Math.cos(rotation + skewX) * scale.y;
+        }
+
+        m[4] = position.x - pivot.x * m[0] - pivot.y * m[2];
+        m[5] = position.y - pivot.x * m[1] - pivot.y * m[3];
+        return out;
     }
 
     /**
-     * Composes a matrix from translation, rotation, scale, and pivot
-     * @param position - Translation
-     * @param rotation - Rotation angle in radians
-     * @param scale - Scale factors
-     * @param pivot - Pivot point (rotation/scale center relative to self)
-     * @returns A new composed Matrix2D
+     * Sets this matrix to the identity matrix.
+     * @returns This matrix.
      */
-    public static Compose(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2, skewX: number = 0, skewY: number = 0): Matrix2D {
-        return Matrix2D.ComposeToRef(position, rotation, scale, pivot, skewX, skewY, new Matrix2D());
-    }
-
-    /**
-     * Composes a matrix from translation, rotation, scale, and pivot, storing the result in ref
-     * @param position - Translation
-     * @param rotation - Rotation angle in radians
-     * @param scale - Scale factors
-     * @param pivot - Pivot point (rotation/scale center relative to self)
-     * @param skewX - Skew along X axis in radians
-     * @param skewY - Skew along Y axis in radians
-     * @param ref - The matrix to store the result in
-     * @returns The ref matrix for chaining
-     */
-    public static ComposeToRef(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2, skewX: number, skewY: number, ref: Matrix2D): Matrix2D {
-        const a = Math.cos(rotation + skewY) * scale.x;
-        const b = Math.sin(rotation + skewY) * scale.x;
-        const c = -Math.sin(rotation + skewX) * scale.y;
-        const d = Math.cos(rotation + skewX) * scale.y;
-        const px = pivot.x;
-        const py = pivot.y;
-
-        ref.m[0] = a;
-        ref.m[1] = b;
-        ref.m[2] = c;
-        ref.m[3] = d;
-        ref.m[4] = position.x - px * a - py * c;
-        ref.m[5] = position.y - px * b - py * d;
-
-        return ref;
-    }
-
-    /**
-     * Multiplies two matrices (this * other)
-     * @param other - The matrix to multiply with
-     * @returns A new Matrix2D containing the result
-     */
-    public multiply(other: Matrix2D): Matrix2D {
-        return this.multiplyToRef(other, new Matrix2D());
-    }
-
-    /**
-     * Multiplies two matrices (this * other) and stores the result in ref
-     * @param other - The matrix to multiply with
-     * @param ref - The matrix to store the result in
-     * @returns The ref matrix for chaining
-     */
-    public multiplyToRef(other: Matrix2D, ref: Matrix2D): Matrix2D {
-        const a = this.m;
-        const b = other.m;
-
-        const r0 = a[0] * b[0] + a[2] * b[1];
-        const r1 = a[1] * b[0] + a[3] * b[1];
-        const r2 = a[0] * b[2] + a[2] * b[3];
-        const r3 = a[1] * b[2] + a[3] * b[3];
-        const r4 = a[0] * b[4] + a[2] * b[5] + a[4];
-        const r5 = a[1] * b[4] + a[3] * b[5] + a[5];
-
-        ref.m[0] = r0;
-        ref.m[1] = r1;
-        ref.m[2] = r2;
-        ref.m[3] = r3;
-        ref.m[4] = r4;
-        ref.m[5] = r5;
-
-        return ref;
-    }
-
-    /**
-     * Multiplies this matrix by the other and stores the result in this matrix
-     * @param other - The matrix to multiply with
-     * @returns This matrix for chaining
-     */
-    public multiplyToSelf(other: Matrix2D): Matrix2D {
-        const a0 = this.m[0],
-            a1 = this.m[1],
-            a2 = this.m[2],
-            a3 = this.m[3],
-            a4 = this.m[4],
-            a5 = this.m[5];
-        const b = other.m;
-
-        this.m[0] = a0 * b[0] + a2 * b[1];
-        this.m[1] = a1 * b[0] + a3 * b[1];
-        this.m[2] = a0 * b[2] + a2 * b[3];
-        this.m[3] = a1 * b[2] + a3 * b[3];
-        this.m[4] = a0 * b[4] + a2 * b[5] + a4;
-        this.m[5] = a1 * b[4] + a3 * b[5] + a5;
-
+    public setIdentity(): this {
+        const m = this.m;
+        m[0] = 1;
+        m[1] = 0;
+        m[2] = 0;
+        m[3] = 1;
+        m[4] = 0;
+        m[5] = 0;
         return this;
     }
 
     /**
-     * Transforms a point by this matrix
-     * @param point - The point to transform
-     * @returns A new transformed Vector2
+     * Composes this matrix in place from translation, rotation, scale, and pivot.
+     * @param position - Translation.
+     * @param rotation - Rotation angle in radians.
+     * @param scale - Scale factors.
+     * @param pivot - Pivot point in local space.
+     * @returns This matrix.
      */
-    public transformPoint(point: Vector2): Vector2 {
-        const m = this.m;
-        return new Vector2(m[0] * point.x + m[2] * point.y + m[4], m[1] * point.x + m[3] * point.y + m[5]);
+    public compose(position: Vector2, rotation: number, scale: Vector2, pivot: Vector2): this {
+        Matrix2D._ComposeWithSkewToRef(position, rotation, scale, pivot, 0, 0, this);
+        return this;
     }
 
     /**
-     * Computes the inverse of this matrix
-     * @returns A new inverted Matrix2D, or identity if not invertible
+     * Multiplies this matrix by another, writing into `out`.
+     * @param other - The right-hand matrix.
+     * @param out - Matrix receiving the result.
+     * @returns The `out` matrix.
      */
-    public invert(): Matrix2D {
-        return this.invertToRef(new Matrix2D());
+    public multiplyToRef(other: Matrix2D, out: Matrix2D): Matrix2D {
+        const a = this.m;
+        const b = other.m;
+        const outM = out.m;
+
+        const m00 = a[0] * b[0] + a[2] * b[1];
+        const m10 = a[1] * b[0] + a[3] * b[1];
+        const m01 = a[0] * b[2] + a[2] * b[3];
+        const m11 = a[1] * b[2] + a[3] * b[3];
+        const m02 = a[0] * b[4] + a[2] * b[5] + a[4];
+        const m12 = a[1] * b[4] + a[3] * b[5] + a[5];
+
+        outM[0] = m00;
+        outM[1] = m10;
+        outM[2] = m01;
+        outM[3] = m11;
+        outM[4] = m02;
+        outM[5] = m12;
+        return out;
     }
 
     /**
-     * Computes the inverse of this matrix and stores the result in ref
-     * @param ref - The matrix to store the result in
-     * @returns The ref matrix, or identity if not invertible
+     * Inverts this matrix into `out`.
+     * @param out - Matrix receiving the inverse.
+     * @returns True when inversion succeeded; otherwise false.
      */
-    public invertToRef(ref: Matrix2D): Matrix2D {
+    public invertToRef(out: Matrix2D): boolean {
         const m = this.m;
-        const det = m[0] * m[3] - m[1] * m[2];
-
-        if (Math.abs(det) < 1e-10) {
-            return ref.reset();
+        const determinant = m[0] * m[3] - m[1] * m[2];
+        if (Math.abs(determinant) < 1e-10) {
+            return false;
         }
 
-        const invDet = 1.0 / det;
-        ref.m[0] = m[3] * invDet;
-        ref.m[1] = -m[1] * invDet;
-        ref.m[2] = -m[2] * invDet;
-        ref.m[3] = m[0] * invDet;
-        ref.m[4] = (m[2] * m[5] - m[3] * m[4]) * invDet;
-        ref.m[5] = (m[1] * m[4] - m[0] * m[5]) * invDet;
-
-        return ref;
+        const inverseDeterminant = 1 / determinant;
+        const outM = out.m;
+        outM[0] = m[3] * inverseDeterminant;
+        outM[1] = -m[1] * inverseDeterminant;
+        outM[2] = -m[2] * inverseDeterminant;
+        outM[3] = m[0] * inverseDeterminant;
+        outM[4] = (m[2] * m[5] - m[3] * m[4]) * inverseDeterminant;
+        outM[5] = (m[1] * m[4] - m[0] * m[5]) * inverseDeterminant;
+        return true;
     }
 
     /**
-     * Copies values from another matrix
-     * @param other - The matrix to copy from
-     * @returns This matrix for chaining
+     * Transforms a point into `out`.
+     * @param x - Point X.
+     * @param y - Point Y.
+     * @param out - Vector receiving the transformed point.
+     * @returns The `out` vector.
      */
-    public copyFrom(other: Matrix2D): Matrix2D {
+    public transformPoint(x: number, y: number, out: Vector2): Vector2 {
+        const m = this.m;
+        out.x = m[0] * x + m[2] * y + m[4];
+        out.y = m[1] * x + m[3] * y + m[5];
+        return out;
+    }
+
+    /**
+     * Transforms a direction vector without applying translation.
+     * @param x - Direction X.
+     * @param y - Direction Y.
+     * @param out - Vector receiving the transformed direction.
+     * @returns The `out` vector.
+     */
+    public transformDirection(x: number, y: number, out: Vector2): Vector2 {
+        const m = this.m;
+        out.x = m[0] * x + m[2] * y;
+        out.y = m[1] * x + m[3] * y;
+        return out;
+    }
+
+    /**
+     * X translation component.
+     * @returns The X translation.
+     */
+    public get tx(): number {
+        return this.m[4];
+    }
+
+    /**
+     * Y translation component.
+     * @returns The Y translation.
+     */
+    public get ty(): number {
+        return this.m[5];
+    }
+
+    /**
+     * X scale magnitude.
+     * @returns The X scale.
+     */
+    public get scaleX(): number {
+        return Math.hypot(this.m[0], this.m[1]);
+    }
+
+    /**
+     * Y scale magnitude.
+     * @returns The Y scale.
+     */
+    public get scaleY(): number {
+        return Math.hypot(this.m[2], this.m[3]);
+    }
+
+    /**
+     * Extracted rotation angle in radians.
+     * @returns The rotation angle.
+     */
+    public get rotation(): number {
+        return Math.atan2(this.m[1], this.m[0]);
+    }
+
+    /**
+     * Copies values from another matrix.
+     * @param other - Matrix to copy from.
+     * @returns This matrix.
+     */
+    public copyFrom(other: Matrix2D): this {
         this.m.set(other.m);
         return this;
     }
 
     /**
-     * Clones this matrix
-     * @returns A new Matrix2D with the same values
+     * Creates a clone of this matrix.
+     * @returns A new matrix with the same values.
      */
     public clone(): Matrix2D {
         return new Matrix2D(this.m[0], this.m[1], this.m[2], this.m[3], this.m[4], this.m[5]);
     }
 
     /**
-     * Sets this matrix to identity
-     * @returns This matrix for chaining
+     * Writes this matrix to an array.
+     * @param array - Target array.
+     * @param offset - Starting element offset.
+     * @returns Nothing.
      */
-    public reset(): Matrix2D {
-        this.m[0] = 1;
-        this.m[1] = 0;
-        this.m[2] = 0;
-        this.m[3] = 1;
-        this.m[4] = 0;
-        this.m[5] = 0;
-        return this;
+    public copyToArray(array: Float32Array, offset: number): void {
+        array[offset] = this.m[0];
+        array[offset + 1] = this.m[1];
+        array[offset + 2] = this.m[2];
+        array[offset + 3] = this.m[3];
+        array[offset + 4] = this.m[4];
+        array[offset + 5] = this.m[5];
+    }
+
+    /**
+     * Compares two matrices using an epsilon.
+     * @param a - First matrix.
+     * @param b - Second matrix.
+     * @param epsilon - Comparison tolerance.
+     * @returns True when all components are within epsilon.
+     */
+    public static AreEqual(a: Matrix2D, b: Matrix2D, epsilon: number = 1e-6): boolean {
+        for (let i = 0; i < 6; i++) {
+            if (Math.abs(a.m[i] - b.m[i]) > epsilon) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns a string representation of this matrix.
+     * @returns The matrix as a string.
+     */
+    public toString(): string {
+        const m = this.m;
+        return `Matrix2D(${m[0]}, ${m[1]}, ${m[2]}, ${m[3]}, ${m[4]}, ${m[5]})`;
     }
 }

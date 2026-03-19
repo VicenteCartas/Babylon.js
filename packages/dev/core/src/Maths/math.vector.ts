@@ -8856,8 +8856,8 @@ class MathTmp {
  * @internal
  */
 export class TmpVectors {
-    /** 3 temp Vector2 at once should be enough */
-    public static Vector2 = BuildTuple(3, Vector2.Zero);
+    /** 4 temp Vector2 at once should be enough */
+    public static Vector2 = BuildTuple(4, Vector2.Zero);
 
     /** 13 temp Vector3 at once should be enough */
     public static Vector3 = BuildTuple(13, Vector3.Zero);

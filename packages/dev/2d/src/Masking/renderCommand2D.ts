@@ -10,7 +10,7 @@ import type { SpriteMask2D } from "./spriteMask2D";
 export const enum RenderCommandType {
     /** Draw a sprite quad */
     Sprite = 0,
-    /** Push a rectangle scissor mask */
+    /** Push a rectangle scissor/stencil mask */
     PushRectMask = 1,
     /** Push a stencil-based sprite mask */
     PushSpriteMask = 2,
@@ -29,14 +29,14 @@ export interface ISpriteRenderCommand {
 }
 
 /**
- * Render command: push a rectangle scissor mask.
+ * Render command: push a rectangle mask.
  * @internal
  */
 export interface IPushRectMaskCommand {
     readonly type: RenderCommandType.PushRectMask;
     /** The rectangle mask to push */
     rectMask: RectMask2D;
-    /** The node that owns the mask (needed for world transform → viewport rect) */
+    /** The node that owns the mask (needed for local-to-world conversion) */
     maskOwner: RenderableNode2D;
 }
 
@@ -48,26 +48,27 @@ export interface IPushSpriteMaskCommand {
     readonly type: RenderCommandType.PushSpriteMask;
     /** The sprite mask to push */
     spriteMask: SpriteMask2D;
-    /** The node that owns the mask (needed for world transform context) */
+    /** The node that owns the mask */
     maskOwner: RenderableNode2D;
 }
 
 /**
  * Render command: pop the most recent mask.
- * Carries the original push command so the stencil buffer can
- * be restored (sprite masks need DECR re-render on pop).
  * @internal
  */
 export interface IPopMaskCommand {
     readonly type: RenderCommandType.PopMask;
-    /** The push command that opened this mask (for stencil DECR on sprite masks) */
-    pushCommand: IPushRectMaskCommand | IPushSpriteMaskCommand;
 }
+
+/**
+ * Union of mask push commands.
+ * @internal
+ */
+export type MaskPushRenderCommand = IPushRectMaskCommand | IPushSpriteMaskCommand;
 
 /**
  * A render command in the 2D render pipeline.
  * Uses a discriminated union for type-safe switch exhaustiveness checking.
  * @internal
  */
-export type RenderCommand2D = ISpriteRenderCommand | IPushRectMaskCommand | IPushSpriteMaskCommand | IPopMaskCommand;
-
+export type RenderCommand2D = ISpriteRenderCommand | MaskPushRenderCommand | IPopMaskCommand;

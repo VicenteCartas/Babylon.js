@@ -108,8 +108,11 @@ export class Camera2D {
     private _shakeRng: (() => number) | null = null;
     private _viewTransform: Matrix2D = Matrix2D.Identity();
     private _invertedViewTransform: Matrix2D = Matrix2D.Identity();
+    private _visibleWorldRect: Rectangle2D = new Rectangle2D();
     private _lookAheadOffset: Vector2 = Vector2.Zero();
+    private _followBasePosition: Vector2 = Vector2.Zero();
     private _previousTargetPosition: Vector2 = Vector2.Zero();
+    private _lookAheadTarget: Node2D | null = null;
     private _scratchTargetPosition: Vector2 = Vector2.Zero();
     private _scratchDesiredLookAhead: Vector2 = Vector2.Zero();
     private _hasPreviousTargetPosition: boolean = false;
@@ -207,9 +210,23 @@ export class Camera2D {
             this.setViewport(viewportWidth, viewportHeight);
         }
 
-        this._updateLookAhead(deltaTime);
-        this._updateFollow(deltaTime);
+        const lockedTarget = this.lockedTarget;
+        if (lockedTarget) {
+            this._followBasePosition.x = this.position.x - this._lookAheadOffset.x;
+            this._followBasePosition.y = this.position.y - this._lookAheadOffset.y;
+            this._updateFollow(deltaTime);
+            this._updateLookAhead(deltaTime);
+            this.position.x = this._followBasePosition.x + this._lookAheadOffset.x;
+            this.position.y = this._followBasePosition.y + this._lookAheadOffset.y;
+        } else {
+            this._updateLookAhead(deltaTime);
+        }
+
         this._clampToBounds();
+        if (lockedTarget) {
+            this._followBasePosition.x = this.position.x - this._lookAheadOffset.x;
+            this._followBasePosition.y = this.position.y - this._lookAheadOffset.y;
+        }
         this._updateShake(deltaTime);
         this._recomputeViewTransform();
         this._updateEffects(deltaTime);
@@ -321,6 +338,44 @@ export class Camera2D {
     public getInverseViewProjectionMatrix(): Readonly<Matrix2D> {
         this._recomputeViewTransform();
         return this._invertedViewTransform;
+    }
+
+    /**
+     * Gets the visible world-space rectangle covered by the current viewport.
+     * Returns a cached rectangle that is updated in place.
+     * @returns The cached visible world rectangle.
+     */
+    public getVisibleWorldRect(): Readonly<Rectangle2D> {
+        return this.getVisibleWorldRectToRef(this._visibleWorldRect);
+    }
+
+    /**
+     * Writes the visible world-space rectangle covered by the current viewport into `out`.
+     * @param out - Rectangle receiving the visible world-space bounds.
+     * @returns The provided output rectangle.
+     */
+    public getVisibleWorldRectToRef(out: Rectangle2D): Rectangle2D {
+        this._recomputeViewTransform();
+
+        if (this._viewportWidth <= 0 || this._viewportHeight <= 0) {
+            return out.set(this.position.x, this.position.y, 0, 0);
+        }
+
+        const m = this._invertedViewTransform.m;
+        const x0 = m[4];
+        const y0 = m[5];
+        const x1 = m[0] * this._viewportWidth + m[4];
+        const y1 = m[1] * this._viewportWidth + m[5];
+        const x2 = m[0] * this._viewportWidth + m[2] * this._viewportHeight + m[4];
+        const y2 = m[1] * this._viewportWidth + m[3] * this._viewportHeight + m[5];
+        const x3 = m[2] * this._viewportHeight + m[4];
+        const y3 = m[3] * this._viewportHeight + m[5];
+
+        const minX = Math.min(x0, x1, x2, x3);
+        const minY = Math.min(y0, y1, y2, y3);
+        const maxX = Math.max(x0, x1, x2, x3);
+        const maxY = Math.max(y0, y1, y2, y3);
+        return out.set(minX, minY, maxX - minX, maxY - minY);
     }
 
     /**
@@ -475,38 +530,53 @@ export class Camera2D {
         }
 
         const targetPos = this.lockedTarget.worldPositionToRef(this._scratchTargetPosition);
-        const targetX = targetPos.x + this.followOffset.x + this._lookAheadOffset.x;
-        const targetY = targetPos.y + this.followOffset.y + this._lookAheadOffset.y;
+        const targetX = targetPos.x + this.followOffset.x;
+        const targetY = targetPos.y + this.followOffset.y;
 
         let desiredX = targetX;
         let desiredY = targetY;
 
         if (this.deadZone) {
-            const clampedX = Camera2D._clamp(targetX - this.position.x, this.deadZone.x, this.deadZone.x + this.deadZone.width);
-            const clampedY = Camera2D._clamp(targetY - this.position.y, this.deadZone.y, this.deadZone.y + this.deadZone.height);
+            const currentX = this._followBasePosition.x;
+            const currentY = this._followBasePosition.y;
+            const clampedX = Camera2D._clamp(targetX - currentX, this.deadZone.x, this.deadZone.x + this.deadZone.width);
+            const clampedY = Camera2D._clamp(targetY - currentY, this.deadZone.y, this.deadZone.y + this.deadZone.height);
             desiredX = targetX - clampedX;
             desiredY = targetY - clampedY;
         }
 
         if (this.lerpSpeed <= 0 || deltaTime <= 0) {
-            this.position.x = desiredX;
-            this.position.y = desiredY;
+            this._followBasePosition.x = desiredX;
+            this._followBasePosition.y = desiredY;
             return;
         }
 
         const t = 1 - Math.exp(-this.lerpSpeed * deltaTime);
-        this.position.x += (desiredX - this.position.x) * t;
-        this.position.y += (desiredY - this.position.y) * t;
+        this._followBasePosition.x += (desiredX - this._followBasePosition.x) * t;
+        this._followBasePosition.y += (desiredY - this._followBasePosition.y) * t;
     }
 
     private _updateLookAhead(deltaTime: number): void {
         if (!this.lockedTarget) {
-            this._updateLookAheadOffset(0, 0, deltaTime);
+            this._lookAheadTarget = null;
             this._hasPreviousTargetPosition = false;
+            this._lookAheadOffset.x = 0;
+            this._lookAheadOffset.y = 0;
             return;
         }
 
-        const targetPos = this.lockedTarget.worldPositionToRef(this._scratchTargetPosition);
+        const target = this.lockedTarget;
+        const targetPos = target.worldPositionToRef(this._scratchTargetPosition);
+        if (this._lookAheadTarget !== target) {
+            this._lookAheadTarget = target;
+            this._previousTargetPosition.x = targetPos.x;
+            this._previousTargetPosition.y = targetPos.y;
+            this._hasPreviousTargetPosition = true;
+            this._lookAheadOffset.x = 0;
+            this._lookAheadOffset.y = 0;
+            return;
+        }
+
         if (!this._hasPreviousTargetPosition) {
             this._previousTargetPosition.x = targetPos.x;
             this._previousTargetPosition.y = targetPos.y;

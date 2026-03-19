@@ -1,3 +1,5 @@
+import { Logger } from "core/Misc/logger";
+
 import { StateMachine2D } from "2d/StateMachine/stateMachine";
 
 interface TestContext {
@@ -11,233 +13,265 @@ function makeCtx(): TestContext {
 }
 
 describe("StateMachine2D", () => {
-    describe("basic state management", () => {
-        it("should register and start in initial state", () => {
+    describe("startup and state queries", () => {
+        it("should start from the constructor initial state", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
-
-            fsm.addState({ name: "idle" });
-            fsm.addState({ name: "walk" });
-            fsm.start("idle");
-
-            expect(fsm.currentState).toBe("idle");
-            expect(fsm.isStarted).toBe(true);
-        });
-
-        it("should call onEnter when starting", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
             fsm.addState({
                 name: "idle",
-                onEnter: (c, prev) => {
-                    c.log.push(`enter-idle-from-${prev}`);
+                onEnter: (context, previousState) => {
+                    context.log.push(`enter-idle-from-${previousState}`);
                 },
             });
-            fsm.start("idle");
 
+            fsm.start();
+
+            expect(fsm.currentState).toBe("idle");
+            expect(fsm.previousState).toBe("");
+            expect(fsm.isRunning).toBe(true);
+            expect(fsm.isStarted).toBe(true);
             expect(ctx.log).toEqual(["enter-idle-from-"]);
         });
 
-        it("should call onUpdate each frame", () => {
+        it("should support the legacy start(initialState) path", () => {
+            const fsm = new StateMachine2D<object>({}, "");
+            fsm.addState({ name: "idle" });
+
+            fsm.start("idle");
+
+            expect(fsm.currentState).toBe("idle");
+            expect(fsm.isRunning).toBe(true);
+        });
+
+        it("should no-op when start is called while already running", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
             fsm.addState({
                 name: "idle",
-                onUpdate: (c, dt) => {
-                    c.log.push(`update-${dt}`);
+                onEnter: (context) => {
+                    context.log.push("enter-idle");
                 },
             });
-            fsm.start("idle");
-            fsm.update(0.016);
-            fsm.update(0.016);
 
-            expect(ctx.log.length).toBe(2);
+            fsm.start();
+            fsm.start();
+
+            expect(ctx.log).toEqual(["enter-idle"]);
         });
 
-        it("should throw when adding duplicate state", () => {
-            const fsm = new StateMachine2D(null);
-            fsm.addState({ name: "idle" });
-            expect(() => fsm.addState({ name: "idle" })).toThrow('State "idle" already exists');
-        });
-
-        it("should throw when starting with unknown state", () => {
-            const fsm = new StateMachine2D(null);
-            expect(() => fsm.start("nonexistent")).toThrow('State "nonexistent" not found');
-        });
-
-        it("should not update if not started", () => {
+        it("should stop and clear the current active state", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
+
             fsm.addState({
                 name: "idle",
-                onUpdate: (c) => c.log.push("updated"),
+                onExit: (context, nextState) => {
+                    context.log.push(`exit-idle-to-${nextState}`);
+                },
             });
-            fsm.update(0.016);
-            expect(ctx.log.length).toBe(0);
-        });
 
-        it("should support hasState", () => {
-            const fsm = new StateMachine2D(null);
-            fsm.addState({ name: "idle" });
-            expect(fsm.hasState("idle")).toBe(true);
-            expect(fsm.hasState("walk")).toBe(false);
-        });
+            fsm.start();
+            fsm.stop();
 
-        it("should support chaining", () => {
-            const fsm = new StateMachine2D(null);
-            const result = fsm.addState({ name: "idle" }).addState({ name: "walk" });
-            expect(result).toBe(fsm);
+            expect(fsm.isRunning).toBe(false);
+            expect(fsm.currentState).toBe("");
+            expect(fsm.previousState).toBe("idle");
+            expect(ctx.log).toEqual(["exit-idle-to-"]);
         });
     });
 
-    describe("auto-transitions", () => {
-        it("should transition when condition becomes true", () => {
+    describe("state registration", () => {
+        it("should replace an existing state with the same name", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
             fsm.addState({
                 name: "idle",
-                onExit: (c, next) => c.log.push(`exit-idle-to-${next}`),
+                onEnter: (context) => {
+                    context.log.push("first");
+                },
+            });
+            fsm.addState({
+                name: "idle",
+                onEnter: (context) => {
+                    context.log.push("second");
+                },
+            });
+
+            fsm.start();
+
+            expect(ctx.log).toEqual(["second"]);
+        });
+
+        it("should remove inactive states and reject removing the active state", () => {
+            const fsm = new StateMachine2D<object>({}, "idle");
+            fsm.addState({ name: "idle" });
+            fsm.addState({ name: "walk" });
+            fsm.removeState("walk");
+
+            expect(fsm.hasState("walk")).toBe(false);
+
+            fsm.start();
+            expect(() => fsm.removeState("idle")).toThrow('Cannot remove active state "idle".');
+        });
+    });
+
+    describe("automatic transitions", () => {
+        it("should respect priority and skip onUpdate when a transition fires", () => {
+            const ctx = makeCtx();
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
+
+            fsm.addState({
+                name: "idle",
+                onUpdate: (context) => {
+                    context.log.push("idle-update");
+                },
+                onExit: (context, nextState) => {
+                    context.log.push(`exit-idle-to-${nextState}`);
+                },
             });
             fsm.addState({
                 name: "chase",
-                onEnter: (c, prev) => c.log.push(`enter-chase-from-${prev}`),
+                onEnter: (context, previousState) => {
+                    context.log.push(`enter-chase-from-${previousState}`);
+                },
             });
-            fsm.addTransition({
-                from: "idle",
-                to: "chase",
-                condition: (c) => c.playerDistance < 100,
-            });
-
-            fsm.start("idle");
-            expect(fsm.currentState).toBe("idle");
-
-            // Distance still large — no transition
-            fsm.update(0.016);
-            expect(fsm.currentState).toBe("idle");
-
-            // Player comes close
-            ctx.playerDistance = 50;
-            fsm.update(0.016);
-            expect(fsm.currentState).toBe("chase");
-            expect(ctx.log).toContain("exit-idle-to-chase");
-            expect(ctx.log).toContain("enter-chase-from-idle");
-        });
-
-        it("should respect priority ordering", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
-
-            fsm.addState({ name: "idle" });
             fsm.addState({ name: "flee" });
-            fsm.addState({ name: "chase" });
 
-            // Both conditions will be true, but flee has higher priority
             fsm.addTransition({
                 from: "idle",
                 to: "chase",
-                condition: (c) => c.playerDistance < 100,
+                condition: (context) => context.playerDistance < 100,
                 priority: 1,
             });
             fsm.addTransition({
                 from: "idle",
                 to: "flee",
-                condition: (c) => c.health < 20,
+                condition: (context) => context.health < 20,
                 priority: 10,
             });
 
-            fsm.start("idle");
+            fsm.start();
+            fsm.update(0.016);
+            expect(ctx.log).toEqual(["idle-update"]);
+
+            ctx.log.length = 0;
             ctx.playerDistance = 50;
             ctx.health = 10;
             fsm.update(0.016);
 
             expect(fsm.currentState).toBe("flee");
+            expect(ctx.log).toEqual(["exit-idle-to-flee"]);
         });
 
-        it("should only fire one transition per update", () => {
+        it("should evaluate state-specific transitions before wildcard transitions", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            ctx.health = 0;
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
-            fsm.addState({
-                name: "a",
-                onExit: (c) => c.log.push("exit-a"),
+            fsm.addState({ name: "idle" });
+            fsm.addState({ name: "chase" });
+            fsm.addState({ name: "dead" });
+
+            fsm.addTransition({
+                from: "idle",
+                to: "chase",
+                condition: () => true,
+                priority: 1,
             });
-            fsm.addState({
-                name: "b",
-                onEnter: (c) => c.log.push("enter-b"),
-            });
-            fsm.addState({
-                name: "c",
-                onEnter: (c) => c.log.push("enter-c"),
+            fsm.addTransition({
+                from: "*",
+                to: "dead",
+                condition: (context) => context.health <= 0,
+                priority: 100,
             });
 
+            fsm.start();
+            fsm.update(0.016);
+
+            expect(fsm.currentState).toBe("chase");
+        });
+
+        it("should support optional transition chaining", () => {
+            const ctx = makeCtx();
+            const fsm = new StateMachine2D<TestContext>(ctx, "a");
+
+            fsm.addState({ name: "a" });
+            fsm.addState({ name: "b" });
+            fsm.addState({ name: "c" });
             fsm.addTransition({ from: "a", to: "b", condition: () => true });
             fsm.addTransition({ from: "b", to: "c", condition: () => true });
 
-            fsm.start("a");
+            fsm.start();
             fsm.update(0.016);
-
-            // Should only go A → B, not A → B → C in one update
             expect(fsm.currentState).toBe("b");
+
+            fsm.forceState("a");
+            fsm.enableTransitionChaining = true;
+            fsm.update(0.016);
+            expect(fsm.currentState).toBe("c");
         });
 
-        it("should not transition to same state", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+        it("should warn when transition chaining reaches the configured limit", () => {
+            const warnSpy = jest.spyOn(Logger, "Warn").mockImplementation(() => {});
+            const fsm = new StateMachine2D<object>({}, "a");
+            fsm.enableTransitionChaining = true;
+            fsm.maxTransitionChainLength = 1;
 
-            fsm.addState({
-                name: "idle",
-                onEnter: (c) => c.log.push("enter"),
-                onExit: (c) => c.log.push("exit"),
-            });
-            fsm.addTransition({ from: "idle", to: "idle", condition: () => true });
+            fsm.addState({ name: "a" });
+            fsm.addState({ name: "b" });
+            fsm.addState({ name: "c" });
+            fsm.addTransition({ from: "a", to: "b", condition: () => true });
+            fsm.addTransition({ from: "b", to: "c", condition: () => true });
 
-            fsm.start("idle");
-            ctx.log.length = 0; // Clear initial onEnter
+            fsm.start();
             fsm.update(0.016);
 
-            // Should not re-enter same state
-            expect(ctx.log.length).toBe(0);
+            expect(fsm.currentState).toBe("b");
+            expect(warnSpy).toHaveBeenCalledTimes(1);
+            warnSpy.mockRestore();
         });
     });
 
-    describe("named triggers", () => {
-        it("should fire named transition", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
-
+    describe("named transitions", () => {
+        it("should fire a named transition from the current state", () => {
+            const fsm = new StateMachine2D<object>({}, "idle");
             fsm.addState({ name: "idle" });
             fsm.addState({ name: "attack" });
             fsm.addTransition({ from: "idle", to: "attack", name: "doAttack" });
 
-            fsm.start("idle");
-            const fired = fsm.trigger("doAttack");
+            fsm.start();
 
-            expect(fired).toBe(true);
+            expect(fsm.trigger("doAttack")).toBe(true);
             expect(fsm.currentState).toBe("attack");
+            expect(fsm.previousState).toBe("idle");
         });
 
-        it("should not fire if from state doesn't match", () => {
+        it("should support wildcard named transitions after state-specific ones", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            ctx.health = 0;
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
             fsm.addState({ name: "idle" });
             fsm.addState({ name: "attack" });
             fsm.addState({ name: "dead" });
-            fsm.addTransition({ from: "attack", to: "dead", name: "die" });
+            fsm.addTransition({ from: "idle", to: "attack", name: "doThing", priority: 1 });
+            fsm.addTransition({ from: "*", to: "dead", name: "die", condition: (context) => context.health <= 0, priority: 100 });
 
-            fsm.start("idle");
-            const fired = fsm.trigger("die");
+            fsm.start();
 
-            expect(fired).toBe(false);
-            expect(fsm.currentState).toBe("idle");
+            expect(fsm.trigger("doThing")).toBe(true);
+            expect(fsm.currentState).toBe("attack");
+
+            expect(fsm.trigger("die")).toBe(true);
+            expect(fsm.currentState).toBe("dead");
         });
 
-        it("should not fire if guard fails", () => {
+        it("should respect conditions on named transitions", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
             fsm.addState({ name: "idle" });
             fsm.addState({ name: "attack" });
@@ -245,185 +279,91 @@ describe("StateMachine2D", () => {
                 from: "idle",
                 to: "attack",
                 name: "doAttack",
-                condition: (c) => c.health > 50,
+                condition: (context) => context.health > 50,
             });
 
-            fsm.start("idle");
+            fsm.start();
             ctx.health = 10;
-            const fired = fsm.trigger("doAttack");
 
-            expect(fired).toBe(false);
+            expect(fsm.trigger("doAttack")).toBe(false);
             expect(fsm.currentState).toBe("idle");
-        });
-
-        it("should return false for unknown transition name", () => {
-            const fsm = new StateMachine2D(null);
-            fsm.addState({ name: "idle" });
-            fsm.start("idle");
-            expect(fsm.trigger("nonexistent")).toBe(false);
         });
     });
 
-    describe("forceState", () => {
-        it("should bypass guards and transition immediately", () => {
+    describe("transition removal and forceState", () => {
+        it("should remove transitions by source and target", () => {
             const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
+
+            fsm.addState({ name: "idle" });
+            fsm.addState({ name: "walk" });
+            fsm.addTransition({ from: "idle", to: "walk", condition: () => true });
+            fsm.removeTransition("idle", "walk");
+
+            fsm.start();
+            fsm.update(0.016);
+
+            expect(fsm.currentState).toBe("idle");
+        });
+
+        it("should force state immediately and start when stopped", () => {
+            const ctx = makeCtx();
+            const fsm = new StateMachine2D<TestContext>(ctx, "idle");
 
             fsm.addState({
                 name: "idle",
-                onExit: (c) => c.log.push("exit-idle"),
+                onExit: (context) => {
+                    context.log.push("exit-idle");
+                },
             });
             fsm.addState({
                 name: "dead",
-                onEnter: (c) => c.log.push("enter-dead"),
+                onEnter: (context, previousState) => {
+                    context.log.push(`enter-dead-from-${previousState}`);
+                },
             });
 
-            fsm.start("idle");
             fsm.forceState("dead");
-
             expect(fsm.currentState).toBe("dead");
-            expect(ctx.log).toContain("exit-idle");
-            expect(ctx.log).toContain("enter-dead");
-        });
+            expect(ctx.log).toEqual(["enter-dead-from-"]);
 
-        it("should start the machine if not started", () => {
-            const fsm = new StateMachine2D(null);
+            ctx.log.length = 0;
             fsm.addState({ name: "idle" });
             fsm.forceState("idle");
-
-            expect(fsm.isStarted).toBe(true);
-            expect(fsm.currentState).toBe("idle");
-        });
-
-        it("should throw for unknown state", () => {
-            const fsm = new StateMachine2D(null);
-            expect(() => fsm.forceState("nonexistent")).toThrow('State "nonexistent" not found');
+            expect(ctx.log).toEqual(["exit-idle", "enter-dead-from-idle"]);
         });
     });
 
-    describe("onStateChange observable", () => {
+    describe("observable and disposal", () => {
         it("should notify on state change", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
-            const events: { prev: string; curr: string }[] = [];
+            const events: Array<{ previousState: string; currentState: string }> = [];
+            const fsm = new StateMachine2D<object>({}, "idle");
 
-            fsm.onStateChange.add((evt) => {
-                events.push({ prev: evt.previousState, curr: evt.currentState });
+            fsm.onStateChange.add((eventData) => {
+                events.push({ previousState: eventData.previousState, currentState: eventData.currentState });
             });
 
             fsm.addState({ name: "idle" });
             fsm.addState({ name: "walk" });
             fsm.addTransition({ from: "idle", to: "walk", condition: () => true });
 
-            fsm.start("idle");
+            fsm.start();
             fsm.update(0.016);
 
-            expect(events.length).toBe(1);
-            expect(events[0]).toEqual({ prev: "idle", curr: "walk" });
-        });
-    });
-
-    describe("transition validation", () => {
-        it("should throw when adding transition with unknown from state", () => {
-            const fsm = new StateMachine2D(null);
-            fsm.addState({ name: "idle" });
-            expect(() =>
-                fsm.addTransition({ from: "nonexistent", to: "idle" })
-            ).toThrow('Source state "nonexistent" not found');
+            expect(events).toEqual([{ previousState: "idle", currentState: "walk" }]);
         });
 
-        it("should throw when adding transition with unknown to state", () => {
-            const fsm = new StateMachine2D(null);
+        it("should dispose all internal state", () => {
+            const fsm = new StateMachine2D<object>({}, "idle");
             fsm.addState({ name: "idle" });
-            expect(() =>
-                fsm.addTransition({ from: "idle", to: "nonexistent" })
-            ).toThrow('Target state "nonexistent" not found');
-        });
-    });
-
-    describe("dispose", () => {
-        it("should reset all state", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
-
-            fsm.addState({ name: "idle" });
-            fsm.addState({ name: "walk" });
-            fsm.addTransition({ from: "idle", to: "walk", condition: () => true });
-            fsm.start("idle");
+            fsm.start();
 
             fsm.dispose();
 
-            expect(fsm.isStarted).toBe(false);
+            expect(fsm.isRunning).toBe(false);
             expect(fsm.currentState).toBe("");
+            expect(fsm.previousState).toBe("");
             expect(fsm.hasState("idle")).toBe(false);
-        });
-    });
-
-    describe("real-world: enemy AI", () => {
-        it("should model a patrol/chase/flee AI", () => {
-            const ctx = makeCtx();
-            const fsm = new StateMachine2D<TestContext>(ctx);
-
-            fsm.addState({
-                name: "patrol",
-                onEnter: (c) => c.log.push("patrolling"),
-                onUpdate: (c) => c.log.push("patrolUpdate"),
-            });
-            fsm.addState({
-                name: "chase",
-                onEnter: (c) => c.log.push("chasing"),
-            });
-            fsm.addState({
-                name: "flee",
-                onEnter: (c) => c.log.push("fleeing"),
-            });
-
-            fsm.addTransition({
-                from: "patrol",
-                to: "chase",
-                condition: (c) => c.playerDistance < 100,
-                priority: 1,
-            });
-            fsm.addTransition({
-                from: "patrol",
-                to: "flee",
-                condition: (c) => c.health < 20,
-                priority: 10,
-            });
-            fsm.addTransition({
-                from: "chase",
-                to: "flee",
-                condition: (c) => c.health < 20,
-            });
-            fsm.addTransition({
-                from: "chase",
-                to: "patrol",
-                condition: (c) => c.playerDistance > 200,
-            });
-
-            fsm.start("patrol");
-            expect(fsm.currentState).toBe("patrol");
-
-            fsm.update(0.016);
-            expect(fsm.currentState).toBe("patrol");
-            expect(ctx.log).toContain("patrolUpdate");
-
-            // Player approaches
-            ctx.playerDistance = 50;
-            fsm.update(0.016);
-            expect(fsm.currentState).toBe("chase");
-
-            // Player retreats
-            ctx.playerDistance = 300;
-            fsm.update(0.016);
-            expect(fsm.currentState).toBe("patrol");
-
-            // Low health triggers flee from patrol
-            ctx.health = 10;
-            ctx.playerDistance = 50;
-            fsm.update(0.016);
-            // Flee has higher priority than chase
-            expect(fsm.currentState).toBe("flee");
         });
     });
 });

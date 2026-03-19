@@ -1,10 +1,10 @@
-import { SceneTransition2D } from "2d/Transition/sceneTransition2D";
-import { Scene2D } from "2d/Scene2D/scene2D";
 import { Camera2D } from "2d/Camera2D/camera2D";
+import { Scene2D } from "2d/Scene2D/scene2D";
+import { SceneTransition2D } from "2d/Transition/sceneTransition2D";
+import { Easing } from "2d/Tween/easing";
 import { Color4 } from "core/Maths/math.color";
 import { Vector2 } from "core/Maths/math.vector";
 
-// Minimal engine mock for Scene2D
 function mockEngine() {
     return {
         getRenderWidth: () => 800,
@@ -16,6 +16,7 @@ function mockEngine() {
         setViewport: () => {},
         setAlphaMode: () => {},
         setDepthBuffer: () => {},
+        setState: () => {},
         enableEffect: () => {},
         createDynamicVertexBuffer: () => ({}),
         updateDynamicVertexBuffer: () => {},
@@ -37,185 +38,210 @@ function createScene(): Scene2D {
 
 describe("SceneTransition2D", () => {
     describe("fade", () => {
-        it("should start active", () => {
+        it("should expose spec-aligned running state and progress", () => {
             const from = createScene();
             const to = createScene();
-            const t = SceneTransition2D.fade({ from, to });
-            expect(t.isActive).toBe(true);
-            expect(t.isDone).toBe(false);
+
+            const transition = SceneTransition2D.fade({ from, to });
+
+            expect(transition.isRunning).toBe(true);
+            expect(transition.isActive).toBe(true);
+            expect(transition.isDone).toBe(false);
+            expect(transition.progress).toBe(0);
+            expect(transition.activeScene).toBe(from);
         });
 
-        it("should start with activeScene = from", () => {
+        it("should create an internal full-screen overlay without polluting root nodes", () => {
             const from = createScene();
             const to = createScene();
-            const t = SceneTransition2D.fade({ from, to });
-            expect(t.activeScene).toBe(from);
-        });
+            const color = new Color4(1, 0, 0, 1);
 
-        it("should not pollute rootNodes with overlay", () => {
-            const from = createScene();
-            const to = createScene();
-            SceneTransition2D.fade({ from, to });
-            // Overlay is internal — not visible in rootNodes
-            expect(from.rootNodes.length).toBe(0);
-        });
+            const transition = SceneTransition2D.fade({ from, to, color });
+            const overlay = (transition as any)._overlay;
 
-        it("should switch to 'to' scene after half duration", () => {
-            const from = createScene();
-            const to = createScene();
-            const t = SceneTransition2D.fade({ from, to, duration: 1.0 });
-
-            // Advance past the "out" phase (0.5s)
-            t.update(0.6);
-            expect(t.activeScene).toBe(to);
-        });
-
-        it("should keep rootNodes clean during transition", () => {
-            const from = createScene();
-            const to = createScene();
-            const t = SceneTransition2D.fade({ from, to, duration: 1.0 });
-
-            t.update(0.6); // Past midpoint
             expect(from.rootNodes.length).toBe(0);
             expect(to.rootNodes.length).toBe(0);
-        });
-
-        it("should complete and call onComplete", () => {
-            const from = createScene();
-            const to = createScene();
-            let completed = false;
-            const t = SceneTransition2D.fade({
-                from,
-                to,
-                duration: 1.0,
-                onComplete: () => {
-                    completed = true;
-                },
-            });
-
-            // Run through both phases
-            t.update(0.6); // Past "out"
-            t.update(0.6); // Past "in"
-            expect(t.isDone).toBe(true);
-            expect(t.isActive).toBe(false);
-            expect(completed).toBe(true);
-        });
-
-        it("should remove overlay when done", () => {
-            const from = createScene();
-            const to = createScene();
-            const t = SceneTransition2D.fade({ from, to, duration: 0.5 });
-
-            t.update(0.3); // Past "out"
-            t.update(0.3); // Past "in"
-            expect(to.rootNodes.length).toBe(0);
-        });
-
-        it("should use custom color", () => {
-            const from = createScene();
-            const to = createScene();
-            const red = new Color4(1, 0, 0, 1);
-            const t = SceneTransition2D.fade({ from, to, color: red });
-
-            // Access internal overlay via cast (test-only)
-            const overlay = (t as any)._overlay;
             expect(overlay.tint.r).toBe(1);
             expect(overlay.tint.g).toBe(0);
             expect(overlay.tint.b).toBe(0);
+            expect(overlay.tint.a).toBe(0);
+            expect(overlay.scrollFactorX).toBe(0);
+            expect(overlay.scrollFactorY).toBe(0);
+            expect(overlay.sortingLayer).toBe(Number.MAX_SAFE_INTEGER);
+            expect(overlay.width).toBe(800);
+            expect(overlay.height).toBe(600);
         });
 
-        it("should use default duration of 0.5", () => {
+        it("should switch scenes at the midpoint and complete once", () => {
             const from = createScene();
             const to = createScene();
-            const t = SceneTransition2D.fade({ from, to });
+            let callbackCount = 0;
+            let observableCount = 0;
 
-            // At 0.3s, should still be in "out" phase (half = 0.25s)
-            t.update(0.3);
-            // Should have switched to "in" phase
-            expect(t.activeScene).toBe(to);
+            const transition = SceneTransition2D.fade({
+                from,
+                to,
+                duration: 1,
+                onComplete: () => {
+                    callbackCount++;
+                },
+            });
+            transition.onComplete.add(() => {
+                observableCount++;
+            });
+
+            transition.update(0.25);
+            expect(transition.progress).toBeCloseTo(0.25);
+            expect(transition.activeScene).toBe(from);
+
+            transition.update(0.25);
+            expect(transition.progress).toBeCloseTo(0.5);
+            expect(transition.activeScene).toBe(to);
+
+            transition.update(0.5);
+            expect(transition.progress).toBe(1);
+            expect(transition.isRunning).toBe(false);
+            expect(transition.isDone).toBe(true);
+            expect(callbackCount).toBe(1);
+            expect(observableCount).toBe(1);
+            expect(from.rootNodes.length).toBe(0);
+            expect(to.rootNodes.length).toBe(0);
+            expect((transition as any)._overlay).toBeNull();
+
+            transition.update(1);
+            expect(callbackCount).toBe(1);
+            expect(observableCount).toBe(1);
+        });
+
+        it("should cancel without firing completion callbacks", () => {
+            const from = createScene();
+            const to = createScene();
+            let callbackCount = 0;
+            let observableCount = 0;
+
+            const transition = SceneTransition2D.fade({
+                from,
+                to,
+                duration: 1,
+                onComplete: () => {
+                    callbackCount++;
+                },
+            });
+            transition.onComplete.add(() => {
+                observableCount++;
+            });
+
+            transition.update(0.25);
+            transition.cancel();
+
+            expect(transition.progress).toBeCloseTo(0.25);
+            expect(transition.isRunning).toBe(false);
+            expect(callbackCount).toBe(0);
+            expect(observableCount).toBe(0);
+            expect(from.rootNodes.length).toBe(0);
+            expect(to.rootNodes.length).toBe(0);
+            expect((transition as any)._overlay).toBeNull();
         });
     });
 
     describe("slide", () => {
-        it("should start active", () => {
-            const from = createScene();
-            const to = createScene();
-            const t = SceneTransition2D.slide({ from, to });
-            expect(t.isActive).toBe(true);
-        });
-
-        it("should offset 'to' camera at start (left slide)", () => {
-            const from = createScene();
-            const to = createScene();
-            to.camera!.position = new Vector2(0, 0);
-            SceneTransition2D.slide({ from, to, direction: "left" });
-
-            // "to" camera should start off-screen to the right (opposite of left)
-            expect(to.camera!.position.x).toBe(800); // +vpW
-        });
-
-        it("should restore 'to' camera at end", () => {
+        it("should fall back to a fade when render textures are unavailable", () => {
             const from = createScene();
             const to = createScene();
             to.camera!.position = new Vector2(100, 200);
-            const t = SceneTransition2D.slide({ from, to, duration: 0.5, direction: "left" });
 
-            t.update(0.6); // Past duration
-            expect(to.camera!.position.x).toBeCloseTo(100);
-            expect(to.camera!.position.y).toBeCloseTo(200);
+            const transition = SceneTransition2D.slide({ from, to, duration: 1, direction: "left" });
+
+            expect(transition.isRunning).toBe(true);
+            expect((transition as any)._overlay).not.toBeNull();
+            expect((transition as any)._slideCompositeScene).toBeNull();
+            expect(to.camera!.position.x).toBe(100);
+            expect(to.camera!.position.y).toBe(200);
+
+            transition.update(0.5);
+            expect(transition.activeScene).toBe(to);
+
+            transition.update(0.5);
+            expect(transition.isDone).toBe(true);
         });
 
-        it("should complete and call onComplete", () => {
+        it("should preserve provided duration and completion behavior when falling back", () => {
             const from = createScene();
             const to = createScene();
-            let completed = false;
-            const t = SceneTransition2D.slide({
+            let completed = 0;
+
+            const transition = SceneTransition2D.slide({
                 from,
                 to,
                 duration: 0.5,
                 onComplete: () => {
-                    completed = true;
+                    completed++;
                 },
             });
 
-            t.update(0.6);
-            expect(t.isDone).toBe(true);
-            expect(completed).toBe(true);
-        });
+            transition.update(0.25);
+            expect(transition.progress).toBeCloseTo(0.5);
 
-        it("should support all 4 directions", () => {
-            for (const dir of ["left", "right", "up", "down"] as const) {
-                const from = createScene();
-                const to = createScene();
-                to.camera!.position = new Vector2(0, 0);
-                const t = SceneTransition2D.slide({ from, to, direction: dir, duration: 0.5 });
-                t.update(0.6);
-                expect(t.isDone).toBe(true);
-                expect(to.camera!.position.x).toBeCloseTo(0);
-                expect(to.camera!.position.y).toBeCloseTo(0);
-            }
+            transition.update(0.25);
+            expect(transition.progress).toBe(1);
+            expect(completed).toBe(1);
         });
     });
 
-    describe("after completion", () => {
-        it("should not advance after done", () => {
+    describe("custom", () => {
+        it("should report eased progress and complete", () => {
             const from = createScene();
             const to = createScene();
-            let count = 0;
-            const t = SceneTransition2D.fade({
+            const progressValues: number[] = [];
+            let completed = 0;
+
+            const transition = SceneTransition2D.custom({
                 from,
                 to,
-                duration: 0.5,
-                onComplete: () => count++,
+                duration: 1,
+                easing: Easing.SineInOut,
+                onProgress: (t) => {
+                    progressValues.push(t);
+                },
+                onComplete: () => {
+                    completed++;
+                },
             });
 
-            t.update(0.3);
-            t.update(0.3);
-            expect(count).toBe(1);
+            transition.update(0.25);
+            transition.update(0.25);
+            transition.update(0.5);
 
-            // Further updates should do nothing
-            t.update(1.0);
-            expect(count).toBe(1);
+            expect(progressValues.length).toBe(3);
+            expect(progressValues[0]).toBeCloseTo(Easing.SineInOut(0.25));
+            expect(progressValues[1]).toBeCloseTo(Easing.SineInOut(0.5));
+            expect(progressValues[2]).toBeCloseTo(1);
+            expect(transition.progress).toBe(1);
+            expect(completed).toBe(1);
+        });
+
+        it("should cancel custom transitions without completing", () => {
+            const from = createScene();
+            const to = createScene();
+            let completed = 0;
+
+            const transition = SceneTransition2D.custom({
+                from,
+                to,
+                duration: 1,
+                onProgress: () => {},
+                onComplete: () => {
+                    completed++;
+                },
+            });
+
+            transition.update(0.1);
+            transition.cancel();
+            transition.update(1);
+
+            expect(transition.progress).toBeCloseTo(0.1);
+            expect(transition.isRunning).toBe(false);
+            expect(completed).toBe(0);
         });
     });
 });

@@ -71,6 +71,7 @@ export class SpatialAudio2D {
 
     /**
      * Whether this instance has been disposed.
+     * @returns True when dispose() has been called.
      */
     public get isDisposed(): boolean {
         return this._isDisposed;
@@ -79,13 +80,18 @@ export class SpatialAudio2D {
     /**
      * Updates the audio listener position from the given camera and
      * syncs all node-attached sound positions. Call once per frame.
-     * @param camera - The Camera2D whose position drives the audio listener
+     * @param camera - The Camera2D whose position drives the audio listener, or null to keep the listener at the origin
+     * @returns Nothing.
      */
-    public update(camera: Camera2D): void {
+    public update(camera: Camera2D | null): void {
         if (this._isDisposed) {
             return;
         }
-        this._updateListenerPosition(camera.position.x, camera.position.y);
+        if (camera) {
+            this._updateListenerPosition(camera.position.x, camera.position.y);
+        } else {
+            this._updateListenerPosition(0, 0);
+        }
 
         for (const [sound, node] of this._attachments) {
             const wp = node.worldPosition;
@@ -100,6 +106,7 @@ export class SpatialAudio2D {
      * @param sound - An AudioV2 Sound with spatial audio enabled
      * @param x - X position in 2D world space
      * @param y - Y position in 2D world space
+     * @returns Nothing.
      */
     public setSoundPosition(sound: Sound, x: number, y: number): void {
         this._setSoundPosition3D(sound, x, y);
@@ -112,6 +119,7 @@ export class SpatialAudio2D {
      * previous attachment is replaced.
      * @param sound - An AudioV2 Sound with spatial audio enabled
      * @param node - The Node2D whose world position the sound will track
+     * @returns Nothing.
      */
     public attachToNode(sound: Sound, node: Node2D): void {
         this._attachments.set(sound, node);
@@ -121,6 +129,7 @@ export class SpatialAudio2D {
      * Removes a sound from automatic Node2D position tracking.
      * Does nothing if the sound is not currently attached.
      * @param sound - The Sound to stop tracking
+     * @returns Nothing.
      */
     public detachFromNode(sound: Sound): void {
         this._attachments.delete(sound);
@@ -128,6 +137,7 @@ export class SpatialAudio2D {
 
     /**
      * Clears all node attachments and releases references.
+     * @returns Nothing.
      */
     public dispose(): void {
         if (this._isDisposed) {
@@ -143,6 +153,7 @@ export class SpatialAudio2D {
      * @param sound - The sound to position
      * @param x - X coordinate
      * @param y - Y coordinate
+     * @returns Nothing.
      */
     private _setSoundPosition3D(sound: Sound, x: number, y: number): void {
         this._tempVector3.x = x;
@@ -153,9 +164,11 @@ export class SpatialAudio2D {
 
     /**
      * Updates the Web Audio API listener position from 2D coordinates.
-     * Maps `(x, y)` to `(x, y, 0)` in 3D listener space.
+     * Maps `(x, y)` to `(x, y, 10)` in listener space so the listener sits
+     * slightly in front of the 2D plane for spatial panning.
      * @param x - Listener X coordinate in 2D world space
      * @param y - Listener Y coordinate in 2D world space
+     * @returns Nothing.
      */
     private _updateListenerPosition(x: number, y: number): void {
         const audioEngine = AbstractEngine.audioEngine;
@@ -174,11 +187,11 @@ export class SpatialAudio2D {
         if (listener.positionX !== undefined) {
             listener.positionX.value = x;
             listener.positionY.value = y;
-            listener.positionZ.value = 0;
+            listener.positionZ.value = 10;
         } else {
             // Fallback to deprecated setPosition for older browsers
             // eslint-disable-next-line @typescript-eslint/no-deprecated
-            listener.setPosition(x, y, 0);
+            listener.setPosition(x, y, 10);
         }
     }
 }

@@ -7,9 +7,12 @@ import { Effect } from "core/Materials/effect";
 import { ShaderStore } from "core/Engines/shaderStore";
 import { ShaderLanguage } from "core/Materials/shaderLanguage";
 import { Constants } from "core/Engines/constants";
+import type { IMatrixLike } from "core/Maths/math.like";
+import { Vector2 } from "core/Maths/math.vector";
 
-import { Matrix2D } from "../Math/matrix2D";
+import { LightingMode2D } from "../Lighting/light2D";
 import type { LightingManager2D } from "../Lighting/light2D";
+import { Matrix2D } from "../Math/matrix2D";
 
 
 // ---------------------------------------------------------------------------
@@ -17,6 +20,25 @@ import type { LightingManager2D } from "../Lighting/light2D";
 // ---------------------------------------------------------------------------
 
 const _MAX_TEXTURES = 8;
+
+type MatrixTuple16 = [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+];
 
 const _SAMPLER_NAMES: string[] = [];
 for (let i = 0; i < _MAX_TEXTURES; i++) {
@@ -86,6 +108,43 @@ void main(void) {
 }
 `;
 
+const _MSDF_FRAG_SHADER = `
+precision highp float;
+
+varying vec2 vUV;
+varying vec4 vColor;
+varying float vTextureIndex;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+uniform sampler2D texture3;
+uniform sampler2D texture4;
+uniform sampler2D texture5;
+uniform sampler2D texture6;
+uniform sampler2D texture7;
+uniform float screenPxRange;
+
+${_TEXTURE_SAMPLE_FN}
+
+float median(float r, float g, float b) {
+    return max(min(r, g), min(max(r, g), b));
+}
+
+void main(void) {
+    vec3 sampleColor = sampleTex().rgb;
+    float signedDistance = median(sampleColor.r, sampleColor.g, sampleColor.b) - 0.5;
+    float opacity = clamp(signedDistance * max(screenPxRange, 1.0) + 0.5, 0.0, 1.0);
+    vec4 finalColor = vec4(vColor.rgb, vColor.a * opacity);
+
+    if (finalColor.a < 0.01) {
+        discard;
+    }
+
+    gl_FragColor = finalColor;
+}
+`;
+
 // Non-instanced: 4 vertices per quad with per-vertex transform
 const _VERT_SHADER = `
 precision highp float;
@@ -123,9 +182,11 @@ attribute vec2 corner;
 
 attribute vec4 iTransform0;
 attribute vec2 iTransform1;
-attribute vec2 iSize;
+attribute vec4 iLocalRect;
 attribute vec4 iColor;
-attribute vec4 iCell;
+attribute vec2 iUvOrigin;
+attribute vec2 iUvAxisX;
+attribute vec2 iUvAxisY;
 attribute float iTexIdx;
 
 uniform mat4 projection;
@@ -135,13 +196,16 @@ varying vec4 vColor;
 varying float vTextureIndex;
 
 void main(void) {
-    vec2 pos = (corner - 0.5) * iSize;
+    vec2 pos = vec2(
+        mix(iLocalRect.x, iLocalRect.z, corner.x),
+        mix(iLocalRect.y, iLocalRect.w, corner.y)
+    );
     vec2 transformed = vec2(
         iTransform0.x * pos.x + iTransform0.z * pos.y + iTransform1.x,
         iTransform0.y * pos.x + iTransform0.w * pos.y + iTransform1.y
     );
     gl_Position = projection * vec4(transformed, 0.0, 1.0);
-    vUV = mix(iCell.xy, iCell.zw, corner);
+    vUV = iUvOrigin + iUvAxisX * corner.x + iUvAxisY * corner.y;
     vColor = iColor;
     vTextureIndex = iTexIdx;
 }
@@ -152,6 +216,10 @@ Effect.ShadersStore["sprite2DVertexShader"] = _VERT_SHADER;
 Effect.ShadersStore["sprite2DFragmentShader"] = _FRAG_SHADER;
 Effect.ShadersStore["sprite2DInstancedVertexShader"] = _VERT_INSTANCED_SHADER;
 Effect.ShadersStore["sprite2DInstancedFragmentShader"] = _FRAG_SHADER;
+Effect.ShadersStore["sprite2DMsdfVertexShader"] = _VERT_SHADER;
+Effect.ShadersStore["sprite2DMsdfFragmentShader"] = _MSDF_FRAG_SHADER;
+Effect.ShadersStore["sprite2DMsdfInstancedVertexShader"] = _VERT_INSTANCED_SHADER;
+Effect.ShadersStore["sprite2DMsdfInstancedFragmentShader"] = _MSDF_FRAG_SHADER;
 
 // ---------------------------------------------------------------------------
 // Forward-lit shader variants
@@ -161,60 +229,67 @@ const _LIGHTING_FRAG_FN = `
 // Light data: 4 vec4s per light
 // [i*4+0]: (posX, posY, radius, type)  type: 0=point, 1=spot, 2=ambient
 // [i*4+1]: (colorR, colorG, colorB, intensity)
-// [i*4+2]: (dirX, dirY, innerAngle, outerAngle)
-// [i*4+3]: (falloff, 0, 0, 0)
-uniform int lightCount;
-uniform vec4 ambientLight;
+// [i*4+2]: (falloff, spotAngle, spotConeAngle, spotSoftness)
+// [i*4+3]: (zHeight, 0, 0, 0)
+uniform int activeLightCount;
+uniform vec3 ambientColor;
+uniform float shadowStrength;
 uniform vec4 lightData[${16 * 4}];
 
 vec3 computeLighting(vec2 worldPos) {
-    vec3 lit = ambientLight.rgb;
+    vec3 lit = ambientColor;
     for (int i = 0; i < ${16}; i++) {
-        if (i >= lightCount) break;
+        if (i >= activeLightCount) {
+            break;
+        }
+
         int base = i * 4;
         vec4 d0 = lightData[base];
         vec4 d1 = lightData[base + 1];
         vec4 d2 = lightData[base + 2];
-        vec4 d3 = lightData[base + 3];
 
-        float lightType = d0.w;
-        vec3 lColor = d1.rgb;
-        float lIntensity = d1.w;
-
-        // Ambient light: uniform contribution
-        if (lightType > 1.5) {
-            lit += lColor * lIntensity;
+        int lightType = int(d0.w + 0.5);
+        if (lightType == 2) {
+            lit += d1.rgb * d1.a;
             continue;
         }
 
-        vec2 lPos = d0.xy;
-        float lRadius = d0.z;
-        float lFalloff = d3.x;
+        vec2 toLight = d0.xy - worldPos;
+        float dist = length(toLight);
+        if (dist >= d0.z) {
+            continue;
+        }
 
-        vec2 delta = worldPos - lPos;
-        float dist = length(delta);
-        if (dist >= lRadius) continue;
+        float atten = pow(max(0.0, 1.0 - dist / d0.z), max(d2.x, 0.0001));
 
-        float t = dist / lRadius;
-        float atten = pow(1.0 - t, lFalloff);
+        if (lightType == 1) {
+            float outerAngle = max(d2.z, 0.0);
+            float innerAngle = max(outerAngle * (1.0 - clamp(d2.w, 0.0, 1.0)), 0.0);
+            float outerCos = cos(outerAngle);
+            float innerCos = cos(innerAngle);
+            vec2 lightDir = vec2(cos(d2.y), sin(d2.y));
+            vec2 toFragment = -toLight / max(dist, 0.001);
+            float spotFactor = dot(toFragment, lightDir);
+            if (spotFactor <= outerCos) {
+                continue;
+            }
 
-        // Spotlight cone attenuation
-        if (lightType > 0.5) {
-            vec2 lDir = normalize(d2.xy);
-            float innerA = d2.z;
-            float outerA = d2.w;
-            vec2 toFrag = delta / max(dist, 0.001);
-            float cosAngle = dot(lDir, toFrag);
-            float angle = acos(clamp(cosAngle, -1.0, 1.0));
-            if (angle > outerA) continue;
-            if (angle > innerA) {
-                atten *= 1.0 - (angle - innerA) / (outerA - innerA);
+            if (d2.w > 0.001) {
+                float coneRange = max(innerCos - outerCos, 0.001);
+                float spotAtten = clamp((spotFactor - outerCos) / coneRange, 0.0, 1.0);
+                atten *= spotAtten;
             }
         }
 
-        lit += lColor * lIntensity * atten;
+        lit += d1.rgb * d1.a * atten;
     }
-    return min(lit, vec3(1.0));
+
+    return clamp(lit, vec3(0.0), vec3(1.0));
+}
+
+vec3 applyLighting(vec3 baseColor, vec3 lighting) {
+    vec3 lightMultiplier = mix(vec3(shadowStrength), vec3(1.0), lighting);
+    return baseColor * lightMultiplier;
 }`;
 
 const _LIT_FRAG_SHADER = `
@@ -254,9 +329,8 @@ void main(void) {
         discard;
     }
 
-    // Apply lighting to the color (preserve alpha)
     vec3 lighting = computeLighting(vWorldPos);
-    finalColor.rgb *= lighting;
+    finalColor.rgb = applyLighting(finalColor.rgb, lighting);
 
     gl_FragColor = finalColor;
 }
@@ -301,9 +375,11 @@ attribute vec2 corner;
 
 attribute vec4 iTransform0;
 attribute vec2 iTransform1;
-attribute vec2 iSize;
+attribute vec4 iLocalRect;
 attribute vec4 iColor;
-attribute vec4 iCell;
+attribute vec2 iUvOrigin;
+attribute vec2 iUvAxisX;
+attribute vec2 iUvAxisY;
 attribute float iTexIdx;
 
 uniform mat4 projection;
@@ -314,14 +390,17 @@ varying float vTextureIndex;
 varying vec2 vWorldPos;
 
 void main(void) {
-    vec2 pos = (corner - 0.5) * iSize;
+    vec2 pos = vec2(
+        mix(iLocalRect.x, iLocalRect.z, corner.x),
+        mix(iLocalRect.y, iLocalRect.w, corner.y)
+    );
     vec2 transformed = vec2(
         iTransform0.x * pos.x + iTransform0.z * pos.y + iTransform1.x,
         iTransform0.y * pos.x + iTransform0.w * pos.y + iTransform1.y
     );
     gl_Position = projection * vec4(transformed, 0.0, 1.0);
     vWorldPos = transformed;
-    vUV = mix(iCell.xy, iCell.zw, corner);
+    vUV = iUvOrigin + iUvAxisX * corner.x + iUvAxisY * corner.y;
     vColor = iColor;
     vTextureIndex = iTexIdx;
 }
@@ -391,6 +470,69 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
 }
 `;
 
+const _WGSL_MSDF_FRAG_SHADER = `
+varying vUV: vec2f;
+varying vColor: vec4f;
+varying vTextureIndex: f32;
+
+var texture0Sampler: sampler;
+var texture0: texture_2d<f32>;
+var texture1Sampler: sampler;
+var texture1: texture_2d<f32>;
+var texture2Sampler: sampler;
+var texture2: texture_2d<f32>;
+var texture3Sampler: sampler;
+var texture3: texture_2d<f32>;
+var texture4Sampler: sampler;
+var texture4: texture_2d<f32>;
+var texture5Sampler: sampler;
+var texture5: texture_2d<f32>;
+var texture6Sampler: sampler;
+var texture6: texture_2d<f32>;
+var texture7Sampler: sampler;
+var texture7: texture_2d<f32>;
+
+uniform screenPxRange: f32;
+
+fn median3(value: vec3f) -> f32 {
+    return max(min(value.x, value.y), min(max(value.x, value.y), value.z));
+}
+
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+    var uv: vec2f = input.vUV;
+    var idx: i32 = i32(input.vTextureIndex + 0.5);
+    var texColor: vec4f;
+    if (idx < 4) {
+        if (idx < 2) {
+            if (idx == 0) { texColor = textureSampleLevel(texture0, texture0Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture1, texture1Sampler, uv, 0.0); }
+        } else {
+            if (idx == 2) { texColor = textureSampleLevel(texture2, texture2Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture3, texture3Sampler, uv, 0.0); }
+        }
+    } else {
+        if (idx < 6) {
+            if (idx == 4) { texColor = textureSampleLevel(texture4, texture4Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture5, texture5Sampler, uv, 0.0); }
+        } else {
+            if (idx == 6) { texColor = textureSampleLevel(texture6, texture6Sampler, uv, 0.0); }
+            else { texColor = textureSampleLevel(texture7, texture7Sampler, uv, 0.0); }
+        }
+    }
+
+    var signedDistance: f32 = median3(texColor.rgb) - 0.5;
+    var opacity: f32 = clamp(signedDistance * max(uniforms.screenPxRange, 1.0) + 0.5, 0.0, 1.0);
+    var finalColor: vec4f = vec4f(input.vColor.rgb, input.vColor.a * opacity);
+
+    if (finalColor.a < 0.01) {
+        discard;
+    }
+
+    fragmentOutputs.color = finalColor;
+}
+`;
+
 const _WGSL_VERT_SHADER = `
 attribute position: vec2f;
 attribute uv: vec2f;
@@ -423,9 +565,11 @@ attribute corner: vec2f;
 
 attribute iTransform0: vec4f;
 attribute iTransform1: vec2f;
-attribute iSize: vec2f;
+attribute iLocalRect: vec4f;
 attribute iColor: vec4f;
-attribute iCell: vec4f;
+attribute iUvOrigin: vec2f;
+attribute iUvAxisX: vec2f;
+attribute iUvAxisY: vec2f;
 attribute iTexIdx: f32;
 
 uniform projection: mat4x4f;
@@ -436,13 +580,16 @@ varying vTextureIndex: f32;
 
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
-    var pos: vec2f = (input.corner - vec2f(0.5)) * input.iSize;
+    var pos: vec2f = vec2f(
+        mix(input.iLocalRect.x, input.iLocalRect.z, input.corner.x),
+        mix(input.iLocalRect.y, input.iLocalRect.w, input.corner.y)
+    );
     var transformed: vec2f = vec2f(
         input.iTransform0.x * pos.x + input.iTransform0.z * pos.y + input.iTransform1.x,
         input.iTransform0.y * pos.x + input.iTransform0.w * pos.y + input.iTransform1.y
     );
     vertexOutputs.position = uniforms.projection * vec4f(transformed, 0.0, 1.0);
-    vertexOutputs.vUV = mix(input.iCell.xy, input.iCell.zw, input.corner);
+    vertexOutputs.vUV = input.iUvOrigin + input.iUvAxisX * input.corner.x + input.iUvAxisY * input.corner.y;
     vertexOutputs.vColor = input.iColor;
     vertexOutputs.vTextureIndex = input.iTexIdx;
 }
@@ -451,56 +598,65 @@ fn main(input: VertexInputs) -> FragmentInputs {
 // Lit WGSL variants
 
 const _WGSL_LIGHTING_FRAG_FN = `
-uniform lightCount: i32;
-uniform ambientLight: vec4f;
+uniform activeLightCount: i32;
+uniform ambientColor: vec3f;
+uniform shadowStrength: f32;
 uniform lightData: array<vec4f, ${16 * 4}>;
 
 fn computeLighting(worldPos: vec2f) -> vec3f {
-    var lit: vec3f = uniforms.ambientLight.rgb;
+    var lit: vec3f = uniforms.ambientColor;
     for (var i: i32 = 0; i < ${16}; i = i + 1) {
-        if (i >= uniforms.lightCount) { break; }
+        if (i >= uniforms.activeLightCount) {
+            break;
+        }
+
         var base: i32 = i * 4;
         var d0: vec4f = uniforms.lightData[base];
         var d1: vec4f = uniforms.lightData[base + 1];
         var d2: vec4f = uniforms.lightData[base + 2];
-        var d3: vec4f = uniforms.lightData[base + 3];
 
-        var lightType: f32 = d0.w;
-        var lColor: vec3f = d1.rgb;
-        var lIntensity: f32 = d1.w;
-
-        if (lightType > 1.5) {
-            lit = lit + lColor * lIntensity;
+        var lightType: i32 = i32(d0.w + 0.5);
+        if (lightType == 2) {
+            lit = lit + d1.rgb * d1.a;
             continue;
         }
 
-        var lPos: vec2f = d0.xy;
-        var lRadius: f32 = d0.z;
-        var lFalloff: f32 = d3.x;
+        var toLight: vec2f = d0.xy - worldPos;
+        var dist: f32 = length(toLight);
+        if (dist >= d0.z) {
+            continue;
+        }
 
-        var delta: vec2f = worldPos - lPos;
-        var dist: f32 = length(delta);
-        if (dist >= lRadius) { continue; }
+        var atten: f32 = pow(max(0.0, 1.0 - dist / d0.z), max(d2.x, 0.0001));
 
-        var t: f32 = dist / lRadius;
-        var atten: f32 = pow(1.0 - t, lFalloff);
+        if (lightType == 1) {
+            var outerAngle: f32 = max(d2.z, 0.0);
+            var innerAngle: f32 = max(outerAngle * (1.0 - clamp(d2.w, 0.0, 1.0)), 0.0);
+            var outerCos: f32 = cos(outerAngle);
+            var innerCos: f32 = cos(innerAngle);
+            var lightDir: vec2f = vec2f(cos(d2.y), sin(d2.y));
+            var toFragment: vec2f = -toLight / max(dist, 0.001);
+            var spotFactor: f32 = dot(toFragment, lightDir);
+            if (spotFactor <= outerCos) {
+                continue;
+            }
 
-        if (lightType > 0.5) {
-            var lDir: vec2f = normalize(d2.xy);
-            var innerA: f32 = d2.z;
-            var outerA: f32 = d2.w;
-            var toFrag: vec2f = delta / max(dist, 0.001);
-            var cosAngle: f32 = dot(lDir, toFrag);
-            var angle: f32 = acos(clamp(cosAngle, -1.0, 1.0));
-            if (angle > outerA) { continue; }
-            if (angle > innerA) {
-                atten = atten * (1.0 - (angle - innerA) / (outerA - innerA));
+            if (d2.w > 0.001) {
+                var coneRange: f32 = max(innerCos - outerCos, 0.001);
+                var spotAtten: f32 = clamp((spotFactor - outerCos) / coneRange, 0.0, 1.0);
+                atten = atten * spotAtten;
             }
         }
 
-        lit = lit + lColor * lIntensity * atten;
+        lit = lit + d1.rgb * d1.a * atten;
     }
-    return min(lit, vec3f(1.0));
+
+    return clamp(lit, vec3f(0.0), vec3f(1.0));
+}
+
+fn applyLighting(baseColor: vec3f, lighting: vec3f) -> vec3f {
+    var lightMultiplier: vec3f = mix(vec3f(uniforms.shadowStrength), vec3f(1.0), lighting);
+    return baseColor * lightMultiplier;
 }`;
 
 const _WGSL_LIT_FRAG_SHADER = `
@@ -557,7 +713,7 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     }
 
     var lighting: vec3f = computeLighting(input.vWorldPos);
-    finalColor = vec4f(finalColor.rgb * lighting, finalColor.a);
+    finalColor = vec4f(applyLighting(finalColor.rgb, lighting), finalColor.a);
 
     fragmentOutputs.color = finalColor;
 }
@@ -597,9 +753,11 @@ attribute corner: vec2f;
 
 attribute iTransform0: vec4f;
 attribute iTransform1: vec2f;
-attribute iSize: vec2f;
+attribute iLocalRect: vec4f;
 attribute iColor: vec4f;
-attribute iCell: vec4f;
+attribute iUvOrigin: vec2f;
+attribute iUvAxisX: vec2f;
+attribute iUvAxisY: vec2f;
 attribute iTexIdx: f32;
 
 uniform projection: mat4x4f;
@@ -611,14 +769,17 @@ varying vWorldPos: vec2f;
 
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
-    var pos: vec2f = (input.corner - vec2f(0.5)) * input.iSize;
+    var pos: vec2f = vec2f(
+        mix(input.iLocalRect.x, input.iLocalRect.z, input.corner.x),
+        mix(input.iLocalRect.y, input.iLocalRect.w, input.corner.y)
+    );
     var transformed: vec2f = vec2f(
         input.iTransform0.x * pos.x + input.iTransform0.z * pos.y + input.iTransform1.x,
         input.iTransform0.y * pos.x + input.iTransform0.w * pos.y + input.iTransform1.y
     );
     vertexOutputs.position = uniforms.projection * vec4f(transformed, 0.0, 1.0);
     vertexOutputs.vWorldPos = transformed;
-    vertexOutputs.vUV = mix(input.iCell.xy, input.iCell.zw, input.corner);
+    vertexOutputs.vUV = input.iUvOrigin + input.iUvAxisX * input.corner.x + input.iUvAxisY * input.corner.y;
     vertexOutputs.vColor = input.iColor;
     vertexOutputs.vTextureIndex = input.iTexIdx;
 }
@@ -629,6 +790,10 @@ ShaderStore.ShadersStoreWGSL["sprite2DVertexShader"] = _WGSL_VERT_SHADER;
 ShaderStore.ShadersStoreWGSL["sprite2DFragmentShader"] = _WGSL_FRAG_SHADER;
 ShaderStore.ShadersStoreWGSL["sprite2DInstancedVertexShader"] = _WGSL_VERT_INSTANCED_SHADER;
 ShaderStore.ShadersStoreWGSL["sprite2DInstancedFragmentShader"] = _WGSL_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMsdfVertexShader"] = _WGSL_VERT_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMsdfFragmentShader"] = _WGSL_MSDF_FRAG_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMsdfInstancedVertexShader"] = _WGSL_VERT_INSTANCED_SHADER;
+ShaderStore.ShadersStoreWGSL["sprite2DMsdfInstancedFragmentShader"] = _WGSL_MSDF_FRAG_SHADER;
 ShaderStore.ShadersStoreWGSL["sprite2DLitVertexShader"] = _WGSL_LIT_VERT_SHADER;
 ShaderStore.ShadersStoreWGSL["sprite2DLitFragmentShader"] = _WGSL_LIT_FRAG_SHADER;
 ShaderStore.ShadersStoreWGSL["sprite2DLitInstancedVertexShader"] = _WGSL_LIT_VERT_INSTANCED_SHADER;
@@ -743,90 +908,54 @@ ShaderStore.ShadersStoreWGSL["sprite2DMaskInstancedFragmentShader"] = _WGSL_MASK
  * Data for a single sprite to be rendered by the batch renderer
  */
 export interface ISprite2DRenderData {
-    /**
-     * The world transform of the sprite (3x2 affine matrix)
-     */
+    /** Precomputed world transform (3x2 affine matrix). */
     worldTransform: Matrix2D;
-    /**
-     * Width in pixels
-     */
-    width: number;
-    /**
-     * Height in pixels
-     */
-    height: number;
-    /**
-     * Tint color (r, g, b, a) with premultiplied worldAlpha
-     */
-    r: number;
-    /**
-     * Green component
-     */
-    g: number;
-    /**
-     * Blue component
-     */
-    b: number;
-    /**
-     * Alpha component
-     */
-    a: number;
-    /**
-     * Source rectangle in normalized UV coordinates [u, v, uWidth, vHeight]
-     */
-    cellU: number;
-    /**
-     * Source V coordinate
-     */
-    cellV: number;
-    /**
-     * Source width in UV space
-     */
-    cellW: number;
-    /**
-     * Source height in UV space
-     */
-    cellH: number;
-    /**
-     * Whether to flip horizontally
-     */
-    flipX: boolean;
-    /**
-     * Whether to flip vertically
-     */
-    flipY: boolean;
-    /**
-     * Whether the texture was loaded with invertY (v=0 at bottom).
-     * When true, the renderer flips V so the image appears right-side up.
-     */
-    invertY: boolean;
-    /**
-     * The texture to render
-     */
+    /** Texture bound for this sprite. */
     texture: ThinTexture;
-    /**
-     * Z-index for sorting
-     */
-    zIndex: number;
-    /**
-     * Sorting layer — sprites in lower layers render behind higher layers
-     */
-    sortingLayer: number;
-    /**
-     * Horizontal scroll factor for parallax (1 = normal, 0 = fixed to camera).
-     * Optional — defaults to 1 if omitted.
-     */
+    /** UV bounds packed as [u0, v0, u1, v1]. */
+    uvs: [number, number, number, number];
+    /** Premultiplied tint * alpha as [r, g, b, a]. */
+    color: [number, number, number, number];
+    /** Display width in pixels. */
+    width: number;
+    /** Display height in pixels. */
+    height: number;
+    /** Alpha blend mode. */
+    alphaMode: number;
+    /** Packed sort key: (sortingLayer << 16) | (zIndex & 0xffff). */
+    sortKey: number;
+    /** Stable insertion-order tiebreaker. */
+    insertionOrder: number;
+    /** Whether this sprite uses the lit shader variant. */
+    lit: boolean;
+    /** Whether this sprite uses the MSDF shader variant. */
+    msdf?: boolean;
+    /** Per-batch screen pixel range used by the MSDF shader. */
+    msdfScreenPxRange?: number;
+    /** Left edge of the local quad in sprite space. */
+    localLeft?: number;
+    /** Top edge of the local quad in sprite space. */
+    localTop?: number;
+    /** Right edge of the local quad in sprite space. */
+    localRight?: number;
+    /** Bottom edge of the local quad in sprite space. */
+    localBottom?: number;
+    /** Base UV for corner (0, 0). */
+    uvOriginU?: number;
+    /** Base UV for corner (0, 0). */
+    uvOriginV?: number;
+    /** UV delta applied across the X axis. */
+    uvAxisXU?: number;
+    /** UV delta applied across the X axis. */
+    uvAxisXV?: number;
+    /** UV delta applied across the Y axis. */
+    uvAxisYU?: number;
+    /** UV delta applied across the Y axis. */
+    uvAxisYV?: number;
+    /** Horizontal scroll factor for parallax. */
     scrollFactorX?: number;
-    /**
-     * Vertical scroll factor for parallax (1 = normal, 0 = fixed to camera).
-     * Optional — defaults to 1 if omitted.
-     */
+    /** Vertical scroll factor for parallax. */
     scrollFactorY?: number;
-    /**
-     * Stable insertion-order tiebreaker used to preserve deterministic sort order.
-     * Optional for backward compatibility with older render-data producers.
-     */
-    insertionOrder?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -855,12 +984,17 @@ export class SpriteBatchRenderer {
     private static readonly _INDICES_PER_QUAD = 6;
     private static readonly _FLOATS_PER_QUAD = 18 * 4;
 
-    // Instanced layout: 17 floats/instance
-    private static readonly _FLOATS_PER_INSTANCE = 17;
+    // Instanced layout: 24 floats/instance (17 live values + reserved padding)
+    private static readonly _FLOATS_PER_INSTANCE = 24;
 
     private _engine: AbstractEngine;
-    private _capacity: number;
     private _useInstancing: boolean;
+
+    /** Maximum number of textures bound per draw call. */
+    public readonly maxTexturesPerBatch: number;
+
+    /** Maximum instances emitted in a single draw call. */
+    public readonly maxInstancesPerBatch: number;
 
     // Shader effect + draw wrapper
     private _drawWrapper: DrawWrapper;
@@ -878,11 +1012,10 @@ export class SpriteBatchRenderer {
     private _maskEffect: Effect | null = null;
     private _isMaskReady: boolean = false;
 
-    /**
-     * When set, enables forward lighting in the sprite shader.
-     * The manager's packLightUniforms() is called automatically before each render.
-     */
-    public lightingManager: LightingManager2D | null = null;
+    // MSDF shader variant
+    private _msdfDrawWrapper: DrawWrapper | null = null;
+    private _msdfEffect: Effect | null = null;
+    private _isMsdfReady: boolean = false;
 
     /**
      * Fallback texture used to fill unused texture slots on WebGPU.
@@ -904,12 +1037,26 @@ export class SpriteBatchRenderer {
     private _instanceBuffer!: Buffer;
 
     // Multi-texture slot tracking
-    private _textureSlots: (ThinTexture | null)[] = new Array(_MAX_TEXTURES).fill(null);
+    private _textureSlotMap: Map<ThinTexture, number> = new Map();
+    private _textureSlots: ThinTexture[] = new Array(_MAX_TEXTURES) as ThinTexture[];
     private _textureSlotCount: number = 0;
 
+    // Per-frame debug stats
+    private _drawCallCount: number = 0;
+    private _spriteCount: number = 0;
+    private _statsFrameId: number = -1;
+
     // Pre-allocated projection matrix to avoid per-frame allocation
-    private _projectionData = new Float32Array(16);
-    private _projectionMatrix: { toArray: () => Float32Array; asArray: () => Float32Array; updateFlag: number };
+    private _projectionData: MatrixTuple16 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    private _projectionMatrix: IMatrixLike;
+    private _activeViewProjection: Readonly<Matrix2D> = Matrix2D.Identity();
+    private _activeLightingManager: LightingManager2D | null = null;
+    private _activeMaskAlphaThreshold: number = 0;
+    private _activeMsdfScreenPxRange: number = 1;
+    private _cameraWorldX: number = 0;
+    private _cameraWorldY: number = 0;
+    private _cameraWorldPosition: Vector2 = Vector2.Zero();
+    private _inverseViewProjection: Matrix2D = Matrix2D.Identity();
 
     // Quad corner positions for non-instanced path
     private static readonly _CORNERS = [
@@ -922,18 +1069,19 @@ export class SpriteBatchRenderer {
     /**
      * Creates a new SpriteBatchRenderer.
      * @param engine - The Babylon engine instance
-     * @param capacity - Maximum number of sprites per batch (default: 10000)
+     * @param capacity - Maximum number of sprites per batch (default: 16384)
      * @param pixelPerfect - Enable fwidth()-based alpha sharpening for pixel art (default: false)
      */
-    constructor(engine: AbstractEngine, capacity: number = 10000, pixelPerfect: boolean = false) {
+    constructor(engine: AbstractEngine, capacity: number = 16384, pixelPerfect: boolean = false) {
         this._engine = engine;
-        this._capacity = capacity;
-        this._useInstancing = engine.getCaps().instancedArrays;
+        this.maxInstancesPerBatch = capacity;
+        const caps = engine.getCaps();
+        this.maxTexturesPerBatch = Math.max(1, Math.min(_MAX_TEXTURES, caps.maxTexturesImageUnits || _MAX_TEXTURES));
+        this._useInstancing = caps.instancedArrays;
         this._shaderLanguage = engine.isWebGPU ? ShaderLanguage.WGSL : ShaderLanguage.GLSL;
 
         const projData = this._projectionData;
         this._projectionMatrix = {
-            toArray: () => projData,
             asArray: () => projData,
             updateFlag: 0,
         };
@@ -967,14 +1115,16 @@ export class SpriteBatchRenderer {
         this._vertexBuffersMap["corner"] = this._cornerBuffer.createVertexBuffer("corner", 0, 2, 2, false);
         this._vertexBuffersMap["iTransform0"] = this._instanceBuffer.createVertexBuffer("iTransform0", 0, 4, stride, true);
         this._vertexBuffersMap["iTransform1"] = this._instanceBuffer.createVertexBuffer("iTransform1", 4, 2, stride, true);
-        this._vertexBuffersMap["iSize"] = this._instanceBuffer.createVertexBuffer("iSize", 6, 2, stride, true);
-        this._vertexBuffersMap["iColor"] = this._instanceBuffer.createVertexBuffer("iColor", 8, 4, stride, true);
-        this._vertexBuffersMap["iCell"] = this._instanceBuffer.createVertexBuffer("iCell", 12, 4, stride, true);
-        this._vertexBuffersMap["iTexIdx"] = this._instanceBuffer.createVertexBuffer("iTexIdx", 16, 1, stride, true);
+        this._vertexBuffersMap["iLocalRect"] = this._instanceBuffer.createVertexBuffer("iLocalRect", 6, 4, stride, true);
+        this._vertexBuffersMap["iColor"] = this._instanceBuffer.createVertexBuffer("iColor", 10, 4, stride, true);
+        this._vertexBuffersMap["iUvOrigin"] = this._instanceBuffer.createVertexBuffer("iUvOrigin", 14, 2, stride, true);
+        this._vertexBuffersMap["iUvAxisX"] = this._instanceBuffer.createVertexBuffer("iUvAxisX", 16, 2, stride, true);
+        this._vertexBuffersMap["iUvAxisY"] = this._instanceBuffer.createVertexBuffer("iUvAxisY", 18, 2, stride, true);
+        this._vertexBuffersMap["iTexIdx"] = this._instanceBuffer.createVertexBuffer("iTexIdx", 20, 1, stride, true);
 
         this._effect = engine.createEffect(
             { vertex: "sprite2DInstanced", fragment: "sprite2DInstanced" },
-            ["corner", "iTransform0", "iTransform1", "iSize", "iColor", "iCell", "iTexIdx"],
+            ["corner", "iTransform0", "iTransform1", "iLocalRect", "iColor", "iUvOrigin", "iUvAxisX", "iUvAxisY", "iTexIdx"],
             ["projection"],
             _SAMPLER_NAMES,
             defines,
@@ -992,10 +1142,10 @@ export class SpriteBatchRenderer {
         };
 
         // Lit variant (same attributes, different shaders + extra uniforms)
-        const litUniforms = ["projection", "lightCount", "ambientLight", "lightData"];
+        const litUniforms = ["projection", "activeLightCount", "ambientColor", "shadowStrength", "lightData"];
         this._litEffect = engine.createEffect(
             { vertex: "sprite2DLitInstanced", fragment: "sprite2DLitInstanced" },
-            ["corner", "iTransform0", "iTransform1", "iSize", "iColor", "iCell", "iTexIdx"],
+            ["corner", "iTransform0", "iTransform1", "iLocalRect", "iColor", "iUvOrigin", "iUvAxisX", "iUvAxisY", "iTexIdx"],
             litUniforms,
             _SAMPLER_NAMES,
             defines,
@@ -1011,10 +1161,28 @@ export class SpriteBatchRenderer {
             this._isLitReady = true;
         };
 
+        this._msdfEffect = engine.createEffect(
+            { vertex: "sprite2DMsdfInstanced", fragment: "sprite2DMsdfInstanced" },
+            ["corner", "iTransform0", "iTransform1", "iLocalRect", "iColor", "iUvOrigin", "iUvAxisX", "iUvAxisY", "iTexIdx"],
+            ["projection", "screenPxRange"],
+            _SAMPLER_NAMES,
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
+        );
+        this._msdfDrawWrapper = new DrawWrapper(engine);
+        if (this._msdfDrawWrapper.drawContext) {
+            this._msdfDrawWrapper.drawContext.useInstancing = true;
+        }
+        this._msdfDrawWrapper.effect = this._msdfEffect;
+        this._msdfEffect.onCompiled = () => {
+            this._isMsdfReady = true;
+        };
+
         // Mask variant (same attributes, alphaThreshold uniform)
         this._maskEffect = engine.createEffect(
             { vertex: "sprite2DMaskInstanced", fragment: "sprite2DMaskInstanced" },
-            ["corner", "iTransform0", "iTransform1", "iSize", "iColor", "iCell", "iTexIdx"],
+            ["corner", "iTransform0", "iTransform1", "iLocalRect", "iColor", "iUvOrigin", "iUvAxisX", "iUvAxisY", "iTexIdx"],
             ["projection", "alphaThreshold"],
             _SAMPLER_NAMES,
             defines,
@@ -1077,7 +1245,7 @@ export class SpriteBatchRenderer {
         };
 
         // Lit variant
-        const litUniforms = ["projection", "lightCount", "ambientLight", "lightData"];
+        const litUniforms = ["projection", "activeLightCount", "ambientColor", "shadowStrength", "lightData"];
         this._litEffect = engine.createEffect(
             "sprite2DLit",
             [VertexBuffer.PositionKind, VertexBuffer.UVKind, VertexBuffer.ColorKind, "cellInfo", "transform0", "transform1"],
@@ -1091,6 +1259,21 @@ export class SpriteBatchRenderer {
         this._litDrawWrapper.effect = this._litEffect;
         this._litEffect.onCompiled = () => {
             this._isLitReady = true;
+        };
+
+        this._msdfEffect = engine.createEffect(
+            "sprite2DMsdf",
+            [VertexBuffer.PositionKind, VertexBuffer.UVKind, VertexBuffer.ColorKind, "cellInfo", "transform0", "transform1"],
+            ["projection", "screenPxRange"],
+            _SAMPLER_NAMES,
+            defines,
+            undefined, undefined, undefined, undefined,
+            this._shaderLanguage
+        );
+        this._msdfDrawWrapper = new DrawWrapper(engine);
+        this._msdfDrawWrapper.effect = this._msdfEffect;
+        this._msdfEffect.onCompiled = () => {
+            this._isMsdfReady = true;
         };
 
         // Mask variant
@@ -1117,7 +1300,7 @@ export class SpriteBatchRenderer {
         if (!this._isReady && this._effect.isReady()) {
             this._isReady = true;
         }
-        return this._isReady;
+        return this._isReady && this.isMsdfReady;
     }
 
     /**
@@ -1140,19 +1323,36 @@ export class SpriteBatchRenderer {
         return this._isMaskReady;
     }
 
+    /**
+     * Whether the MSDF shader variant is ready.
+     */
+    public get isMsdfReady(): boolean {
+        if (!this._isMsdfReady && this._msdfEffect && this._msdfEffect.isReady()) {
+            this._isMsdfReady = true;
+        }
+        return this._isMsdfReady;
+    }
+
+    /** Gets the number of draw calls issued during the last rendered frame. */
+    public get drawCallCount(): number {
+        return this._drawCallCount;
+    }
+
+    /** Gets the number of sprites submitted during the last rendered frame. */
+    public get spriteCount(): number {
+        return this._spriteCount;
+    }
     /** Reusable single-element array to avoid per-call allocation in renderMaskSprite */
     private _singleSpriteArray: ISprite2DRenderData[] = [];
 
     /**
      * Renders a single sprite into the stencil buffer using the mask shader.
-     * Color writes are disabled; only the stencil buffer is updated.
-     * The caller is responsible for setting up stencil state before calling this.
-     * @param sprite - The mask sprite's render data
-     * @param alphaThreshold - Alpha cutoff for the stencil discard
-     * @param viewportWidth - Viewport width in pixels
-     * @param viewportHeight - Viewport height in pixels
-     * @param cameraTransform - Camera view transform
-     * @param cameraWorldPosition - Camera world position for parallax
+     * @param sprite - The mask sprite render data.
+     * @param alphaThreshold - Alpha cutoff for the stencil discard.
+     * @param viewportWidth - Viewport width in pixels.
+     * @param viewportHeight - Viewport height in pixels.
+     * @param viewProjection - World-to-screen transform.
+     * @param cameraWorldPosition - Optional camera world position for parallax.
      * @internal
      */
     public renderMaskSprite(
@@ -1160,61 +1360,66 @@ export class SpriteBatchRenderer {
         alphaThreshold: number,
         viewportWidth: number,
         viewportHeight: number,
-        cameraTransform: Matrix2D,
+        viewProjection: Readonly<Matrix2D>,
         cameraWorldPosition?: { x: number; y: number } | null
     ): void {
-        if (!this.isMaskReady) {
-            return;
-        }
-        const engine = this._engine;
-        const maskEffect = this._maskEffect!;
-        const maskWrapper = this._maskDrawWrapper!;
-
-        // Disable color and depth writes for stencil-only rendering
-        engine.setColorWrite(false);
-        engine.setDepthBuffer(false);
-        engine.enableEffect(maskWrapper);
-        (engine as any).applyStates();
-
-        // Set projection
-        const p = this._projectionData;
-        p[0] = 2.0 / viewportWidth;
-        p[5] = -2.0 / viewportHeight;
-        p[10] = 1;
-        p[12] = -1;
-        p[13] = 1;
-        p[15] = 1;
-        this._projectionMatrix.updateFlag++;
-        maskEffect.setMatrix("projection", this._projectionMatrix as any);
-        maskEffect.setFloat("alphaThreshold", alphaThreshold);
-
-        // Render the single mask sprite
-        this._activeEffect = maskEffect;
-        const cwx = cameraWorldPosition ? cameraWorldPosition.x : 0;
-        const cwy = cameraWorldPosition ? cameraWorldPosition.y : 0;
-
         this._singleSpriteArray[0] = sprite;
-        if (this._useInstancing) {
-            this._renderInstanced(this._singleSpriteArray, cameraTransform, cwx, cwy);
-        } else {
-            this._renderNonInstanced(this._singleSpriteArray, cameraTransform, cwx, cwy);
-        }
+        this.renderMaskSprites(this._singleSpriteArray, alphaThreshold, viewportWidth, viewportHeight, viewProjection, cameraWorldPosition);
         this._singleSpriteArray.length = 0;
-
-        // Restore color and depth writes
-        engine.setColorWrite(true);
-        engine.setDepthBuffer(false); // Remain off — caller (_processRenderCommands) owns state
     }
 
     /**
-     * Renders a batch of sprite data.
-     * @param sprites - Array of sprite render data, sorted by z-index
-     * @param viewportWidth - Width of the viewport in pixels
-     * @param viewportHeight - Height of the viewport in pixels
-     * @param cameraTransform - The camera's inverse world transform (to convert world → view)
-     * @param cameraWorldPosition - Optional camera world position for parallax scroll factor correction
+     * Renders one or more sprites into the stencil buffer using the mask shader.
+     * @param sprites - Sorted mask sprite render data.
+     * @param alphaThreshold - Alpha cutoff for the stencil discard.
+     * @param viewportWidth - Viewport width in pixels.
+     * @param viewportHeight - Viewport height in pixels.
+     * @param viewProjection - World-to-screen transform.
+     * @param cameraWorldPosition - Optional camera world position for parallax.
+     * @internal
      */
-    public render(sprites: ISprite2DRenderData[], viewportWidth: number, viewportHeight: number, cameraTransform: Matrix2D, cameraWorldPosition?: { x: number; y: number } | null): void {
+    public renderMaskSprites(
+        sprites: ISprite2DRenderData[],
+        alphaThreshold: number,
+        viewportWidth: number,
+        viewportHeight: number,
+        viewProjection: Readonly<Matrix2D>,
+        cameraWorldPosition?: { x: number; y: number } | null
+    ): void {
+        this._beginStatsFrame();
+        if (!this.isMaskReady || sprites.length === 0) {
+            return;
+        }
+
+        const engine = this._engine;
+        engine.setColorWrite(false);
+        engine.setDepthBuffer(false);
+        engine.setAlphaMode(Constants.ALPHA_DISABLE);
+        engine.setState(false);
+
+        this._prepareRenderContext(viewProjection, null, viewportWidth, viewportHeight, cameraWorldPosition, alphaThreshold);
+        this._renderBatches(sprites, true);
+
+        engine.setColorWrite(true);
+        engine.setDepthBuffer(false);
+    }
+
+    /**
+     * Renders a sorted list of sprite render data.
+     * @param sprites - Sorted sprite render data.
+     * @param viewProjection - Combined world-to-screen matrix from Camera2D.
+     * @param lightingManager - Active lighting manager, or null for unlit rendering.
+     * @param viewportWidth - Viewport width in pixels.
+     * @param viewportHeight - Viewport height in pixels.
+     */
+    public render(
+        sprites: ISprite2DRenderData[],
+        viewProjection: Readonly<Matrix2D>,
+        lightingManager: LightingManager2D | null,
+        viewportWidth: number,
+        viewportHeight: number
+    ): void {
+        this._beginStatsFrame();
         if (!this.isReady || sprites.length === 0) {
             return;
         }
@@ -1222,69 +1427,224 @@ export class SpriteBatchRenderer {
         const engine = this._engine;
         engine.setAlphaMode(Constants.ALPHA_COMBINE);
         engine.setDepthBuffer(false);
-        engine.setState(false); // Disable backface culling for 2D quads
+        engine.setState(false);
 
-        this.renderBatch(sprites, viewportWidth, viewportHeight, cameraTransform, cameraWorldPosition);
+        this._prepareRenderContext(viewProjection, lightingManager, viewportWidth, viewportHeight);
+        this._renderBatches(sprites, false);
 
         engine.setDepthBuffer(true);
         engine.setAlphaMode(Constants.ALPHA_DISABLE);
     }
 
     /**
-     * Renders a batch of sprite data without managing global engine state
-     * (depth buffer, alpha mode, cull state). The caller is responsible
-     * for setting up and restoring engine state.
-     *
-     * Used by Scene2D._processRenderCommands where the outer method owns state.
-     * @param sprites - Array of sprite render data, sorted by z-index
-     * @param viewportWidth - Width of the viewport in pixels
-     * @param viewportHeight - Height of the viewport in pixels
-     * @param cameraTransform - The camera's inverse world transform
-     * @param cameraWorldPosition - Optional camera world position for parallax
-     * @internal
+     * Flushes a single batch to the GPU.
+     * @param sprites - Source sprite array.
+     * @param start - Start index of the batch.
+     * @param count - Number of sprites in the batch.
+     * @param textureSlots - Texture slots assigned for the batch.
+     * @param alphaMode - Alpha mode for the batch.
+     * @param lit - Whether the batch uses the lit shader variant.
+     * @param maskMode - Whether the mask shader variant should be used.
      */
-    public renderBatch(sprites: ISprite2DRenderData[], viewportWidth: number, viewportHeight: number, cameraTransform: Matrix2D, cameraWorldPosition?: { x: number; y: number } | null): void {
-        if (!this.isReady || sprites.length === 0) {
+    public flush(
+        sprites: ISprite2DRenderData[],
+        start: number,
+        count: number,
+        textureSlots: ThinTexture[],
+        alphaMode: number,
+        lit: boolean,
+        maskMode: boolean,
+        msdfMode: boolean,
+        msdfScreenPxRange: number
+    ): void {
+        if (count <= 0) {
             return;
         }
 
-        const useLit = this.lightingManager !== null && this.lightingManager.activeLightCount > 0 && this.isLitReady;
-        const activeEffect = useLit ? this._litEffect! : this._effect;
-        const activeWrapper = useLit ? this._litDrawWrapper! : this._drawWrapper;
-        this._activeEffect = activeEffect;
-
-        const engine = this._engine;
-        engine.enableEffect(activeWrapper);
-
-        // Ensure deferred GL state (blend, depth, cull) is flushed before drawing.
-        // enableEffect only calls applyStates when the active shader changes;
-        // when the same shader is reused across frames the state may be stale.
-        (engine as any).applyStates();
-
-        // Update orthographic projection (Y-down, top-left origin)
-        const p = this._projectionData;
-        p[0] = 2.0 / viewportWidth;
-        p[5] = -2.0 / viewportHeight;
-        p[10] = 1;
-        p[12] = -1;
-        p[13] = 1;
-        p[15] = 1;
-        this._projectionMatrix.updateFlag++;
-        activeEffect.setMatrix("projection", this._projectionMatrix as any);
-
-        // Bind lighting uniforms if using lit shader
-        if (useLit) {
-            this.lightingManager!.bindToEffect(activeEffect);
+        if (textureSlots !== this._textureSlots) {
+            this._syncTextureSlots(textureSlots);
         }
 
-        // Extract camera world position for parallax correction
-        const cwx = cameraWorldPosition ? cameraWorldPosition.x : 0;
-        const cwy = cameraWorldPosition ? cameraWorldPosition.y : 0;
+        const useMsdf = msdfMode && this._canUseMsdf(maskMode);
+        const useLit = !useMsdf && lit && this._canUseForwardLighting(maskMode);
+        if (!maskMode) {
+            this._engine.setAlphaMode(alphaMode);
+        }
+
+        this._activeMsdfScreenPxRange = msdfScreenPxRange;
+        this._bindEffect(useLit, maskMode, useMsdf);
 
         if (this._useInstancing) {
-            this._renderInstanced(sprites, cameraTransform, cwx, cwy);
+            this._renderInstancedRange(sprites, start, count);
+            this._drawInstanced(count);
         } else {
-            this._renderNonInstanced(sprites, cameraTransform, cwx, cwy);
+            this._renderNonInstancedRange(sprites, start, count);
+            this._drawNonInstanced(count);
+        }
+
+        this._drawCallCount++;
+        this._spriteCount += count;
+        this._resetTextureSlots();
+    }
+
+    private _prepareRenderContext(
+        viewProjection: Readonly<Matrix2D>,
+        lightingManager: LightingManager2D | null,
+        viewportWidth: number,
+        viewportHeight: number,
+        cameraWorldPosition?: { x: number; y: number } | null,
+        maskAlphaThreshold: number = 0
+    ): void {
+        this._activeViewProjection = viewProjection;
+        this._activeLightingManager = lightingManager;
+        this._activeMaskAlphaThreshold = maskAlphaThreshold;
+        this._updateProjection(viewportWidth, viewportHeight);
+
+        if (cameraWorldPosition) {
+            this._cameraWorldX = cameraWorldPosition.x;
+            this._cameraWorldY = cameraWorldPosition.y;
+        } else {
+            this._resolveCameraWorldPosition(viewProjection, viewportWidth, viewportHeight);
+        }
+
+        this._cameraWorldPosition.x = this._cameraWorldX;
+        this._cameraWorldPosition.y = this._cameraWorldY;
+    }
+
+    private _updateProjection(viewportWidth: number, viewportHeight: number): void {
+        const p = this._projectionData;
+        p[0] = 2.0 / viewportWidth;
+        p[1] = 0;
+        p[2] = 0;
+        p[3] = 0;
+        p[4] = 0;
+        p[5] = -2.0 / viewportHeight;
+        p[6] = 0;
+        p[7] = 0;
+        p[8] = 0;
+        p[9] = 0;
+        p[10] = 1;
+        p[11] = 0;
+        p[12] = -1;
+        p[13] = 1;
+        p[14] = 0;
+        p[15] = 1;
+        this._projectionMatrix.updateFlag++;
+    }
+
+    private _resolveCameraWorldPosition(viewProjection: Readonly<Matrix2D>, viewportWidth: number, viewportHeight: number): void {
+        const matrix = viewProjection.m;
+        if (matrix[0] === 1 && matrix[1] === 0 && matrix[2] === 0 && matrix[3] === 1 && matrix[4] === 0 && matrix[5] === 0) {
+            this._cameraWorldX = 0;
+            this._cameraWorldY = 0;
+            return;
+        }
+
+        if (!viewProjection.invertToRef(this._inverseViewProjection)) {
+            this._cameraWorldX = 0;
+            this._cameraWorldY = 0;
+            return;
+        }
+
+        const inverse = this._inverseViewProjection.m;
+        const screenCenterX = viewportWidth * 0.5;
+        const screenCenterY = viewportHeight * 0.5;
+        this._cameraWorldX = inverse[0] * screenCenterX + inverse[2] * screenCenterY + inverse[4];
+        this._cameraWorldY = inverse[1] * screenCenterX + inverse[3] * screenCenterY + inverse[5];
+    }
+
+    private _bindEffect(useLit: boolean, maskMode: boolean, msdfMode: boolean): void {
+        let effect: Effect;
+        let drawWrapper: DrawWrapper;
+
+        if (maskMode) {
+            effect = this._maskEffect!;
+            drawWrapper = this._maskDrawWrapper!;
+        } else if (msdfMode) {
+            effect = this._msdfEffect!;
+            drawWrapper = this._msdfDrawWrapper!;
+        } else if (useLit) {
+            effect = this._litEffect!;
+            drawWrapper = this._litDrawWrapper!;
+        } else {
+            effect = this._effect;
+            drawWrapper = this._drawWrapper;
+        }
+
+        this._activeEffect = effect;
+        this._engine.enableEffect(drawWrapper);
+        this._applyStates();
+        effect.setMatrix("projection", this._projectionMatrix);
+
+        if (maskMode) {
+            effect.setFloat("alphaThreshold", this._activeMaskAlphaThreshold);
+        } else if (msdfMode) {
+            effect.setFloat("screenPxRange", this._activeMsdfScreenPxRange);
+        } else if (useLit && this._activeLightingManager) {
+            this._activeLightingManager.uploadUniforms(effect, this._cameraWorldPosition);
+        }
+    }
+
+    private _canUseForwardLighting(maskMode: boolean): boolean {
+        return !maskMode && this._activeLightingManager !== null && this._activeLightingManager.mode === LightingMode2D.Forward && this.isLitReady;
+    }
+
+    private _canUseMsdf(maskMode: boolean): boolean {
+        return !maskMode && this.isMsdfReady;
+    }
+
+    private _renderBatches(sprites: ISprite2DRenderData[], maskMode: boolean): void {
+        this._resetTextureSlots();
+
+        let batchStart = 0;
+        let batchCount = 0;
+        let batchAlphaMode = maskMode ? Constants.ALPHA_DISABLE : Constants.ALPHA_COMBINE;
+        let batchLit = false;
+        let batchMsdf = false;
+        let batchMsdfScreenPxRange = 0;
+
+        for (let i = 0; i < sprites.length; i++) {
+            const sprite = sprites[i];
+            const spriteAlphaMode = maskMode ? Constants.ALPHA_DISABLE : sprite.alphaMode;
+            const spriteMsdf = !maskMode && sprite.msdf === true;
+            const spriteMsdfScreenPxRange = sprite.msdfScreenPxRange ?? 0;
+            const spriteLit = !spriteMsdf && this._canUseForwardLighting(maskMode) && sprite.lit;
+
+            if (batchCount > 0 && (
+                spriteAlphaMode !== batchAlphaMode ||
+                spriteLit !== batchLit ||
+                spriteMsdf !== batchMsdf ||
+                (spriteMsdf && spriteMsdfScreenPxRange !== batchMsdfScreenPxRange) ||
+                batchCount >= this.maxInstancesPerBatch
+            )) {
+                this.flush(sprites, batchStart, batchCount, this._textureSlots, batchAlphaMode, batchLit, maskMode, batchMsdf, batchMsdfScreenPxRange);
+                batchCount = 0;
+            }
+
+            if (batchCount === 0) {
+                batchStart = i;
+                batchAlphaMode = spriteAlphaMode;
+                batchLit = spriteLit;
+                batchMsdf = spriteMsdf;
+                batchMsdfScreenPxRange = spriteMsdfScreenPxRange;
+            }
+
+            if (!this._textureSlotMap.has(sprite.texture) && this._textureSlotCount >= this.maxTexturesPerBatch) {
+                this.flush(sprites, batchStart, batchCount, this._textureSlots, batchAlphaMode, batchLit, maskMode, batchMsdf, batchMsdfScreenPxRange);
+                batchStart = i;
+                batchCount = 0;
+                batchAlphaMode = spriteAlphaMode;
+                batchLit = spriteLit;
+                batchMsdf = spriteMsdf;
+                batchMsdfScreenPxRange = spriteMsdfScreenPxRange;
+            }
+
+            this._getTextureSlot(sprite.texture);
+            batchCount++;
+        }
+
+        if (batchCount > 0) {
+            this.flush(sprites, batchStart, batchCount, this._textureSlots, batchAlphaMode, batchLit, maskMode, batchMsdf, batchMsdfScreenPxRange);
         }
     }
 
@@ -1311,49 +1671,80 @@ export class SpriteBatchRenderer {
         if (this._litEffect) {
             this._litEffect.dispose();
         }
+        if (this._msdfEffect) {
+            this._msdfEffect.dispose();
+        }
         if (this._litDrawWrapper) {
             this._litDrawWrapper.dispose();
         }
         if (this._maskDrawWrapper) {
             this._maskDrawWrapper.dispose();
         }
+        if (this._msdfDrawWrapper) {
+            this._msdfDrawWrapper.dispose();
+        }
     }
 
     // -----------------------------------------------------------------------
     // Multi-texture slot management
     // -----------------------------------------------------------------------
-
     /**
      * Returns the slot index for a texture, assigning a new slot if needed.
-     * Returns -1 if all slots are full (caller must flush).
+     * @param texture - Texture to look up.
+     * @returns Assigned texture slot index.
      */
     private _getTextureSlot(texture: ThinTexture): number {
+        const existingSlot = this._textureSlotMap.get(texture);
+        if (existingSlot !== undefined) {
+            return existingSlot;
+        }
+
+        const slot = this._textureSlotCount;
+        this._textureSlotMap.set(texture, slot);
+        this._textureSlots[slot] = texture;
+        this._textureSlotCount++;
+        return slot;
+    }
+
+    private _syncTextureSlots(textureSlots: ThinTexture[]): void {
+        this._textureSlotMap.clear();
+        this._textureSlotCount = Math.min(textureSlots.length, this.maxTexturesPerBatch);
         for (let i = 0; i < this._textureSlotCount; i++) {
-            if (this._textureSlots[i] === texture) {
-                return i;
-            }
+            const texture = textureSlots[i];
+            this._textureSlots[i] = texture;
+            this._textureSlotMap.set(texture, i);
         }
-        if (this._textureSlotCount < _MAX_TEXTURES) {
-            this._textureSlots[this._textureSlotCount] = texture;
-            return this._textureSlotCount++;
-        }
-        return -1;
     }
 
     private _resetTextureSlots(): void {
-        for (let i = 0; i < this._textureSlotCount; i++) {
-            this._textureSlots[i] = null;
-        }
+        this._textureSlotMap.clear();
         this._textureSlotCount = 0;
     }
 
     private _activeEffect: Effect = null!;
 
+    private _beginStatsFrame(): void {
+        const frameId = this._engine.frameId;
+        if (typeof frameId !== "number") {
+            if (this._statsFrameId === -1) {
+                this._statsFrameId = 0;
+                this._drawCallCount = 0;
+                this._spriteCount = 0;
+            }
+            return;
+        }
+
+        if (frameId !== this._statsFrameId) {
+            this._statsFrameId = frameId;
+            this._drawCallCount = 0;
+            this._spriteCount = 0;
+        }
+    }
+
     private _bindTextures(): void {
         for (let i = 0; i < this._textureSlotCount; i++) {
             this._activeEffect.setTexture(`texture${i}`, this._textureSlots[i]);
         }
-        // WebGPU requires all declared texture bindings to be bound
         if (this._engine.isWebGPU && this.fallbackTexture) {
             for (let i = this._textureSlotCount; i < _MAX_TEXTURES; i++) {
                 this._activeEffect.setTexture(`texture${i}`, this.fallbackTexture);
@@ -1361,28 +1752,26 @@ export class SpriteBatchRenderer {
         }
     }
 
+    private _applyStates(): void {
+        const engine = this._engine as AbstractEngine & { applyStates?: () => void };
+        engine.applyStates?.();
+    }
+
     // -----------------------------------------------------------------------
     // Instanced render path
     // -----------------------------------------------------------------------
-
-    private _renderInstanced(sprites: ISprite2DRenderData[], cameraTransform: Matrix2D, cwx: number, cwy: number): void {
-        const cm = cameraTransform.m;
+    private _renderInstancedRange(sprites: ISprite2DRenderData[], start: number, count: number): void {
+        const cm = this._activeViewProjection.m;
         const stride = SpriteBatchRenderer._FLOATS_PER_INSTANCE;
         const data = this._instanceData;
-        let count = 0;
 
-        for (let i = 0; i < sprites.length; i++) {
-            const sprite = sprites[i];
-
-            let texSlot = this._getTextureSlot(sprite.texture);
-            if (texSlot === -1 || count >= this._capacity) {
-                this._flushInstanced(count);
-                count = 0;
-                texSlot = this._getTextureSlot(sprite.texture);
-            }
-
-            // Combined camera × sprite world transform
+        for (let i = 0; i < count; i++) {
+            const sprite = sprites[start + i];
             const wt = sprite.worldTransform.m;
+            const texSlot = this._textureSlotMap.get(sprite.texture) ?? 0;
+            const color = sprite.color;
+            const packedUvs = sprite.uvs;
+
             const ca = cm[0] * wt[0] + cm[2] * wt[1];
             const cb = cm[1] * wt[0] + cm[3] * wt[1];
             const cc = cm[0] * wt[2] + cm[2] * wt[3];
@@ -1390,94 +1779,74 @@ export class SpriteBatchRenderer {
             let ctx = cm[0] * wt[4] + cm[2] * wt[5] + cm[4];
             let cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
 
-            // Parallax scroll factor correction: counteract a portion of the
-            // camera translation so this sprite scrolls slower (or not at all).
             const sfx = sprite.scrollFactorX ?? 1;
             const sfy = sprite.scrollFactorY ?? 1;
             if (sfx !== 1 || sfy !== 1) {
-                const dx = cwx * (1 - sfx);
-                const dy = cwy * (1 - sfy);
+                const dx = this._cameraWorldX * (1 - sfx);
+                const dy = this._cameraWorldY * (1 - sfy);
                 ctx += cm[0] * dx + cm[2] * dy;
                 cty += cm[1] * dx + cm[3] * dy;
             }
 
-            // UV corners (pre-baked with flip)
-            // Babylon textures default to invertY=true, so v=0 is bottom of image.
-            // Flip V so the top of the quad samples the top of the source rect.
-            let u0 = sprite.cellU;
-            let v0 = sprite.invertY ? 1.0 - sprite.cellV : sprite.cellV;
-            let u1 = sprite.cellU + sprite.cellW;
-            let v1 = sprite.invertY ? 1.0 - sprite.cellV - sprite.cellH : sprite.cellV + sprite.cellH;
-            if (sprite.flipX) {
-                const t = u0;
-                u0 = u1;
-                u1 = t;
-            }
-            if (sprite.flipY) {
-                const t = v0;
-                v0 = v1;
-                v1 = t;
-            }
+            const localLeft = sprite.localLeft ?? -sprite.width * 0.5;
+            const localTop = sprite.localTop ?? -sprite.height * 0.5;
+            const localRight = sprite.localRight ?? sprite.width * 0.5;
+            const localBottom = sprite.localBottom ?? sprite.height * 0.5;
+            const uvOriginU = sprite.uvOriginU ?? packedUvs[0];
+            const uvOriginV = sprite.uvOriginV ?? packedUvs[1];
+            const uvAxisXU = sprite.uvAxisXU ?? (packedUvs[2] - packedUvs[0]);
+            const uvAxisXV = sprite.uvAxisXV ?? 0;
+            const uvAxisYU = sprite.uvAxisYU ?? 0;
+            const uvAxisYV = sprite.uvAxisYV ?? (packedUvs[3] - packedUvs[1]);
 
-            const off = count * stride;
+            const off = i * stride;
             data[off] = ca;
             data[off + 1] = cb;
             data[off + 2] = cc;
             data[off + 3] = cd;
             data[off + 4] = ctx;
             data[off + 5] = cty;
-            data[off + 6] = sprite.width;
-            data[off + 7] = sprite.height;
-            data[off + 8] = sprite.r;
-            data[off + 9] = sprite.g;
-            data[off + 10] = sprite.b;
-            data[off + 11] = sprite.a;
-            data[off + 12] = u0;
-            data[off + 13] = v0;
-            data[off + 14] = u1;
-            data[off + 15] = v1;
-            data[off + 16] = texSlot;
-
-            count++;
-        }
-
-        if (count > 0) {
-            this._flushInstanced(count);
+            data[off + 6] = localLeft;
+            data[off + 7] = localTop;
+            data[off + 8] = localRight;
+            data[off + 9] = localBottom;
+            data[off + 10] = color[0];
+            data[off + 11] = color[1];
+            data[off + 12] = color[2];
+            data[off + 13] = color[3];
+            data[off + 14] = uvOriginU;
+            data[off + 15] = uvOriginV;
+            data[off + 16] = uvAxisXU;
+            data[off + 17] = uvAxisXV;
+            data[off + 18] = uvAxisYU;
+            data[off + 19] = uvAxisYV;
+            data[off + 20] = texSlot;
         }
     }
 
-    private _flushInstanced(count: number): void {
-        if (count === 0) {
-            return;
-        }
+    private _drawInstanced(count: number): void {
         this._bindTextures();
+        this._applyStates();
         this._instanceBuffer.updateDirectly(this._instanceData, 0, count);
-        this._engine.bindBuffers(this._vertexBuffersMap, null as any, this._activeEffect);
+        this._engine.bindBuffers(this._vertexBuffersMap, null as never, this._activeEffect);
         this._engine.drawArraysType(Constants.MATERIAL_TriangleStripDrawMode, 0, 4, count);
-        this._resetTextureSlots();
     }
 
     // -----------------------------------------------------------------------
     // Non-instanced render path (fallback)
     // -----------------------------------------------------------------------
 
-    private _renderNonInstanced(sprites: ISprite2DRenderData[], cameraTransform: Matrix2D, cwx: number, cwy: number): void {
-        const cm = cameraTransform.m;
+    private _renderNonInstancedRange(sprites: ISprite2DRenderData[], start: number, count: number): void {
+        const cm = this._activeViewProjection.m;
         const vd = this._vertexData;
-        let count = 0;
 
-        for (let i = 0; i < sprites.length; i++) {
-            const sprite = sprites[i];
-
-            let texSlot = this._getTextureSlot(sprite.texture);
-            if (texSlot === -1 || count >= this._capacity) {
-                this._flushNonInstanced(count);
-                count = 0;
-                texSlot = this._getTextureSlot(sprite.texture);
-            }
-
-            // Combined camera × sprite world transform
+        for (let i = 0; i < count; i++) {
+            const sprite = sprites[start + i];
             const wt = sprite.worldTransform.m;
+            const texSlot = this._textureSlotMap.get(sprite.texture) ?? 0;
+            const color = sprite.color;
+            const packedUvs = sprite.uvs;
+
             const ca = cm[0] * wt[0] + cm[2] * wt[1];
             const cb = cm[1] * wt[0] + cm[3] * wt[1];
             const cc = cm[0] * wt[2] + cm[2] * wt[3];
@@ -1485,71 +1854,42 @@ export class SpriteBatchRenderer {
             let ctx = cm[0] * wt[4] + cm[2] * wt[5] + cm[4];
             let cty = cm[1] * wt[4] + cm[3] * wt[5] + cm[5];
 
-            // Parallax scroll factor correction: counteract a portion of the
-            // camera translation so this sprite scrolls slower (or not at all).
             const sfx = sprite.scrollFactorX ?? 1;
             const sfy = sprite.scrollFactorY ?? 1;
             if (sfx !== 1 || sfy !== 1) {
-                const dx = cwx * (1 - sfx);
-                const dy = cwy * (1 - sfy);
+                const dx = this._cameraWorldX * (1 - sfx);
+                const dy = this._cameraWorldY * (1 - sfy);
                 ctx += cm[0] * dx + cm[2] * dy;
                 cty += cm[1] * dx + cm[3] * dy;
             }
 
-            const w = sprite.width;
-            const h = sprite.height;
+            const localLeft = sprite.localLeft ?? -sprite.width * 0.5;
+            const localTop = sprite.localTop ?? -sprite.height * 0.5;
+            const localRight = sprite.localRight ?? sprite.width * 0.5;
+            const localBottom = sprite.localBottom ?? sprite.height * 0.5;
+            const uvOriginU = sprite.uvOriginU ?? packedUvs[0];
+            const uvOriginV = sprite.uvOriginV ?? packedUvs[1];
+            const uvAxisXU = sprite.uvAxisXU ?? (packedUvs[2] - packedUvs[0]);
+            const uvAxisXV = sprite.uvAxisXV ?? 0;
+            const uvAxisYU = sprite.uvAxisYU ?? 0;
+            const uvAxisYV = sprite.uvAxisYV ?? (packedUvs[3] - packedUvs[1]);
 
-            // UV corners (pre-baked with flip)
-            // Babylon textures default to invertY=true, so v=0 is bottom of image.
-            // Flip V so the top of the quad samples the top of the source rect.
-            let u0 = sprite.cellU;
-            let v0 = sprite.invertY ? 1.0 - sprite.cellV : sprite.cellV;
-            let u1 = sprite.cellU + sprite.cellW;
-            let v1 = sprite.invertY ? 1.0 - sprite.cellV - sprite.cellH : sprite.cellV + sprite.cellH;
-            if (sprite.flipX) {
-                const t = u0;
-                u0 = u1;
-                u1 = t;
-            }
-            if (sprite.flipY) {
-                const t = v0;
-                v0 = v1;
-                v1 = t;
-            }
-
-            const uvs = [
-                [u0, v0],
-                [u1, v0],
-                [u1, v1],
-                [u0, v1],
-            ];
-
-            const baseOffset = count * SpriteBatchRenderer._FLOATS_PER_QUAD;
+            const baseOffset = i * SpriteBatchRenderer._FLOATS_PER_QUAD;
             for (let v = 0; v < 4; v++) {
                 const corner = SpriteBatchRenderer._CORNERS[v];
                 const off = baseOffset + v * SpriteBatchRenderer._FLOATS_PER_VERTEX;
-
-                // Position (local, centered)
-                vd[off] = (corner[0] - 0.5) * w;
-                vd[off + 1] = (corner[1] - 0.5) * h;
-
-                // UV (pre-baked)
-                vd[off + 2] = uvs[v][0];
-                vd[off + 3] = uvs[v][1];
-
-                // Color
-                vd[off + 4] = sprite.r;
-                vd[off + 5] = sprite.g;
-                vd[off + 6] = sprite.b;
-                vd[off + 7] = sprite.a;
-
-                // cellInfo: x = texture index, yzw unused
+                vd[off] = corner[0] === 0 ? localLeft : localRight;
+                vd[off + 1] = corner[1] === 0 ? localTop : localBottom;
+                vd[off + 2] = uvOriginU + uvAxisXU * corner[0] + uvAxisYU * corner[1];
+                vd[off + 3] = uvOriginV + uvAxisXV * corner[0] + uvAxisYV * corner[1];
+                vd[off + 4] = color[0];
+                vd[off + 5] = color[1];
+                vd[off + 6] = color[2];
+                vd[off + 7] = color[3];
                 vd[off + 8] = texSlot;
                 vd[off + 9] = 0;
                 vd[off + 10] = 0;
                 vd[off + 11] = 0;
-
-                // Transform (combined camera × world)
                 vd[off + 12] = ca;
                 vd[off + 13] = cb;
                 vd[off + 14] = cc;
@@ -1557,26 +1897,28 @@ export class SpriteBatchRenderer {
                 vd[off + 16] = ctx;
                 vd[off + 17] = cty;
             }
-
-            count++;
-        }
-
-        if (count > 0) {
-            this._flushNonInstanced(count);
         }
     }
 
-    private _flushNonInstanced(count: number): void {
-        if (count === 0) {
-            return;
-        }
+    private _drawNonInstanced(count: number): void {
         this._bindTextures();
+        this._applyStates();
         this._buffer.updateDirectly(this._vertexData, 0, count * SpriteBatchRenderer._VERTS_PER_QUAD);
         this._engine.bindBuffers(this._vertexBuffersMap, this._indexBuffer, this._activeEffect);
         this._engine.drawElementsType(Constants.MATERIAL_TriangleFillMode, 0, count * SpriteBatchRenderer._INDICES_PER_QUAD);
-        this._resetTextureSlots();
     }
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

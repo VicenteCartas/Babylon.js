@@ -1,168 +1,350 @@
 import { Observable } from "core/Misc/observable";
-import type { BaseTexture } from "core/Materials/Textures/baseTexture";
+import { Logger } from "core/Misc/logger";
 
+import { Rectangle2D } from "../Math/rectangle2D";
+import type { Scene2D } from "../Scene2D/scene2D";
 import { Sprite2D } from "../Sprite2D/sprite2D";
-import type { SpriteSheet, ISpriteAnimation } from "../SpriteSheet/spriteSheet";
+import { SpriteSheet } from "../SpriteSheet/spriteSheet";
 
 /**
- * A sprite that plays frame-based animations from a SpriteSheet.
- * Extends Sprite2D with animation playback controls and events.
+ * Defines a named animation sequence.
+ */
+export interface IAnimationClip {
+    /** Unique clip name. */
+    name: string;
+    /** Frame indices referencing SpriteSheet frames. */
+    frames: number[];
+    /** Playback rate in frames per second. */
+    fps?: number;
+    /** Whether the clip loops. */
+    loop?: boolean;
+    /** Whether the loop ping-pongs between the ends. */
+    pingPong?: boolean;
+}
+
+/**
+ * A sprite with frame-based animation driven by named clips.
  */
 export class AnimatedSprite2D extends Sprite2D {
     /**
-     * The sprite sheet containing frames and animation definitions
+     * The spritesheet containing all frames.
      */
-    public spriteSheet: SpriteSheet;
+    public readonly spriteSheet: SpriteSheet;
 
     /**
-     * Playback speed multiplier (1 = normal, 2 = double speed, 0.5 = half speed)
+     * Playback speed multiplier.
      */
-    public speed: number = 1;
+    public playbackSpeed: number = 1;
 
     /**
-     * Observable triggered when an animation finishes (with the animation name)
+     * Fires when the displayed frame changes.
      */
-    public onAnimationEnd: Observable<string> = new Observable<string>();
+    public readonly onFrameChange: Observable<number> = new Observable<number>();
 
     /**
-     * Observable triggered when the current frame changes (with the frame index)
+     * Fires when the animation reaches its last frame.
      */
-    public onFrameChange: Observable<number> = new Observable<number>();
+    public readonly onAnimationEnd: Observable<string> = new Observable<string>();
 
-    private _currentAnimation: ISpriteAnimation | null = null;
-    private _currentFrame: number = 0;
-    private _isPlaying: boolean = false;
-    private _loop: boolean = false;
+    /**
+     * Fires when a looping animation wraps back to its start.
+     */
+    public readonly onLoop: Observable<string> = new Observable<string>();
+
+    private _clips: Map<string, IAnimationClip> = new Map();
+    private _currentClipData: IAnimationClip | null = null;
+    private _currentFrameIndex: number = 0;
+    private _currentClipName: string | null = null;
+    private _isPaused: boolean = false;
+    private _isStopped: boolean = true;
+    private _isReverse: boolean = false;
     private _elapsed: number = 0;
+    private _frameRect: Rectangle2D = new Rectangle2D();
 
     /**
-     * Creates a new AnimatedSprite2D
-     * @param name - Name of the sprite
-     * @param spriteSheet - The sprite sheet containing frames and animations
+     * Creates a new AnimatedSprite2D.
+     * @param name - Sprite name.
+     * @param spriteSheet - The spritesheet containing animation frames.
+     * @param scene - Optional owning scene.
      */
-    constructor(name: string, spriteSheet: SpriteSheet) {
-        super(name);
-        this.texture = spriteSheet.texture as BaseTexture;
+    constructor(name: string, spriteSheet: SpriteSheet, scene?: Scene2D | null) {
+        super(name, scene);
         this.spriteSheet = spriteSheet;
+        this.texture = spriteSheet.texture;
+        this.sourceRect = this._frameRect;
+        this.onUpdate.add((deltaTime) => {
+            this.advanceTime(deltaTime);
+        });
     }
 
     /**
-     * The name of the currently playing animation, or empty string if none
+     * Name of the currently playing clip, or null when stopped.
      */
-    public get currentAnimation(): string {
-        return this._currentAnimation?.name ?? "";
+    public get currentClip(): string | null {
+        if (this._isStopped) {
+            return null;
+        }
+
+        return this._currentClipName;
     }
 
     /**
-     * The index into the current animation's frame array
+     * Current frame index within the active clip.
      */
-    public get currentFrame(): number {
-        return this._currentFrame;
+    public get currentFrameIndex(): number {
+        return this._currentFrameIndex;
     }
 
     /**
-     * Whether an animation is currently playing
+     * Whether playback is currently paused.
      */
-    public get isPlaying(): boolean {
-        return this._isPlaying;
+    public get isPaused(): boolean {
+        return this._isPaused;
     }
 
     /**
-     * Plays a named animation
-     * @param animationName - Name of the animation defined in the sprite sheet
-     * @param loop - Whether to loop the animation (default: true)
+     * Registers or replaces an animation clip.
+     * @param clip - The clip definition.
      */
-    public play(animationName: string, loop: boolean = true): void {
-        const anim = this.spriteSheet.getAnimation(animationName);
-        if (!anim || anim.frames.length === 0) {
+    public addClip(clip: IAnimationClip): void {
+        const normalizedClip: IAnimationClip = {
+            name: clip.name,
+            frames: clip.frames.slice(),
+            fps: clip.fps,
+            loop: clip.loop,
+            pingPong: clip.pingPong,
+        };
+
+        this._clips.set(normalizedClip.name, normalizedClip);
+
+        if (this._currentClipName === normalizedClip.name) {
+            this._currentClipData = normalizedClip;
+            if (normalizedClip.frames.length === 0) {
+                this._currentFrameIndex = 0;
+                this._isStopped = true;
+                this._frameRect.x = 0;
+                this._frameRect.y = 0;
+                this._frameRect.width = 0;
+                this._frameRect.height = 0;
+                return;
+            }
+
+            if (this._currentFrameIndex >= normalizedClip.frames.length) {
+                this._currentFrameIndex = normalizedClip.frames.length - 1;
+            }
+
+            this._applyFrame(true);
+        }
+    }
+
+    /**
+     * Starts playing a named clip.
+     * @param clipName - The clip name.
+     * @param forceRestart - Whether to restart even if the clip is already active.
+     */
+    public play(clipName: string, forceRestart: boolean = false): void {
+        const clip = this._clips.get(clipName);
+        if (!clip || clip.frames.length === 0) {
+            Logger.Warn(`AnimatedSprite2D '${this.name}' cannot play missing clip '${clipName}'.`);
             return;
         }
 
-        // Don't restart if already playing the same animation
-        if (this._currentAnimation === anim && this._isPlaying) {
+        if (this._currentClipName === clipName && !this._isStopped && !forceRestart) {
             return;
         }
 
-        this._currentAnimation = anim;
-        this._currentFrame = 0;
-        this._isPlaying = true;
-        this._loop = loop;
+        this._currentClipData = clip;
+        this._currentClipName = clipName;
+        this._currentFrameIndex = 0;
+        this._isPaused = false;
+        this._isStopped = false;
+        this._isReverse = false;
         this._elapsed = 0;
-
-        this._applyFrame();
+        this._applyFrame(true);
     }
 
     /**
-     * Stops the current animation
-     */
-    public stop(): void {
-        this._isPlaying = false;
-    }
-
-    /**
-     * Pauses the current animation (can be resumed with play)
+     * Pauses playback at the current frame.
      */
     public pause(): void {
-        this._isPlaying = false;
-    }
-
-    /**
-     * Updates the animation state. Called each frame via Node2D.update().
-     * @param deltaTime - Time elapsed since last frame in seconds
-     */
-    public override update(deltaTime: number): void {
-        if (this._isPlaying && this._currentAnimation) {
-            this._elapsed += deltaTime * this.speed;
-
-            const frameDuration = 1.0 / this._currentAnimation.frameRate;
-            const totalFrames = this._currentAnimation.frames.length;
-
-            if (this._elapsed >= frameDuration) {
-                const framesToAdvance = Math.floor(this._elapsed / frameDuration);
-                this._elapsed -= framesToAdvance * frameDuration;
-
-                const newFrame = this._currentFrame + framesToAdvance;
-
-                if (newFrame >= totalFrames) {
-                    if (this._loop) {
-                        this._currentFrame = newFrame % totalFrames;
-                        this._applyFrame();
-                    } else {
-                        this._currentFrame = totalFrames - 1;
-                        this._isPlaying = false;
-                        this._applyFrame();
-                        this.onAnimationEnd.notifyObservers(this._currentAnimation.name);
-                    }
-                } else {
-                    this._currentFrame = newFrame;
-                    this._applyFrame();
-                }
-            }
-        }
-
-        // Call parent update to propagate to children and notify observers
-        super.update(deltaTime);
-    }
-
-    /**
-     * Sets the sourceRect on the Sprite2D base class to match the current animation frame
-     */
-    private _applyFrame(): void {
-        if (!this._currentAnimation) {
+        if (!this._currentClipData || this._isStopped) {
             return;
         }
 
-        const frameIndex = this._currentAnimation.frames[this._currentFrame];
-        this.sourceRect = this.spriteSheet.getFrame(frameIndex);
-        this.onFrameChange.notifyObservers(this._currentFrame);
+        this._isPaused = true;
     }
 
     /**
-     * Disposes of this animated sprite
+     * Resumes a paused animation.
+     */
+    public resume(): void {
+        if (!this._currentClipData || !this._isPaused) {
+            return;
+        }
+
+        this._isPaused = false;
+        this._isStopped = false;
+    }
+
+    /**
+     * Stops playback and resets to the first frame of the current clip.
+     */
+    public stop(): void {
+        if (!this._currentClipData) {
+            return;
+        }
+
+        this._isPaused = false;
+        this._isStopped = true;
+        this._isReverse = false;
+        this._elapsed = 0;
+        this._currentFrameIndex = 0;
+        this._applyFrame(false);
+    }
+
+    /**
+     * Jumps to a frame within the current clip.
+     * @param frameIndexInClip - The frame index within the clip.
+     */
+    public gotoFrame(frameIndexInClip: number): void {
+        const clip = this._currentClipData;
+        if (!clip || clip.frames.length === 0) {
+            return;
+        }
+
+        let targetIndex = Math.floor(frameIndexInClip);
+        if (targetIndex < 0) {
+            targetIndex = 0;
+        } else if (targetIndex >= clip.frames.length) {
+            targetIndex = clip.frames.length - 1;
+        }
+
+        if (targetIndex === this._currentFrameIndex) {
+            return;
+        }
+
+        this._currentFrameIndex = targetIndex;
+        this._elapsed = 0;
+        this._applyFrame(true);
+    }
+
+    /**
+     * Advances the animation by elapsed time.
+     * @param deltaTime - Elapsed time in seconds.
+     */
+    public advanceTime(deltaTime: number): void {
+        const clip = this._currentClipData;
+        if (!clip || this._isStopped || this._isPaused || deltaTime <= 0 || this.playbackSpeed <= 0) {
+            return;
+        }
+
+        const frameRate = clip.fps && clip.fps > 0 ? clip.fps : 12;
+        const frameDuration = 1 / frameRate;
+        this._elapsed += deltaTime * this.playbackSpeed;
+
+        while (this._elapsed >= frameDuration) {
+            this._elapsed -= frameDuration;
+            this._advanceFrame();
+            if (this._isStopped) {
+                this._elapsed = 0;
+                break;
+            }
+        }
+    }
+
+    /**
+     * Disposes the sprite and clears animation observables.
      */
     public override dispose(): void {
-        this.onAnimationEnd.clear();
         this.onFrameChange.clear();
+        this.onAnimationEnd.clear();
+        this.onLoop.clear();
         super.dispose();
+    }
+
+    private _advanceFrame(): void {
+        const clip = this._currentClipData;
+        if (!clip || clip.frames.length === 0) {
+            return;
+        }
+
+        const lastFrameIndex = clip.frames.length - 1;
+        if (lastFrameIndex <= 0) {
+            this.onAnimationEnd.notifyObservers(clip.name);
+            if (clip.loop ?? true) {
+                this.onLoop.notifyObservers(clip.name);
+            } else {
+                this._isStopped = true;
+            }
+            this._applyFrame(false);
+            return;
+        }
+
+        if (clip.pingPong && (clip.loop ?? true)) {
+            if (!this._isReverse) {
+                if (this._currentFrameIndex < lastFrameIndex) {
+                    this._currentFrameIndex++;
+                    this._applyFrame(true);
+                    if (this._currentFrameIndex === lastFrameIndex) {
+                        this.onAnimationEnd.notifyObservers(clip.name);
+                        this._isReverse = true;
+                    }
+                    return;
+                }
+
+                this._isReverse = true;
+            }
+
+            if (this._currentFrameIndex > 0) {
+                this._currentFrameIndex--;
+                this._applyFrame(true);
+                if (this._currentFrameIndex === 0) {
+                    this._isReverse = false;
+                    this.onLoop.notifyObservers(clip.name);
+                }
+            }
+            return;
+        }
+
+        if (this._currentFrameIndex < lastFrameIndex) {
+            this._currentFrameIndex++;
+            this._applyFrame(true);
+            if (this._currentFrameIndex === lastFrameIndex) {
+                this.onAnimationEnd.notifyObservers(clip.name);
+                if (!(clip.loop ?? true)) {
+                    this._isStopped = true;
+                }
+            }
+            return;
+        }
+
+        if (clip.loop ?? true) {
+            this._currentFrameIndex = 0;
+            this._applyFrame(true);
+            this.onLoop.notifyObservers(clip.name);
+        } else {
+            this._isStopped = true;
+            this._applyFrame(false);
+        }
+    }
+
+    private _applyFrame(notify: boolean): void {
+        const clip = this._currentClipData;
+        if (!clip || clip.frames.length === 0) {
+            this._frameRect.x = 0;
+            this._frameRect.y = 0;
+            this._frameRect.width = 0;
+            this._frameRect.height = 0;
+            return;
+        }
+
+        this.spriteSheet.getFrameRect(clip.frames[this._currentFrameIndex], this._frameRect);
+        if (this.sourceRect !== this._frameRect) {
+            this.sourceRect = this._frameRect;
+        }
+
+        if (notify) {
+            this.onFrameChange.notifyObservers(this._currentFrameIndex);
+        }
     }
 }

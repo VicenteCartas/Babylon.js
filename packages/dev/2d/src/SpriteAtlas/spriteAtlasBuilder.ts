@@ -1,435 +1,530 @@
-import type { ThinEngine } from "core/Engines/thinEngine";
-import type { BaseTexture } from "core/Materials/Textures/baseTexture";
-import { HtmlElementTexture } from "core/Materials/Textures/htmlElementTexture";
+import type { AbstractEngine } from "core/Engines/abstractEngine";
 import { Constants } from "core/Engines/constants";
+import { HtmlElementTexture } from "core/Materials/Textures/htmlElementTexture";
+import type { ThinTexture } from "core/Materials/Textures/thinTexture";
 
 import { Rectangle2D } from "../Math/rectangle2D";
 import { SpriteSheet } from "../SpriteSheet/spriteSheet";
+import type { ISpriteAtlasJsonArray } from "./spriteAtlas";
 import { SpriteAtlas } from "./spriteAtlas";
 
 /**
- * Configuration options for the sprite atlas builder
+ * The output of a SpriteAtlasBuilder build operation.
  */
-export interface ISpriteAtlasBuilderOptions {
-    /**
-     * Maximum width of the atlas texture in pixels (default: 2048)
-     */
-    maxWidth?: number;
+export interface ISpriteAtlasBuildResult {
+    /** The packed GPU texture. Owned by the result. */
+    readonly texture: ThinTexture;
+    /** A SpriteSheet wrapping the packed frames in insertion order. */
+    readonly sheet: SpriteSheet;
+    /** All packed frame keys in insertion order. */
+    readonly frameKeys: ReadonlyArray<string>;
+    /** Atlas texture width in pixels. */
+    readonly width: number;
+    /** Atlas texture height in pixels. */
+    readonly height: number;
 
     /**
-     * Maximum height of the atlas texture in pixels (default: 2048)
+     * Returns the pixel rectangle of a named frame.
+     * @param key - The packed frame key.
+     * @param out - Output rectangle.
+     * @returns The output rectangle, or null when not found.
      */
-    maxHeight?: number;
+    getFrame(key: string, out: Rectangle2D): Rectangle2D | null;
 
     /**
-     * Padding between sprites in pixels (default: 1)
+     * Returns whether the given frame key exists.
+     * @param key - The packed frame key.
+     * @returns True when the frame exists.
      */
-    padding?: number;
+    hasFrame(key: string): boolean;
 
-    /**
-     * Whether to constrain atlas size to power-of-two dimensions (default: true)
-     */
-    powerOfTwo?: boolean;
+    /** Dispose the GPU texture. */
+    dispose(): void;
 }
 
-/**
- * Image source that can be added to the atlas builder
- */
-type ImageSource = string | HTMLImageElement | HTMLCanvasElement | BaseTexture;
+interface IFrameSource {
+    key: string;
+    texture: ThinTexture;
+    order: number;
+}
 
-/**
- * Internal representation of an image to be packed
- */
-interface IPackImage {
+interface ILoadedFrame {
     key: string;
     width: number;
     height: number;
-    source: HTMLImageElement | HTMLCanvasElement;
+    canvas: HTMLCanvasElement;
+    order: number;
 }
 
-/**
- * Rectangle placement in the atlas
- */
-interface IPackedRect {
-    key: string;
+interface IRect {
     x: number;
     y: number;
     width: number;
     height: number;
 }
 
-/**
- * Shelf in the shelf-packing algorithm
- */
-interface IShelf {
-    y: number;
-    height: number;
-    usedWidth: number;
+interface IPlacement extends IRect {
+    key: string;
+    frameX: number;
+    frameY: number;
+    frameWidth: number;
+    frameHeight: number;
+    sourceWidth: number;
+    sourceHeight: number;
+    rotated: boolean;
+    canvas: HTMLCanvasElement;
+    order: number;
+}
+
+interface IScoredRect extends IRect {
+    shortSideFit: number;
+    longSideFit: number;
+    rotated: boolean;
+}
+
+interface IReadableTexture extends ThinTexture {
+    readPixels(
+        faceIndex?: number,
+        level?: number,
+        buffer?: ArrayBufferView | null,
+        flushRenderer?: boolean,
+        noDataConversion?: boolean,
+        x?: number,
+        y?: number,
+        width?: number,
+        height?: number
+    ): Promise<ArrayBufferView> | null;
 }
 
 /**
- * Auto-pack multiple images into a single texture atlas at load time.
- * Maximizes multi-texture batching by reducing the number of textures needed.
- * 
- * @example
- * ```typescript
- * // Create atlas builder with custom options
- * const builder = new SpriteAtlasBuilder(engine, {
- *     maxWidth: 2048,
- *     maxHeight: 2048,
- *     padding: 2,
- *     powerOfTwo: true
- * });
- * 
- * // Add images from URLs
- * builder.addImage("player", "assets/player.png");
- * builder.addImage("enemy", "assets/enemy.png");
- * builder.addImage("bullet", "assets/bullet.png");
- * 
- * // Or add existing textures
- * builder.addImage("powerup", existingTexture);
- * 
- * // Build the atlas asynchronously
- * const atlas = await builder.buildAsync();
- * 
- * // Use with Sprite2D
- * const sprite = new Sprite2D("player", scene);
- * sprite.texture = atlas.texture;
- * sprite.sourceRect = atlas.getFrame("player");
- * 
- * // Or get the SpriteSheet for animations
- * const sheet = atlas.spriteSheet;
- * const animatedSprite = new AnimatedSprite2D("character", sheet, scene);
- * ```
+ * Sprite atlas build result returned by {@link SpriteAtlasBuilder.buildAsync}.
+ */
+export class SpriteAtlasBuildResult extends SpriteAtlas implements ISpriteAtlasBuildResult {
+    /** A SpriteSheet wrapping the packed frames in insertion order. */
+    public readonly sheet: SpriteSheet;
+    /** Atlas texture width in pixels. */
+    public readonly width: number;
+    /** Atlas texture height in pixels. */
+    public readonly height: number;
+
+    /**
+     * Creates a new SpriteAtlasBuildResult.
+     * @param data - The generated atlas data.
+     * @param texture - The packed atlas texture.
+     * @param width - Atlas texture width.
+     * @param height - Atlas texture height.
+     */
+    constructor(data: ISpriteAtlasJsonArray, texture: ThinTexture, width: number, height: number) {
+        super(data, texture);
+        this.sheet = SpriteSheet.fromAtlasJson(texture, data);
+        this.width = width;
+        this.height = height;
+        this._setOwnsTexture(true);
+    }
+
+    /**
+     * All packed frame keys in insertion order.
+     * @returns The packed frame keys.
+     */
+    public get frameKeys(): ReadonlyArray<string> {
+        return this.frameNames;
+    }
+}
+
+/**
+ * Packs loose textures into a single GPU atlas at runtime.
+ * Uses a MaxRects bin-packing heuristic for efficient layout.
  */
 export class SpriteAtlasBuilder {
-    private readonly _engine: ThinEngine;
-    private readonly _options: Required<ISpriteAtlasBuilderOptions>;
-    private readonly _images: Map<string, ImageSource> = new Map();
+    /** Maximum atlas width in pixels. */
+    public readonly maxWidth: number;
+    /** Maximum atlas height in pixels. */
+    public readonly maxHeight: number;
+    /** Pixel padding between packed frames. */
+    public padding: number;
+    /** Whether 90° rotation is allowed during packing. */
+    public allowRotation: boolean;
+
+    private readonly _engine: AbstractEngine;
+    private readonly _sources: Map<string, IFrameSource> = new Map();
+    private _nextOrder: number = 0;
 
     /**
-     * Creates a new SpriteAtlasBuilder
-     * @param engine - The Babylon.js engine
-     * @param options - Optional configuration options
+     * Creates a new SpriteAtlasBuilder.
+     * @param engine - Engine used to create the packed atlas texture.
+     * @param maxWidth - Optional max atlas width.
+     * @param maxHeight - Optional max atlas height.
      */
-    constructor(engine: ThinEngine, options?: ISpriteAtlasBuilderOptions) {
+    constructor(engine: AbstractEngine, maxWidth: number = 2048, maxHeight: number = 2048) {
         this._engine = engine;
-        this._options = {
-            maxWidth: options?.maxWidth ?? 2048,
-            maxHeight: options?.maxHeight ?? 2048,
-            padding: options?.padding ?? 1,
-            powerOfTwo: options?.powerOfTwo ?? true,
-        };
+        this.maxWidth = maxWidth;
+        this.maxHeight = maxHeight;
+        this.padding = 1;
+        this.allowRotation = false;
     }
 
     /**
-     * Adds an image to the atlas builder
-     * @param key - Unique identifier for the image
-     * @param source - Image source (URL string, HTMLImageElement, HTMLCanvasElement, or Texture)
+     * Adds a texture to be packed.
+     * @param key - Unique identifier for this frame.
+     * @param texture - Source texture to pack.
      */
-    public addImage(key: string, source: ImageSource): void {
-        if (this._images.has(key)) {
+    public add(key: string, texture: ThinTexture): void {
+        if (this._sources.has(key)) {
             throw new Error(`Image with key "${key}" already exists in the atlas builder`);
         }
-        this._images.set(key, source);
+
+        this._sources.set(key, {
+            key,
+            texture,
+            order: this._nextOrder++,
+        });
     }
 
     /**
-     * Packs all added images into a single atlas texture
-     * @returns Promise that resolves to a SpriteAtlas containing the packed texture and frame data
+     * Removes a frame by key before building.
+     * @param key - Frame key to remove.
      */
-    public async buildAsync(): Promise<SpriteAtlas> {
-        if (this._images.size === 0) {
+    public remove(key: string): void {
+        this._sources.delete(key);
+    }
+
+    /**
+     * Returns whether a frame key has been added.
+     * @param key - Frame key to look up.
+     * @returns True when the key exists.
+     */
+    public has(key: string): boolean {
+        return this._sources.has(key);
+    }
+
+    /**
+     * Number of frames added.
+     * @returns The number of queued frames.
+     */
+    public get count(): number {
+        return this._sources.size;
+    }
+
+    /**
+     * Packs all added textures into a runtime atlas.
+     * @returns A build result containing the atlas texture and frame lookup.
+     */
+    public async buildAsync(): Promise<SpriteAtlasBuildResult> {
+        if (this._sources.size === 0) {
             throw new Error("Cannot build atlas: no images added");
         }
 
-        // Load all images
-        const loadedImages = await this._loadAllImagesAsync();
-
-        // Pack rectangles using shelf algorithm
-        const packedRects = this._packRectangles(loadedImages);
-
-        // Determine final atlas size
-        const atlasSize = this._calculateAtlasSize(packedRects);
-
-        // Create canvas and composite images
-        const canvas = this._createCompositeCanvas(atlasSize.width, atlasSize.height, loadedImages, packedRects);
-
-        // Create Babylon.js texture from canvas
+        const loadedFrames = await this._loadSourcesAsync();
+        const placements = this._packFrames(loadedFrames);
+        const atlasSize = this._calculateAtlasSize(placements);
+        const canvas = this._renderAtlasCanvas(atlasSize.width, atlasSize.height, placements);
         const texture = this._createTextureFromCanvas(canvas);
+        const orderedPlacements = [...placements].sort((left, right) => left.order - right.order);
+        const data: ISpriteAtlasJsonArray = {
+            frames: orderedPlacements.map((placement) => ({
+                filename: placement.key,
+                frame: {
+                    x: placement.frameX,
+                    y: placement.frameY,
+                    w: placement.frameWidth,
+                    h: placement.frameHeight,
+                },
+                rotated: placement.rotated || undefined,
+                sourceSize: {
+                    w: placement.sourceWidth,
+                    h: placement.sourceHeight,
+                },
+            })),
+            meta: {
+                image: "",
+                size: {
+                    w: atlasSize.width,
+                    h: atlasSize.height,
+                },
+            },
+        };
 
-        // Release canvas memory now that texture is uploaded to GPU
-        canvas.width = 0;
-        canvas.height = 0;
-
-        // Create SpriteSheet compatible atlas data
-        const frames = new Map<string, Rectangle2D>();
-        const atlasData: { frames: any } = { frames: {} };
-
-        for (const rect of packedRects) {
-            const frame = new Rectangle2D(rect.x, rect.y, rect.width, rect.height);
-            frames.set(rect.key, frame);
-            atlasData.frames[rect.key] = {
-                frame: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
-            };
-        }
-
-        const spriteSheet = SpriteSheet.FromAtlas(texture, atlasData);
-
-        return new SpriteAtlas(texture, spriteSheet, frames);
+        return new SpriteAtlasBuildResult(data, texture, atlasSize.width, atlasSize.height);
     }
 
     /**
-     * Loads all added images and prepares them for packing
-     * @returns Promise that resolves to array of loaded images
+     * Clears all queued frames.
      */
-    private async _loadAllImagesAsync(): Promise<IPackImage[]> {
-        const promises: Promise<IPackImage>[] = [];
+    public clear(): void {
+        this._sources.clear();
+        this._nextOrder = 0;
+    }
 
-        for (const [key, source] of this._images) {
-            promises.push(this._loadImageAsync(key, source));
+    /**
+     * Disposes the builder. Source textures are not disposed.
+     */
+    public dispose(): void {
+        this.clear();
+    }
+
+    private async _loadSourcesAsync(): Promise<ILoadedFrame[]> {
+        const promises: Array<Promise<ILoadedFrame>> = [];
+
+        for (const source of this._sources.values()) {
+            promises.push(this._loadSourceAsync(source));
         }
 
         return Promise.all(promises);
     }
 
-    /**
-     * Loads a single image from its source
-     * @param key - Image key
-     * @param source - Image source
-     * @returns Promise that resolves to packed image data
-     */
-    private async _loadImageAsync(key: string, source: ImageSource): Promise<IPackImage> {
-        if (typeof source === "string") {
-            // Load from URL
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.onload = () => {
-                    resolve({
-                        key,
-                        width: img.width,
-                        height: img.height,
-                        source: img,
-                    });
-                };
-                img.onerror = () => {
-                    reject(new Error(`Failed to load image: ${source}`));
-                };
-                img.src = source;
-            });
-        } else if (source instanceof HTMLCanvasElement) {
-            // Use existing canvas element directly
-            return {
-                key,
-                width: source.width,
-                height: source.height,
-                source,
-            };
-        } else if (source instanceof HTMLImageElement) {
-            // Use existing image element
-            return {
-                key,
-                width: source.width,
-                height: source.height,
-                source,
-            };
-        } else {
-            // Extract from Babylon.js texture
-            const textureSource = source as BaseTexture;
+    private async _loadSourceAsync(source: IFrameSource): Promise<ILoadedFrame> {
+        const canvas = await this._readTextureToCanvasAsync(source.key, source.texture);
+        return {
+            key: source.key,
+            width: canvas.width,
+            height: canvas.height,
+            canvas,
+            order: source.order,
+        };
+    }
 
-            // Safely check for a url property without unsafe casts
-            const textureUrl = "url" in textureSource && typeof (textureSource as { url: unknown }).url === "string"
-                ? (textureSource as { url: string }).url
-                : undefined;
-            if (textureUrl) {
-                // Load from URL if available
-                return new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        resolve({
-                            key,
-                            width: img.width,
-                            height: img.height,
-                            source: img,
-                        });
-                    };
-                    img.onerror = () => {
-                        reject(new Error(`Failed to load texture from URL: ${textureUrl}`));
-                    };
-                    img.src = textureUrl;
+    private async _readTextureToCanvasAsync(key: string, texture: ThinTexture): Promise<HTMLCanvasElement> {
+        const size = texture.getSize();
+        if (size.width <= 0 || size.height <= 0) {
+            throw new Error(`Cannot read texture data for "${key}" because its size is invalid.`);
+        }
+
+        if (texture instanceof HtmlElementTexture) {
+            const element = texture.element;
+            const isVideoElement = typeof HTMLVideoElement !== "undefined" && element instanceof HTMLVideoElement;
+            const width = isVideoElement ? element.videoWidth : element.width;
+            const height = isVideoElement ? element.videoHeight : element.height;
+            return this._copyElementToCanvas(element, width, height);
+        }
+
+        const readableTexture = texture as IReadableTexture;
+        if (typeof readableTexture.readPixels !== "function") {
+            throw new Error(`Cannot read texture data for "${key}". The texture must expose readable pixels.`);
+        }
+
+        const pixelPromise = readableTexture.readPixels();
+        if (!pixelPromise) {
+            throw new Error(`Cannot read texture data for "${key}". The texture did not provide pixel data.`);
+        }
+
+        const pixels = await pixelPromise;
+        return this._createCanvasFromPixels(size.width, size.height, pixels);
+    }
+
+    private _packFrames(frames: ILoadedFrame[]): IPlacement[] {
+        const sortedFrames = [...frames].sort((left, right) => {
+            const areaDifference = right.width * right.height - left.width * left.height;
+            if (areaDifference !== 0) {
+                return areaDifference;
+            }
+
+            return right.height - left.height;
+        });
+        const freeRects: IRect[] = [{ x: 0, y: 0, width: this.maxWidth, height: this.maxHeight }];
+        const placements: IPlacement[] = [];
+        const padding = Math.max(0, this.padding);
+
+        for (const frame of sortedFrames) {
+            const bestRect = this._findBestRect(freeRects, frame.width, frame.height, padding);
+            if (!bestRect) {
+                throw new Error(
+                    `Cannot fit image "${frame.key}" (${frame.width}x${frame.height}) in atlas. ` +
+                        `Consider increasing maxWidth/maxHeight or reducing padding.`
+                );
+            }
+
+            const occupiedRect: IRect = {
+                x: bestRect.x,
+                y: bestRect.y,
+                width: bestRect.width,
+                height: bestRect.height,
+            };
+            this._splitFreeRects(freeRects, occupiedRect);
+            this._pruneFreeRects(freeRects);
+
+            const frameWidth = bestRect.rotated ? frame.height : frame.width;
+            const frameHeight = bestRect.rotated ? frame.width : frame.height;
+            placements.push({
+                ...occupiedRect,
+                key: frame.key,
+                frameX: occupiedRect.x + padding,
+                frameY: occupiedRect.y + padding,
+                frameWidth,
+                frameHeight,
+                sourceWidth: frame.width,
+                sourceHeight: frame.height,
+                rotated: bestRect.rotated,
+                canvas: frame.canvas,
+                order: frame.order,
+            });
+        }
+
+        return placements;
+    }
+
+    private _findBestRect(freeRects: readonly IRect[], frameWidth: number, frameHeight: number, padding: number): IScoredRect | null {
+        let bestRect: IScoredRect | null = null;
+
+        for (const freeRect of freeRects) {
+            const uprightRect = this._scoreRect(freeRect, frameWidth + padding * 2, frameHeight + padding * 2, false);
+            bestRect = this._selectBetterRect(bestRect, uprightRect);
+
+            if (this.allowRotation && frameWidth !== frameHeight) {
+                const rotatedRect = this._scoreRect(freeRect, frameHeight + padding * 2, frameWidth + padding * 2, true);
+                bestRect = this._selectBetterRect(bestRect, rotatedRect);
+            }
+        }
+
+        return bestRect;
+    }
+
+    private _scoreRect(freeRect: IRect, width: number, height: number, rotated: boolean): IScoredRect | null {
+        if (width > freeRect.width || height > freeRect.height) {
+            return null;
+        }
+
+        const leftoverHorizontal = freeRect.width - width;
+        const leftoverVertical = freeRect.height - height;
+        return {
+            x: freeRect.x,
+            y: freeRect.y,
+            width,
+            height,
+            shortSideFit: Math.min(leftoverHorizontal, leftoverVertical),
+            longSideFit: Math.max(leftoverHorizontal, leftoverVertical),
+            rotated,
+        };
+    }
+
+    private _selectBetterRect(currentBest: IScoredRect | null, candidate: IScoredRect | null): IScoredRect | null {
+        if (!candidate) {
+            return currentBest;
+        }
+
+        if (
+            !currentBest ||
+            candidate.shortSideFit < currentBest.shortSideFit ||
+            (candidate.shortSideFit === currentBest.shortSideFit && candidate.longSideFit < currentBest.longSideFit)
+        ) {
+            return candidate;
+        }
+
+        return currentBest;
+    }
+
+    private _splitFreeRects(freeRects: IRect[], usedRect: IRect): void {
+        for (let index = freeRects.length - 1; index >= 0; index--) {
+            const freeRect = freeRects[index];
+            if (!this._intersects(freeRect, usedRect)) {
+                continue;
+            }
+
+            freeRects.splice(index, 1);
+
+            if (usedRect.x > freeRect.x) {
+                freeRects.push({
+                    x: freeRect.x,
+                    y: freeRect.y,
+                    width: usedRect.x - freeRect.x,
+                    height: freeRect.height,
                 });
             }
 
-            // No URL available — cannot extract pixel data from GPU-only textures
-            throw new Error(
-                `Cannot extract texture data for "${key}". ` +
-                `The texture has no source URL. Please provide a URL string or HTMLImageElement instead.`
-            );
+            if (usedRect.x + usedRect.width < freeRect.x + freeRect.width) {
+                freeRects.push({
+                    x: usedRect.x + usedRect.width,
+                    y: freeRect.y,
+                    width: freeRect.x + freeRect.width - (usedRect.x + usedRect.width),
+                    height: freeRect.height,
+                });
+            }
+
+            if (usedRect.y > freeRect.y) {
+                freeRects.push({
+                    x: freeRect.x,
+                    y: freeRect.y,
+                    width: freeRect.width,
+                    height: usedRect.y - freeRect.y,
+                });
+            }
+
+            if (usedRect.y + usedRect.height < freeRect.y + freeRect.height) {
+                freeRects.push({
+                    x: freeRect.x,
+                    y: usedRect.y + usedRect.height,
+                    width: freeRect.width,
+                    height: freeRect.y + freeRect.height - (usedRect.y + usedRect.height),
+                });
+            }
         }
     }
 
-    /**
-     * Packs rectangles using a shelf-first-fit algorithm.
-     * Images are sorted by height (descending) then placed on the first shelf
-     * that fits. A new shelf is created when no existing shelf can accommodate
-     * the image. This is a simple O(n log n) algorithm that works well for
-     * sprites of similar sizes. For highly varied sizes, a MaxRects algorithm
-     * would give better packing efficiency.
-     * @param images - Array of images to pack
-     * @returns Array of packed rectangles with positions
-     */
-    private _packRectangles(images: IPackImage[]): IPackedRect[] {
-        // Sort images by height (descending) for better packing
-        const sorted = [...images].sort((a, b) => b.height - a.height);
+    private _pruneFreeRects(freeRects: IRect[]): void {
+        for (let leftIndex = 0; leftIndex < freeRects.length; leftIndex++) {
+            const leftRect = freeRects[leftIndex];
 
-        const packed: IPackedRect[] = [];
-        const shelves: IShelf[] = [];
-        const padding = this._options.padding;
+            for (let rightIndex = freeRects.length - 1; rightIndex > leftIndex; rightIndex--) {
+                const rightRect = freeRects[rightIndex];
+                if (this._contains(leftRect, rightRect)) {
+                    freeRects.splice(rightIndex, 1);
+                    continue;
+                }
 
-        for (const img of sorted) {
-            const rectWidth = img.width + padding * 2;
-            const rectHeight = img.height + padding * 2;
-
-            let placed = false;
-
-            // Try to place on existing shelves
-            for (const shelf of shelves) {
-                if (shelf.usedWidth + rectWidth <= this._options.maxWidth && rectHeight <= shelf.height) {
-                    // Place on this shelf
-                    packed.push({
-                        key: img.key,
-                        x: shelf.usedWidth + padding,
-                        y: shelf.y + padding,
-                        width: img.width,
-                        height: img.height,
-                    });
-                    shelf.usedWidth += rectWidth;
-                    placed = true;
+                if (this._contains(rightRect, leftRect)) {
+                    freeRects.splice(leftIndex, 1);
+                    leftIndex--;
                     break;
                 }
             }
-
-            if (!placed) {
-                // Create a new shelf
-                const shelfY = shelves.reduce((sum, s) => sum + s.height, 0);
-
-                if (shelfY + rectHeight > this._options.maxHeight) {
-                    throw new Error(
-                        `Cannot fit image "${img.key}" (${img.width}x${img.height}) in atlas. ` +
-                        `Consider increasing maxWidth/maxHeight or reducing padding.`
-                    );
-                }
-
-                const newShelf: IShelf = {
-                    y: shelfY,
-                    height: rectHeight,
-                    usedWidth: rectWidth,
-                };
-
-                shelves.push(newShelf);
-
-                packed.push({
-                    key: img.key,
-                    x: padding,
-                    y: shelfY + padding,
-                    width: img.width,
-                    height: img.height,
-                });
-            }
         }
-
-        return packed;
     }
 
-    /**
-     * Calculates the final atlas size based on packed rectangles
-     * @param rects - Array of packed rectangles
-     * @returns Atlas size with width and height properties
-     */
-    private _calculateAtlasSize(rects: IPackedRect[]): { width: number; height: number } {
-        let maxX = 0;
-        let maxY = 0;
-        const padding = this._options.padding;
+    private _calculateAtlasSize(placements: readonly IPlacement[]): { width: number; height: number } {
+        let width = 0;
+        let height = 0;
 
-        for (const rect of rects) {
-            maxX = Math.max(maxX, rect.x + rect.width + padding);
-            maxY = Math.max(maxY, rect.y + rect.height + padding);
+        for (const placement of placements) {
+            width = Math.max(width, placement.x + placement.width);
+            height = Math.max(height, placement.y + placement.height);
         }
 
-        let width = maxX;
-        let height = maxY;
-
-        // Round up to power of two if required
-        if (this._options.powerOfTwo) {
-            width = this._nextPowerOfTwo(width);
-            height = this._nextPowerOfTwo(height);
+        if (width > this.maxWidth || height > this.maxHeight) {
+            throw new Error("Packed atlas dimensions exceed the configured maximum size.");
         }
 
-        return { width, height };
+        return {
+            width: Math.max(1, width),
+            height: Math.max(1, height),
+        };
     }
 
-    /**
-     * Rounds up to the next power of two.
-     * Uses Math.log2 for O(1) computation without risk of infinite loop on large values.
-     * @param value - Input value (must be positive)
-     * @returns Next power of two greater than or equal to value
-     */
-    private _nextPowerOfTwo(value: number): number {
-        if (value <= 1) {
-            return 1;
-        }
-        return Math.pow(2, Math.ceil(Math.log2(value)));
-    }
-
-    /**
-     * Creates a composite canvas with all images drawn at their packed positions
-     * @param width - Atlas width
-     * @param height - Atlas height
-     * @param images - Array of loaded images
-     * @param rects - Array of packed rectangles
-     * @returns Canvas with composite image
-     */
-    private _createCompositeCanvas(
-        width: number,
-        height: number,
-        images: IPackImage[],
-        rects: IPackedRect[]
-    ): HTMLCanvasElement {
+    private _renderAtlasCanvas(width: number, height: number, placements: readonly IPlacement[]): HTMLCanvasElement {
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-            throw new Error("Failed to get 2D context for atlas canvas");
+        const context = canvas.getContext("2d");
+        if (!context) {
+            throw new Error("Failed to get 2D context for sprite atlas build.");
         }
 
-        // Clear to transparent
-        ctx.clearRect(0, 0, width, height);
-
-        // Draw each image at its packed position
-        const imageMap = new Map<string, IPackImage>();
-        for (const img of images) {
-            imageMap.set(img.key, img);
-        }
-
-        for (const rect of rects) {
-            const img = imageMap.get(rect.key);
-            if (img) {
-                ctx.drawImage(img.source, rect.x, rect.y, rect.width, rect.height);
+        context.clearRect(0, 0, width, height);
+        for (const placement of placements) {
+            if (!placement.rotated) {
+                context.drawImage(placement.canvas, placement.frameX, placement.frameY, placement.frameWidth, placement.frameHeight);
+                continue;
             }
+
+            context.save();
+            context.translate(placement.frameX + placement.frameWidth, placement.frameY);
+            context.rotate(Math.PI * 0.5);
+            context.drawImage(placement.canvas, 0, 0, placement.sourceWidth, placement.sourceHeight);
+            context.restore();
         }
 
         return canvas;
     }
 
-    /**
-     * Creates a Babylon.js texture from a canvas element
-     * @param canvas - Source canvas
-     * @returns Babylon.js texture
-     */
     private _createTextureFromCanvas(canvas: HTMLCanvasElement): HtmlElementTexture {
         const texture = new HtmlElementTexture("SpriteAtlas", canvas, {
             generateMipMaps: false,
@@ -441,7 +536,92 @@ export class SpriteAtlasBuilder {
 
         texture.wrapU = Constants.TEXTURE_CLAMP_ADDRESSMODE;
         texture.wrapV = Constants.TEXTURE_CLAMP_ADDRESSMODE;
-
         return texture;
     }
+
+    private _copyElementToCanvas(element: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement, width: number, height: number): HTMLCanvasElement {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+            throw new Error("Failed to get 2D context for sprite atlas source.");
+        }
+
+        context.clearRect(0, 0, width, height);
+        context.drawImage(element, 0, 0, width, height);
+        return canvas;
+    }
+
+    private _createCanvasFromPixels(width: number, height: number, pixels: ArrayBufferView): HTMLCanvasElement {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+            throw new Error("Failed to get 2D context for sprite atlas source.");
+        }
+
+        const rgbaPixels = this._toUint8ClampedArray(width, height, pixels);
+        const imageData = context.createImageData(width, height);
+        const rowWidth = width * 4;
+
+        for (let row = 0; row < height; row++) {
+            const srcOffset = row * rowWidth;
+            const dstOffset = (height - row - 1) * rowWidth;
+            imageData.data.set(rgbaPixels.subarray(srcOffset, srcOffset + rowWidth), dstOffset);
+        }
+
+        context.putImageData(imageData, 0, 0);
+        return canvas;
+    }
+
+    private _toUint8ClampedArray(width: number, height: number, pixels: ArrayBufferView): Uint8ClampedArray {
+        const expectedLength = width * height * 4;
+        if (pixels instanceof Uint8ClampedArray) {
+            return pixels.length === expectedLength ? pixels : new Uint8ClampedArray(pixels.buffer.slice(0, expectedLength));
+        }
+
+        if (pixels instanceof Uint8Array) {
+            return pixels.length === expectedLength ? new Uint8ClampedArray(pixels) : new Uint8ClampedArray(pixels.buffer.slice(0, expectedLength));
+        }
+
+        if (pixels instanceof Float32Array) {
+            const target = new Uint8ClampedArray(expectedLength);
+            const length = Math.min(pixels.length, expectedLength);
+            for (let index = 0; index < length; index++) {
+                target[index] = Math.min(255, Math.max(0, Math.round(pixels[index] * 255)));
+            }
+
+            return target;
+        }
+
+        const source = new Uint8Array(pixels.buffer, pixels.byteOffset, Math.min(pixels.byteLength, expectedLength));
+        const target = new Uint8ClampedArray(expectedLength);
+        target.set(source.subarray(0, expectedLength));
+        return target;
+    }
+
+    private _intersects(left: IRect, right: IRect): boolean {
+        return (
+            left.x < right.x + right.width &&
+            left.x + left.width > right.x &&
+            left.y < right.y + right.height &&
+            left.y + left.height > right.y
+        );
+    }
+
+    private _contains(container: IRect, inner: IRect): boolean {
+        return (
+            inner.x >= container.x &&
+            inner.y >= container.y &&
+            inner.x + inner.width <= container.x + container.width &&
+            inner.y + inner.height <= container.y + container.height
+        );
+    }
 }
+
+
+

@@ -1,14 +1,17 @@
 import { AnimatedSprite2D } from "2d/AnimatedSprite2D/animatedSprite2D";
+import { Rectangle2D } from "2d/Math/rectangle2D";
 import { SpriteSheet } from "2d/SpriteSheet/spriteSheet";
+import { Logger } from "core/Misc/logger";
 
 const mockTexture = { getSize: () => ({ width: 128, height: 128 }) } as any;
 
-function createSheet(): SpriteSheet {
-    const sheet = SpriteSheet.FromGrid(mockTexture, 32, 32);
-    sheet.defineAnimation("walk", [0, 1, 2, 3], 10);
-    sheet.defineAnimation("idle", [0], 1);
-    sheet.defineAnimation("attack", [4, 5, 6], 12);
-    return sheet;
+function createAnimatedSprite(): { sheet: SpriteSheet; sprite: AnimatedSprite2D } {
+    const sheet = SpriteSheet.fromGrid(mockTexture, 32, 32);
+    const sprite = new AnimatedSprite2D("hero", sheet);
+    sprite.addClip({ name: "walk", frames: [0, 1, 2, 3], fps: 10 });
+    sprite.addClip({ name: "idle", frames: [0], fps: 1 });
+    sprite.addClip({ name: "attack", frames: [4, 5, 6], fps: 12, loop: false });
+    return { sheet, sprite };
 }
 
 describe("AnimatedSprite2D", () => {
@@ -16,8 +19,9 @@ describe("AnimatedSprite2D", () => {
     let sprite: AnimatedSprite2D;
 
     beforeEach(() => {
-        sheet = createSheet();
-        sprite = new AnimatedSprite2D("hero", sheet);
+        const setup = createAnimatedSprite();
+        sheet = setup.sheet;
+        sprite = setup.sprite;
     });
 
     describe("constructor", () => {
@@ -29,147 +33,219 @@ describe("AnimatedSprite2D", () => {
             expect(sprite.texture).toBe(mockTexture);
         });
 
-        it("should not be playing initially", () => {
-            expect(sprite.isPlaying).toBe(false);
-            expect(sprite.currentAnimation).toBe("");
+        it("should start stopped with no current clip", () => {
+            expect(sprite.currentClip).toBeNull();
+            expect(sprite.currentFrameIndex).toBe(0);
+            expect(sprite.isPaused).toBe(false);
         });
 
-        it("should have default speed of 1", () => {
-            expect(sprite.speed).toBe(1);
+        it("should have default playbackSpeed of 1", () => {
+            expect(sprite.playbackSpeed).toBe(1);
         });
     });
 
     describe("play", () => {
-        it("should start playing an animation", () => {
+        it("should start playing a clip", () => {
             sprite.play("walk");
-            expect(sprite.isPlaying).toBe(true);
-            expect(sprite.currentAnimation).toBe("walk");
-            expect(sprite.currentFrame).toBe(0);
+            expect(sprite.currentClip).toBe("walk");
+            expect(sprite.currentFrameIndex).toBe(0);
+            expect(sprite.isPaused).toBe(false);
         });
 
         it("should set sourceRect to the first frame", () => {
             sprite.play("walk");
-            const frame0 = sheet.getFrame(0);
+            const frame0 = sheet.getFrameRect(0, new Rectangle2D());
             expect(sprite.sourceRect).toEqual(frame0);
         });
 
-        it("should not restart if already playing the same animation", () => {
+        it("should not restart the same clip unless forceRestart is true", () => {
             sprite.play("walk");
-            // Advance a few frames
-            sprite.update(0.15);
-            const frameBefore = sprite.currentFrame;
+            sprite.advanceTime(0.15);
+            const frameBefore = sprite.currentFrameIndex;
             sprite.play("walk");
-            expect(sprite.currentFrame).toBe(frameBefore);
+            expect(sprite.currentFrameIndex).toBe(frameBefore);
         });
 
-        it("should restart if playing a different animation", () => {
+        it("should restart the same clip when forceRestart is true", () => {
             sprite.play("walk");
-            sprite.update(0.15);
+            sprite.advanceTime(0.15);
+            sprite.play("walk", true);
+            expect(sprite.currentClip).toBe("walk");
+            expect(sprite.currentFrameIndex).toBe(0);
+        });
+
+        it("should switch to a different clip", () => {
+            sprite.play("walk");
+            sprite.advanceTime(0.15);
             sprite.play("attack");
-            expect(sprite.currentAnimation).toBe("attack");
-            expect(sprite.currentFrame).toBe(0);
+            expect(sprite.currentClip).toBe("attack");
+            expect(sprite.currentFrameIndex).toBe(0);
         });
 
-        it("should ignore unknown animation names", () => {
-            sprite.play("nonexistent");
-            expect(sprite.isPlaying).toBe(false);
+        it("should ignore unknown clip names", () => {
+            const warnSpy = jest.spyOn(Logger, "Warn").mockImplementation(() => {});
+
+            try {
+                sprite.play("nonexistent");
+                expect(sprite.currentClip).toBeNull();
+                expect(sprite.currentFrameIndex).toBe(0);
+            } finally {
+                warnSpy.mockRestore();
+            }
         });
     });
 
-    describe("stop / pause", () => {
-        it("should stop the animation", () => {
+    describe("pause / resume / stop", () => {
+        it("should pause the current clip without advancing", () => {
             sprite.play("walk");
-            sprite.stop();
-            expect(sprite.isPlaying).toBe(false);
-        });
+            sprite.advanceTime(0.15);
+            const frame = sprite.currentFrameIndex;
 
-        it("should pause the animation", () => {
-            sprite.play("walk");
-            sprite.update(0.15);
-            const frame = sprite.currentFrame;
             sprite.pause();
-            expect(sprite.isPlaying).toBe(false);
-            sprite.update(0.5);
-            expect(sprite.currentFrame).toBe(frame);
+            expect(sprite.isPaused).toBe(true);
+
+            sprite.advanceTime(0.5);
+            expect(sprite.currentFrameIndex).toBe(frame);
+        });
+
+        it("should resume a paused clip", () => {
+            sprite.play("walk");
+            sprite.advanceTime(0.15);
+            sprite.pause();
+            sprite.resume();
+
+            expect(sprite.isPaused).toBe(false);
+            sprite.advanceTime(0.1);
+            expect(sprite.currentFrameIndex).toBe(2);
+        });
+
+        it("should stop playback and reset to the first frame", () => {
+            sprite.play("walk");
+            sprite.advanceTime(0.15);
+            sprite.stop();
+
+            expect(sprite.currentClip).toBeNull();
+            expect(sprite.currentFrameIndex).toBe(0);
+            expect(sprite.isPaused).toBe(false);
         });
     });
 
-    describe("update / frame advancement", () => {
-        it("should advance frames based on deltaTime and frameRate", () => {
-            sprite.play("walk"); // 10fps → 0.1s per frame
+    describe("frame advancement", () => {
+        it("should auto-advance through the onUpdate hook", () => {
+            sprite.play("walk");
             sprite.update(0.1);
-            expect(sprite.currentFrame).toBe(1);
+            expect(sprite.currentFrameIndex).toBe(1);
         });
 
-        it("should loop when loop is true", () => {
-            sprite.play("walk", true); // 4 frames at 10fps
-            // Advance past last frame
-            sprite.update(0.4);
-            expect(sprite.isPlaying).toBe(true);
-            expect(sprite.currentFrame).toBeLessThan(4);
+        it("should loop clips by default", () => {
+            const loops: string[] = [];
+            sprite.onLoop.add((clipName) => loops.push(clipName));
+
+            sprite.play("walk");
+            sprite.advanceTime(0.4);
+
+            expect(sprite.currentClip).toBe("walk");
+            expect(sprite.currentFrameIndex).toBe(0);
+            expect(loops).toEqual(["walk"]);
         });
 
-        it("should stop at last frame when loop is false", () => {
-            sprite.play("walk", false); // 4 frames at 10fps
-            sprite.update(0.5); // Well past the end
-            expect(sprite.isPlaying).toBe(false);
-            expect(sprite.currentFrame).toBe(3); // Last frame
+        it("should stop at the last frame for non-looping clips", () => {
+            sprite.play("attack");
+            sprite.advanceTime(0.5);
+
+            expect(sprite.currentClip).toBeNull();
+            expect(sprite.currentFrameIndex).toBe(2);
         });
 
-        it("should respect speed multiplier", () => {
-            sprite.speed = 2;
-            sprite.play("walk"); // 10fps → 0.1s per frame, but 2x speed → 0.05s per frame
-            sprite.update(0.05);
-            expect(sprite.currentFrame).toBe(1);
+        it("should respect playbackSpeed", () => {
+            sprite.playbackSpeed = 2;
+            sprite.play("walk");
+            sprite.advanceTime(0.05);
+            expect(sprite.currentFrameIndex).toBe(1);
         });
 
-        it("should not advance when not playing", () => {
+        it("should not advance while stopped", () => {
             sprite.play("walk");
             sprite.stop();
-            sprite.update(1.0);
-            expect(sprite.currentFrame).toBe(0);
+            sprite.advanceTime(1.0);
+            expect(sprite.currentFrameIndex).toBe(0);
         });
 
-        it("should skip multiple frames when dt is large", () => {
-            sprite.play("walk"); // 10fps, 4 frames
-            sprite.update(0.25); // Should advance 2 frames
-            expect(sprite.currentFrame).toBe(2);
+        it("should skip multiple frames when deltaTime is large", () => {
+            sprite.play("walk");
+            sprite.advanceTime(0.25);
+            expect(sprite.currentFrameIndex).toBe(2);
+        });
+
+        it("should clamp gotoFrame to the clip bounds", () => {
+            sprite.play("walk");
+            sprite.gotoFrame(99);
+            expect(sprite.currentFrameIndex).toBe(3);
+
+            sprite.gotoFrame(-2);
+            expect(sprite.currentFrameIndex).toBe(0);
+        });
+
+        it("should support ping-pong looping clips", () => {
+            sprite.addClip({ name: "ping", frames: [0, 1, 2], fps: 10, loop: true, pingPong: true });
+            sprite.play("ping");
+
+            sprite.advanceTime(0.1);
+            expect(sprite.currentFrameIndex).toBe(1);
+
+            sprite.advanceTime(0.1);
+            expect(sprite.currentFrameIndex).toBe(2);
+
+            sprite.advanceTime(0.1);
+            expect(sprite.currentFrameIndex).toBe(1);
+
+            sprite.advanceTime(0.1);
+            expect(sprite.currentFrameIndex).toBe(0);
         });
     });
 
     describe("observables", () => {
-        it("should fire onFrameChange when frame changes", () => {
+        it("should fire onFrameChange when the displayed frame changes", () => {
             const frames: number[] = [];
-            sprite.onFrameChange.add((f) => frames.push(f));
+            sprite.onFrameChange.add((frameIndex) => frames.push(frameIndex));
+
             sprite.play("walk");
-            expect(frames).toEqual([0]); // Initial frame
-            sprite.update(0.1);
+            sprite.advanceTime(0.1);
+
             expect(frames).toEqual([0, 1]);
         });
 
-        it("should fire onAnimationEnd when non-looping animation finishes", () => {
+        it("should fire onAnimationEnd for non-looping clips", () => {
             const ended: string[] = [];
-            sprite.onAnimationEnd.add((name) => ended.push(name));
-            sprite.play("walk", false);
-            sprite.update(0.5);
-            expect(ended).toEqual(["walk"]);
+            sprite.onAnimationEnd.add((clipName) => ended.push(clipName));
+
+            sprite.play("attack");
+            sprite.advanceTime(0.5);
+
+            expect(ended).toEqual(["attack"]);
         });
 
-        it("should not fire onAnimationEnd for looping animations", () => {
-            const ended: string[] = [];
-            sprite.onAnimationEnd.add((name) => ended.push(name));
-            sprite.play("walk", true);
-            sprite.update(2.0); // Many loops
-            expect(ended).toHaveLength(0);
+        it("should fire onLoop when a looping clip wraps", () => {
+            const loops: string[] = [];
+            sprite.onLoop.add((clipName) => loops.push(clipName));
+
+            sprite.play("walk");
+            sprite.advanceTime(0.4);
+
+            expect(loops).toEqual(["walk"]);
         });
     });
 
     describe("dispose", () => {
         it("should clear observables", () => {
             let called = false;
-            sprite.onAnimationEnd.add(() => { called = true; });
+            sprite.onAnimationEnd.add(() => {
+                called = true;
+            });
+
             sprite.dispose();
             sprite.onAnimationEnd.notifyObservers("walk");
+
             expect(called).toBe(false);
         });
     });

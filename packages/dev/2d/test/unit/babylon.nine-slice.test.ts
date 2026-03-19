@@ -1,4 +1,5 @@
 import { NineSliceSprite2D } from "2d/NineSlice/nineSliceSprite2D";
+import { Scene2D } from "2d/Scene2D/scene2D";
 import type { ISprite2DRenderData } from "2d/Rendering/spriteBatchRenderer";
 
 // Mock texture with known size
@@ -16,11 +17,10 @@ describe("NineSliceSprite2D", () => {
     let sprite: NineSliceSprite2D;
 
     beforeEach(() => {
-        sprite = new NineSliceSprite2D("panel");
-        sprite.texture = mockTexture(64, 64);
+        sprite = new NineSliceSprite2D("panel", mockTexture(64, 64));
         sprite.width = 200;
         sprite.height = 100;
-        sprite.setBorders(16, 16, 16, 16);
+        sprite.setSlices(16, 16, 16, 16);
     });
 
     describe("basic setup", () => {
@@ -29,25 +29,38 @@ describe("NineSliceSprite2D", () => {
             expect(sprite.getDisplayHeight()).toBe(100);
         });
 
-        it("should set borders via setBorders", () => {
-            sprite.setBorders(10, 20, 30, 40);
-            expect(sprite.borderLeft).toBe(10);
-            expect(sprite.borderRight).toBe(20);
-            expect(sprite.borderTop).toBe(30);
-            expect(sprite.borderBottom).toBe(40);
+        it("should set slices via setSlices", () => {
+            sprite.setSlices(10, 20, 30, 40);
+            expect(sprite.sliceLeft).toBe(10);
+            expect(sprite.sliceRight).toBe(20);
+            expect(sprite.sliceTop).toBe(30);
+            expect(sprite.sliceBottom).toBe(40);
         });
 
-        it("should set uniform borders", () => {
-            sprite.setUniformBorders(8);
-            expect(sprite.borderLeft).toBe(8);
-            expect(sprite.borderRight).toBe(8);
-            expect(sprite.borderTop).toBe(8);
-            expect(sprite.borderBottom).toBe(8);
+        it("should set uniform slices", () => {
+            sprite.setUniformSlices(8);
+            expect(sprite.sliceLeft).toBe(8);
+            expect(sprite.sliceRight).toBe(8);
+            expect(sprite.sliceTop).toBe(8);
+            expect(sprite.sliceBottom).toBe(8);
         });
 
-        it("should chain setBorders", () => {
-            const result = sprite.setBorders(1, 2, 3, 4);
-            expect(result).toBe(sprite);
+        it("should attach to an explicitly provided scene", () => {
+            const mockEngine = {
+                getRenderWidth: () => 1,
+                getRenderHeight: () => 1,
+                beginFrame: jest.fn(),
+                endFrame: jest.fn(),
+                setViewport: jest.fn(),
+                clear: jest.fn(),
+            } as any;
+            const scene = new Scene2D(mockEngine);
+            const panel = new NineSliceSprite2D("panel", mockTexture(16, 16), scene);
+
+            expect(panel.scene).toBe(scene);
+            expect(scene.rootNodes).toContain(panel);
+
+            scene.dispose();
         });
     });
 
@@ -68,13 +81,13 @@ describe("NineSliceSprite2D", () => {
             expect(list.length).toBe(4);
         });
 
-        it("should produce nothing for zero-size sprite", () => {
+        it("should use the 1x1 white fallback when texture and explicit size are missing", () => {
             sprite.width = 0;
             sprite.height = 0;
             sprite.texture = null;
             const list: ISprite2DRenderData[] = [];
             sprite._collectRenderData(list, whiteTex);
-            expect(list.length).toBe(0);
+            expect(list.length).toBe(4);
         });
 
         it("should use fallback texture when no texture set", () => {
@@ -198,7 +211,7 @@ describe("NineSliceSprite2D", () => {
 
     describe("asymmetric borders", () => {
         it("should handle different border sizes per side", () => {
-            sprite.setBorders(8, 24, 12, 20);
+            sprite.setSlices(8, 24, 12, 20);
             const list: ISprite2DRenderData[] = [];
             sprite._collectRenderData(list, whiteTex);
 

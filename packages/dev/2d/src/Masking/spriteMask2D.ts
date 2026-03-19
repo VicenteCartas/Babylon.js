@@ -47,6 +47,8 @@ export class SpriteMask2D implements IMask2D {
      */
     public sprite: Sprite2D;
 
+    private _alphaThreshold: number = 0.5;
+
     /**
      * Alpha threshold (0–1). Mask pixels with alpha >= threshold pass the
      * stencil test; pixels below are clipped. Default: 0.5.
@@ -54,7 +56,13 @@ export class SpriteMask2D implements IMask2D {
      * Lower values = more permissive mask (semi-transparent areas visible).
      * Higher values = stricter mask (only fully opaque areas visible).
      */
-    public alphaThreshold: number = 0.5;
+    public get alphaThreshold(): number {
+        return this._alphaThreshold;
+    }
+
+    public set alphaThreshold(value: number) {
+        this._alphaThreshold = Math.min(Math.max(value, 0), 1);
+    }
 
     /**
      * Creates a new SpriteMask2D.

@@ -1,5 +1,6 @@
 import { Sprite2D } from "2d/Sprite2D/sprite2D";
 import { Rectangle2D } from "2d/Math/rectangle2D";
+import type { ISprite2DRenderData } from "2d/Rendering/spriteBatchRenderer";
 import { Color4 } from "core/Maths/math.color";
 import { Constants } from "core/Engines/constants";
 
@@ -61,6 +62,7 @@ describe("Sprite2D", () => {
 
         it("should fall back to sourceRect dimensions", () => {
             const s = new Sprite2D("s");
+            s.texture = mockTexture(128, 64);
             s.sourceRect = new Rectangle2D(10, 20, 48, 32);
             expect(s.getDisplayWidth()).toBe(48);
             expect(s.getDisplayHeight()).toBe(32);
@@ -73,10 +75,10 @@ describe("Sprite2D", () => {
             expect(s.getDisplayHeight()).toBe(256);
         });
 
-        it("should return 0 when no size info available", () => {
+        it("should return a 1x1 fallback size when no size info is available", () => {
             const s = new Sprite2D("s");
-            expect(s.getDisplayWidth()).toBe(0);
-            expect(s.getDisplayHeight()).toBe(0);
+            expect(s.getDisplayWidth()).toBe(1);
+            expect(s.getDisplayHeight()).toBe(1);
         });
 
         it("should prioritize explicit width over sourceRect and texture", () => {
@@ -118,6 +120,30 @@ describe("Sprite2D", () => {
             s.texture = mockTexture(0, 0);
             s.sourceRect = new Rectangle2D(0, 0, 32, 32);
             expect(s.getSourceUV()).toEqual([0, 0, 1, 1]);
+        });
+
+        it("should clamp sourceRect to the texture bounds", () => {
+            const s = new Sprite2D("s");
+            s.texture = mockTexture(64, 64);
+            s.sourceRect = new Rectangle2D(48, 48, 32, 32);
+
+            expect(s.getDisplayWidth()).toBe(16);
+            expect(s.getDisplayHeight()).toBe(16);
+            expect(s.getSourceUV()).toEqual([48 / 64, 48 / 64, 16 / 64, 16 / 64]);
+        });
+    });
+
+    describe("render data", () => {
+        it("should propagate alphaMode into render data", () => {
+            const s = new Sprite2D("glow");
+            s.texture = mockTexture(32, 32);
+            s.alphaMode = Constants.ALPHA_ADD;
+
+            const list: ISprite2DRenderData[] = [];
+            s._collectRenderData(list, mockTexture(1, 1));
+
+            expect(list).toHaveLength(1);
+            expect(list[0].alphaMode).toBe(Constants.ALPHA_ADD);
         });
     });
 

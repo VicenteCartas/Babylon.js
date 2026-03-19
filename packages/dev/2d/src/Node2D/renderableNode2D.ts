@@ -1,4 +1,5 @@
 import type { IMask2D } from "../Masking/iMask2D";
+import type { Rectangle2D } from "../Math/rectangle2D";
 import type { Scene2D } from "../Scene2D/scene2D";
 import { Node2D } from "./node2D";
 
@@ -169,9 +170,21 @@ export class RenderableNode2D extends Node2D {
         return this.children.filter((child): child is RenderableNode2D => child instanceof RenderableNode2D).sort((left, right) => left.zIndex - right.zIndex);
     }
 
-    /**
-     * Disposes this renderable node.
-     */
+
+/**
+ * Resolves local-space bounds usable by RectMask2D owner-bounds fallback.
+ * Subclasses with stable logical bounds override this.
+ * @param _out - Rectangle receiving the bounds.
+ * @returns True when bounds were written.
+ * @internal
+ */
+public _getMaskLocalBounds(_out: Rectangle2D): boolean {
+    return false;
+}
+
+/**
+ * Disposes this renderable node.
+ */
     public override dispose(): void {
         this.mask = null;
         super.dispose();

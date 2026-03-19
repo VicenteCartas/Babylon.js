@@ -1,89 +1,210 @@
 /**
- * A* pathfinding on a 2D grid.
- * Supports weighted nodes, diagonal movement, and custom heuristics.
- */
-
-/**
- * Options for configuring the A* pathfinder
+ * Options for configuring the A* pathfinder.
  */
 export interface IAStarOptions {
     /**
-     * Grid width in cells
+     * Grid width in cells.
      */
     width: number;
     /**
-     * Grid height in cells
+     * Grid height in cells.
      */
     height: number;
     /**
-     * Callback to determine if a cell is walkable.
-     * Return false for walls/obstacles.
-     * @param col - Column index
-     * @param row - Row index
-     * @returns True if walkable
+     * Returns whether a cell is walkable.
+     * @param col - Column index.
+     * @param row - Row index.
+     * @returns True when the cell can be traversed.
      */
     isWalkable: (col: number, row: number) => boolean;
     /**
-     * Optional callback to get the movement cost for entering a cell.
-     * Default: 1 for all cells.
-     * @param col - Column index
-     * @param row - Row index
-     * @returns Movement cost (higher = slower)
+     * Returns the cost for entering a cell.
+     * @param col - Column index.
+     * @param row - Row index.
+     * @returns Movement cost.
      */
     getCost?: (col: number, row: number) => number;
     /**
-     * Whether to allow diagonal movement. Default: false
+     * Whether diagonal movement is allowed.
      */
     allowDiagonal?: boolean;
     /**
-     * Heuristic function. Default: Manhattan (or Octile if diagonal allowed)
-     * @param ax - Start column
-     * @param ay - Start row
-     * @param bx - End column
-     * @param by - End row
-     * @returns Estimated distance
+     * Custom heuristic function.
+     * @param ax - Start column.
+     * @param ay - Start row.
+     * @param bx - Goal column.
+     * @param by - Goal row.
+     * @returns Estimated remaining cost.
      */
     heuristic?: (ax: number, ay: number, bx: number, by: number) => number;
 }
 
 /**
- * A point on the path grid
+ * A point on a computed path.
  */
 export interface IPathPoint {
     /**
-     * Column index
+     * Column index.
      */
     col: number;
     /**
-     * Row index
+     * Row index.
      */
     row: number;
 }
 
-/**
- * Internal node used during A* search
- */
 interface IAStarNode {
     col: number;
     row: number;
     g: number;
     h: number;
     f: number;
-    parentCol: number;
-    parentRow: number;
-    closed: boolean;
+    parentIndex: number;
+    generation: number;
     opened: boolean;
+    closed: boolean;
+    heapIndex: number;
+}
+
+class AStarMinHeap {
+    private _heap: IAStarNode[] = [];
+
+    /**
+     * Returns the number of nodes in the heap.
+     */
+    public get size(): number {
+        return this._heap.length;
+    }
+
+    /**
+     * Removes all nodes from the heap.
+     */
+    public clear(): void {
+        for (let i = 0; i < this._heap.length; i++) {
+            this._heap[i].heapIndex = -1;
+        }
+        this._heap.length = 0;
+    }
+
+    /**
+     * Adds a node to the heap.
+     * @param node - Node to insert.
+     */
+    public push(node: IAStarNode): void {
+        node.heapIndex = this._heap.length;
+        this._heap.push(node);
+        this._siftUp(node.heapIndex);
+    }
+
+    /**
+     * Removes and returns the lowest-cost node.
+     * @returns The next node, or null when the heap is empty.
+     */
+    public pop(): IAStarNode | null {
+        if (this._heap.length === 0) {
+            return null;
+        }
+
+        const root = this._heap[0];
+        const last = this._heap.pop()!;
+        root.heapIndex = -1;
+
+        if (this._heap.length > 0) {
+            this._heap[0] = last;
+            last.heapIndex = 0;
+            this._siftDown(0);
+        }
+
+        return root;
+    }
+
+    /**
+     * Updates a node whose key decreased.
+     * @param node - Node to reheapify.
+     */
+    public update(node: IAStarNode): void {
+        if (node.heapIndex < 0) {
+            return;
+        }
+
+        this._siftUp(node.heapIndex);
+        this._siftDown(node.heapIndex);
+    }
+
+    private _siftUp(index: number): void {
+        while (index > 0) {
+            const parentIndex = (index - 1) >> 1;
+            if (!this._isHigherPriority(index, parentIndex)) {
+                break;
+            }
+
+            this._swap(index, parentIndex);
+            index = parentIndex;
+        }
+    }
+
+    private _siftDown(index: number): void {
+        for (;;) {
+            const left = index * 2 + 1;
+            const right = left + 1;
+            let best = index;
+
+            if (left < this._heap.length && this._isHigherPriority(left, best)) {
+                best = left;
+            }
+            if (right < this._heap.length && this._isHigherPriority(right, best)) {
+                best = right;
+            }
+            if (best === index) {
+                break;
+            }
+
+            this._swap(index, best);
+            index = best;
+        }
+    }
+
+    private _isHigherPriority(aIndex: number, bIndex: number): boolean {
+        const a = this._heap[aIndex];
+        const b = this._heap[bIndex];
+        if (a.f !== b.f) {
+            return a.f < b.f;
+        }
+        if (a.h !== b.h) {
+            return a.h < b.h;
+        }
+        return a.g > b.g;
+    }
+
+    private _swap(aIndex: number, bIndex: number): void {
+        const a = this._heap[aIndex];
+        const b = this._heap[bIndex];
+        this._heap[aIndex] = b;
+        this._heap[bIndex] = a;
+        a.heapIndex = bIndex;
+        b.heapIndex = aIndex;
+    }
 }
 
 /**
- * Manhattan distance heuristic (no diagonal movement)
+ * Manhattan heuristic for 4-direction movement.
+ * @param ax - Start column.
+ * @param ay - Start row.
+ * @param bx - Goal column.
+ * @param by - Goal row.
+ * @returns Estimated remaining cost.
  */
 function heuristicManhattan(ax: number, ay: number, bx: number, by: number): number {
     return Math.abs(ax - bx) + Math.abs(ay - by);
 }
 
 /**
- * Octile distance heuristic (diagonal movement allowed)
+ * Octile heuristic for 8-direction movement.
+ * @param ax - Start column.
+ * @param ay - Start row.
+ * @param bx - Goal column.
+ * @param by - Goal row.
+ * @returns Estimated remaining cost.
  */
 function heuristicOctile(ax: number, ay: number, bx: number, by: number): number {
     const dx = Math.abs(ax - bx);
@@ -92,18 +213,8 @@ function heuristicOctile(ax: number, ay: number, bx: number, by: number): number
 }
 
 /**
- * A* pathfinder for 2D grid-based maps.
- *
- * Usage:
- * ```typescript
- * const pathfinder = new AStarPathfinder({
- *     width: mapWidth,
- *     height: mapHeight,
- *     isWalkable: (col, row) => !tilemap.isSolid(col, row),
- *     allowDiagonal: true,
- * });
- * const path = pathfinder.findPath(0, 0, 10, 5);
- * ```
+ * A* pathfinding on a 2D grid.
+ * Reusable across multiple findPath() calls — internal node pool is pre-allocated.
  */
 export class AStarPathfinder {
     private static readonly _CARDINAL_DIRECTIONS: readonly (readonly [number, number])[] = [
@@ -130,20 +241,13 @@ export class AStarPathfinder {
     private _getCost: (col: number, row: number) => number;
     private _allowDiagonal: boolean;
     private _heuristic: (ax: number, ay: number, bx: number, by: number) => number;
-
-    /** Reusable node grid for findPath — avoids per-call 2D array allocation */
-    private _nodeGrid: IAStarNode[][] = [];
-    private _nodeGridWidth: number = 0;
-    private _nodeGridHeight: number = 0;
-
-    /** Reusable cost grid for getReachableCells */
-    private _costGrid: number[][] = [];
-    private _costGridWidth: number = 0;
-    private _costGridHeight: number = 0;
+    private _nodes: IAStarNode[];
+    private _openHeap = new AStarMinHeap();
+    private _generation = 0;
 
     /**
-     * Creates a new AStarPathfinder
-     * @param options - Configuration options
+     * Creates a new AStarPathfinder.
+     * @param options - Pathfinder configuration.
      */
     constructor(options: IAStarOptions) {
         this._width = options.width;
@@ -152,297 +256,320 @@ export class AStarPathfinder {
         this._getCost = options.getCost ?? (() => 1);
         this._allowDiagonal = options.allowDiagonal ?? false;
         this._heuristic = options.heuristic ?? (this._allowDiagonal ? heuristicOctile : heuristicManhattan);
+        this._nodes = new Array(this._width * this._height);
+
+        for (let row = 0; row < this._height; row++) {
+            for (let col = 0; col < this._width; col++) {
+                const index = this._toIndex(col, row);
+                this._nodes[index] = {
+                    col,
+                    row,
+                    g: Number.POSITIVE_INFINITY,
+                    h: 0,
+                    f: Number.POSITIVE_INFINITY,
+                    parentIndex: -1,
+                    generation: 0,
+                    opened: false,
+                    closed: false,
+                    heapIndex: -1,
+                };
+            }
+        }
     }
 
     /**
-     * Gets the grid width in cells
+     * Gets the grid width in cells.
      */
     public get gridWidth(): number {
         return this._width;
     }
 
     /**
-     * Gets the grid height in cells
+     * Gets the grid height in cells.
      */
     public get gridHeight(): number {
         return this._height;
     }
 
     /**
-     * Checks whether a particular cell is walkable
-     * @param col - Column index
-     * @param row - Row index
-     * @returns True if the cell is walkable
+     * Returns whether a cell is walkable.
+     * @param col - Column index.
+     * @param row - Row index.
+     * @returns True when the cell is walkable.
      */
     public isWalkable(col: number, row: number): boolean {
-        return this._isWalkable(col, row);
+        return this._inBounds(col, row) && this._isWalkable(col, row);
     }
 
     /**
-     * Finds a path from (startCol, startRow) to (endCol, endRow).
-     * @param startCol - Start column
-     * @param startRow - Start row
-     * @param endCol - End column
-     * @param endRow - End row
-     * @returns Array of path points from start to end, or empty array if no path found
+     * Finds the shortest path from start to goal.
+     * @param startCol - Start column.
+     * @param startRow - Start row.
+     * @param goalCol - Goal column.
+     * @param goalRow - Goal row.
+     * @returns Path points from start to goal, or null when no path exists.
      */
-    public findPath(startCol: number, startRow: number, endCol: number, endRow: number): IPathPoint[] {
-        // Validate bounds
-        if (!this._inBounds(startCol, startRow) || !this._inBounds(endCol, endRow)) {
-            return [];
+    public findPath(startCol: number, startRow: number, goalCol: number, goalRow: number): IPathPoint[] | null {
+        if (!this._inBounds(startCol, startRow) || !this._inBounds(goalCol, goalRow)) {
+            return null;
         }
-        if (!this._isWalkable(startCol, startRow) || !this._isWalkable(endCol, endRow)) {
-            return [];
+        if (!this._isWalkable(startCol, startRow) || !this._isWalkable(goalCol, goalRow)) {
+            return null;
         }
-        if (startCol === endCol && startRow === endRow) {
+        if (startCol === goalCol && startRow === goalRow) {
             return [{ col: startCol, row: startRow }];
         }
 
-        // Reuse pooled node grid
-        const nodes = this._ensureNodeGrid();
+        this._beginSearch();
 
-        // Open list (simple array, sorted by f)
-        const open: IAStarNode[] = [];
-
-        const startNode = nodes[startRow][startCol];
+        const startNode = this._getNode(startCol, startRow);
         startNode.g = 0;
-        startNode.h = this._heuristic(startCol, startRow, endCol, endRow);
+        startNode.h = this._heuristic(startCol, startRow, goalCol, goalRow);
         startNode.f = startNode.h;
+        startNode.parentIndex = -1;
         startNode.opened = true;
-        open.push(startNode);
+        this._openHeap.push(startNode);
 
-        // Direction offsets
-        const dirs = this._allowDiagonal ? AStarPathfinder._ALL_DIRECTIONS : AStarPathfinder._CARDINAL_DIRECTIONS;
+        const directions = this._allowDiagonal ? AStarPathfinder._ALL_DIRECTIONS : AStarPathfinder._CARDINAL_DIRECTIONS;
 
-        while (open.length > 0) {
-            // Find node with lowest f
-            let bestIdx = 0;
-            for (let i = 1; i < open.length; i++) {
-                if (open[i].f < open[bestIdx].f) {
-                    bestIdx = i;
-                }
+        while (this._openHeap.size > 0) {
+            const current = this._openHeap.pop();
+            if (current === null || current.closed) {
+                continue;
             }
-            const current = open[bestIdx];
-            open.splice(bestIdx, 1);
+
+            if (current.col === goalCol && current.row === goalRow) {
+                return this._reconstructPath(current);
+            }
+
             current.closed = true;
 
-            // Reached goal
-            if (current.col === endCol && current.row === endRow) {
-                return this._reconstructPath(nodes, endCol, endRow);
-            }
+            for (const [dc, dr] of directions) {
+                const neighborCol = current.col + dc;
+                const neighborRow = current.row + dr;
 
-            // Expand neighbors
-            for (const [dx, dy] of dirs) {
-                const nc = current.col + dx;
-                const nr = current.row + dy;
-
-                if (!this._inBounds(nc, nr) || !this._isWalkable(nc, nr)) {
+                if (!this._inBounds(neighborCol, neighborRow) || !this._isWalkable(neighborCol, neighborRow)) {
                     continue;
                 }
 
-                const neighbor = nodes[nr][nc];
+                if (dc !== 0 && dr !== 0 && !this._canTraverseDiagonal(current.col, current.row, dc, dr)) {
+                    continue;
+                }
+
+                const neighbor = this._getNode(neighborCol, neighborRow);
                 if (neighbor.closed) {
                     continue;
                 }
 
-                // For diagonal movement, check that we can cut corners
-                if (dx !== 0 && dy !== 0) {
-                    if (!this._isWalkable(current.col + dx, current.row) || !this._isWalkable(current.col, current.row + dy)) {
-                        continue;
-                    }
-                }
+                const moveCost = (dc !== 0 && dr !== 0 ? Math.SQRT2 : 1) * this._getCost(neighborCol, neighborRow);
+                const tentativeG = current.g + moveCost;
 
-                const moveCost = dx !== 0 && dy !== 0 ? Math.SQRT2 : 1;
-                const tentativeG = current.g + moveCost * this._getCost(nc, nr);
-
-                if (tentativeG < neighbor.g) {
+                if (!neighbor.opened || tentativeG < neighbor.g) {
                     neighbor.g = tentativeG;
-                    neighbor.h = this._heuristic(nc, nr, endCol, endRow);
+                    neighbor.h = this._heuristic(neighborCol, neighborRow, goalCol, goalRow);
                     neighbor.f = neighbor.g + neighbor.h;
-                    neighbor.parentCol = current.col;
-                    neighbor.parentRow = current.row;
+                    neighbor.parentIndex = this._toIndex(current.col, current.row);
 
                     if (!neighbor.opened) {
                         neighbor.opened = true;
-                        open.push(neighbor);
+                        this._openHeap.push(neighbor);
+                    } else {
+                        this._openHeap.update(neighbor);
                     }
                 }
             }
         }
 
-        // No path found
-        return [];
+        return null;
     }
 
     /**
-     * Gets all walkable cells reachable within a given movement range.
-     * Useful for turn-based games to show movement range.
-     * @param col - Starting column
-     * @param row - Starting row
-     * @param maxCost - Maximum movement cost
-     * @returns Array of reachable cells with their costs
+     * Tests line-of-sight between two cells using Bresenham's algorithm.
+     * @param fromCol - Start column.
+     * @param fromRow - Start row.
+     * @param toCol - Goal column.
+     * @param toRow - Goal row.
+     * @returns True when all intersected cells are walkable.
      */
-    public getReachableCells(col: number, row: number, maxCost: number): Array<{ col: number; row: number; cost: number }> {
-        if (!this._inBounds(col, row)) {
-            return [];
-        }
-
-        // Reuse pooled cost grid
-        const costGrid = this._ensureCostGrid();
-        costGrid[row][col] = 0;
-
-        const results: Array<{ col: number; row: number; cost: number }> = [{ col, row, cost: 0 }];
-        const queue: Array<{ col: number; row: number; cost: number }> = [{ col, row, cost: 0 }];
-
-        const dirs = this._allowDiagonal ? AStarPathfinder._ALL_DIRECTIONS : AStarPathfinder._CARDINAL_DIRECTIONS;
-
-        while (queue.length > 0) {
-            // Find lowest cost in queue
-            let bestIdx = 0;
-            for (let i = 1; i < queue.length; i++) {
-                if (queue[i].cost < queue[bestIdx].cost) {
-                    bestIdx = i;
-                }
-            }
-            const current = queue[bestIdx];
-            queue.splice(bestIdx, 1);
-
-            for (const [dx, dy] of dirs) {
-                const nc = current.col + dx;
-                const nr = current.row + dy;
-
-                if (!this._inBounds(nc, nr) || !this._isWalkable(nc, nr)) {
-                    continue;
-                }
-
-                if (dx !== 0 && dy !== 0) {
-                    if (!this._isWalkable(current.col + dx, current.row) || !this._isWalkable(current.col, current.row + dy)) {
-                        continue;
-                    }
-                }
-
-                const moveCost = dx !== 0 && dy !== 0 ? Math.SQRT2 : 1;
-                const newCost = current.cost + moveCost * this._getCost(nc, nr);
-
-                if (newCost <= maxCost && newCost < costGrid[nr][nc]) {
-                    costGrid[nr][nc] = newCost;
-                    const cell = { col: nc, row: nr, cost: newCost };
-                    results.push(cell);
-                    queue.push(cell);
-                }
-            }
-        }
-
-        return results;
-    }
-
-    /**
-     * Checks if there is a clear line of sight between two cells using Bresenham's line algorithm.
-     * @param startCol - Start column
-     * @param startRow - Start row
-     * @param endCol - End column
-     * @param endRow - End row
-     * @returns True if all cells on the line are walkable
-     */
-    public hasLineOfSight(startCol: number, startRow: number, endCol: number, endRow: number): boolean {
-        let x0 = startCol;
-        let y0 = startRow;
-        const x1 = endCol;
-        const y1 = endRow;
-
-        const dx = Math.abs(x1 - x0);
-        const dy = Math.abs(y1 - y0);
-        const sx = x0 < x1 ? 1 : -1;
-        const sy = y0 < y1 ? 1 : -1;
-        let err = dx - dy;
+    public hasLineOfSight(fromCol: number, fromRow: number, toCol: number, toRow: number): boolean {
+        let col = fromCol;
+        let row = fromRow;
+        const deltaCol = Math.abs(toCol - fromCol);
+        const stepCol = fromCol < toCol ? 1 : -1;
+        const deltaRow = -Math.abs(toRow - fromRow);
+        const stepRow = fromRow < toRow ? 1 : -1;
+        let error = deltaCol + deltaRow;
 
         while (true) {
-            if (!this._inBounds(x0, y0) || !this._isWalkable(x0, y0)) {
+            if (!this._inBounds(col, row) || !this._isWalkable(col, row)) {
                 return false;
             }
-            if (x0 === x1 && y0 === y1) {
+            if (col === toCol && row === toRow) {
                 return true;
             }
 
-            const e2 = 2 * err;
-            if (e2 > -dy) {
-                err -= dy;
-                x0 += sx;
+            const error2 = 2 * error;
+            if (error2 >= deltaRow) {
+                error += deltaRow;
+                col += stepCol;
             }
-            if (e2 < dx) {
-                err += dx;
-                y0 += sy;
+            if (error2 <= deltaCol) {
+                error += deltaCol;
+                row += stepRow;
             }
         }
     }
 
-    private _ensureNodeGrid(): IAStarNode[][] {
-        if (this._nodeGridWidth !== this._width || this._nodeGridHeight !== this._height) {
-            this._nodeGrid = [];
-            for (let r = 0; r < this._height; r++) {
-                const row: IAStarNode[] = [];
-                for (let c = 0; c < this._width; c++) {
-                    row.push({ col: c, row: r, g: Infinity, h: 0, f: Infinity, parentCol: -1, parentRow: -1, closed: false, opened: false });
-                }
-                this._nodeGrid.push(row);
+    /**
+     * Flood-fills the grid and returns all cells reachable within the given movement budget.
+     * @param col - Start column.
+     * @param row - Start row.
+     * @param maxSteps - Maximum travel cost.
+     * @returns Map keyed by `"col,row"` with total movement cost values.
+     */
+    public getReachableCells(col: number, row: number, maxSteps: number): Map<string, number> {
+        const reachable = new Map<string, number>();
+        if (!this._inBounds(col, row)) {
+            return reachable;
+        }
+
+        reachable.set(this._makeKey(col, row), 0);
+        if (!this._isWalkable(col, row)) {
+            return reachable;
+        }
+
+        this._beginSearch();
+
+        const startNode = this._getNode(col, row);
+        startNode.g = 0;
+        startNode.h = 0;
+        startNode.f = 0;
+        startNode.parentIndex = -1;
+        startNode.opened = true;
+        this._openHeap.push(startNode);
+
+        const directions = this._allowDiagonal ? AStarPathfinder._ALL_DIRECTIONS : AStarPathfinder._CARDINAL_DIRECTIONS;
+
+        while (this._openHeap.size > 0) {
+            const current = this._openHeap.pop();
+            if (current === null || current.closed) {
+                continue;
             }
-            this._nodeGridWidth = this._width;
-            this._nodeGridHeight = this._height;
-        } else {
-            // Reset all nodes for reuse
-            for (let r = 0; r < this._height; r++) {
-                for (let c = 0; c < this._width; c++) {
-                    const node = this._nodeGrid[r][c];
-                    node.g = Infinity;
-                    node.h = 0;
-                    node.f = Infinity;
-                    node.parentCol = -1;
-                    node.parentRow = -1;
-                    node.closed = false;
-                    node.opened = false;
+
+            if (current.g > maxSteps) {
+                continue;
+            }
+
+            current.closed = true;
+            reachable.set(this._makeKey(current.col, current.row), current.g);
+
+            for (const [dc, dr] of directions) {
+                const neighborCol = current.col + dc;
+                const neighborRow = current.row + dr;
+
+                if (!this._inBounds(neighborCol, neighborRow) || !this._isWalkable(neighborCol, neighborRow)) {
+                    continue;
+                }
+
+                if (dc !== 0 && dr !== 0 && !this._canTraverseDiagonal(current.col, current.row, dc, dr)) {
+                    continue;
+                }
+
+                const neighbor = this._getNode(neighborCol, neighborRow);
+                if (neighbor.closed) {
+                    continue;
+                }
+
+                const stepCost = (dc !== 0 && dr !== 0 ? Math.SQRT2 : 1) * this._getCost(neighborCol, neighborRow);
+                const nextCost = current.g + stepCost;
+                if (nextCost > maxSteps) {
+                    continue;
+                }
+
+                if (!neighbor.opened || nextCost < neighbor.g) {
+                    neighbor.g = nextCost;
+                    neighbor.h = 0;
+                    neighbor.f = nextCost;
+                    neighbor.parentIndex = this._toIndex(current.col, current.row);
+
+                    if (!neighbor.opened) {
+                        neighbor.opened = true;
+                        this._openHeap.push(neighbor);
+                    } else {
+                        this._openHeap.update(neighbor);
+                    }
                 }
             }
         }
-        return this._nodeGrid;
+
+        return reachable;
     }
 
-    private _ensureCostGrid(): number[][] {
-        if (this._costGridWidth !== this._width || this._costGridHeight !== this._height) {
-            this._costGrid = [];
-            for (let r = 0; r < this._height; r++) {
-                this._costGrid.push(new Array(this._width));
-            }
-            this._costGridWidth = this._width;
-            this._costGridHeight = this._height;
+    /**
+     * Invalidates any cached walkability state.
+     * This implementation reads live walkability data, so invalidation is a no-op.
+     */
+    public invalidate(): void {
+        // No cached walkability data to invalidate.
+    }
+
+    /**
+     * Releases internal pooled state.
+     */
+    public dispose(): void {
+        this._openHeap.clear();
+        this._nodes = [];
+        this._generation = 0;
+    }
+
+    private _beginSearch(): void {
+        this._generation++;
+        this._openHeap.clear();
+    }
+
+    private _getNode(col: number, row: number): IAStarNode {
+        const node = this._nodes[this._toIndex(col, row)];
+        if (node.generation !== this._generation) {
+            node.generation = this._generation;
+            node.g = Number.POSITIVE_INFINITY;
+            node.h = 0;
+            node.f = Number.POSITIVE_INFINITY;
+            node.parentIndex = -1;
+            node.opened = false;
+            node.closed = false;
+            node.heapIndex = -1;
         }
-        // Reset all to Infinity
-        for (let r = 0; r < this._height; r++) {
-            for (let c = 0; c < this._width; c++) {
-                this._costGrid[r][c] = Infinity;
-            }
-        }
-        return this._costGrid;
+
+        return node;
     }
 
     private _inBounds(col: number, row: number): boolean {
         return col >= 0 && col < this._width && row >= 0 && row < this._height;
     }
 
-    private _reconstructPath(nodes: IAStarNode[][], endCol: number, endRow: number): IPathPoint[] {
-        const path: IPathPoint[] = [];
-        let c = endCol;
-        let r = endRow;
+    private _toIndex(col: number, row: number): number {
+        return row * this._width + col;
+    }
 
-        while (c !== -1 && r !== -1) {
-            path.push({ col: c, row: r });
-            const node = nodes[r][c];
-            const pc = node.parentCol;
-            const pr = node.parentRow;
-            c = pc;
-            r = pr;
+    private _makeKey(col: number, row: number): string {
+        return `${col},${row}`;
+    }
+
+    private _canTraverseDiagonal(col: number, row: number, dc: number, dr: number): boolean {
+        return this.isWalkable(col + dc, row) && this.isWalkable(col, row + dr);
+    }
+
+    private _reconstructPath(goalNode: IAStarNode): IPathPoint[] {
+        const path: IPathPoint[] = [];
+        let current: IAStarNode | null = goalNode;
+
+        while (current !== null) {
+            path.push({ col: current.col, row: current.row });
+            current = current.parentIndex >= 0 ? this._nodes[current.parentIndex] : null;
         }
 
         path.reverse();
         return path;
     }
 }
+

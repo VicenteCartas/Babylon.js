@@ -1,68 +1,120 @@
-import type { BaseTexture } from "core/Materials/Textures/baseTexture";
 import type { ThinTexture } from "core/Materials/Textures/thinTexture";
 import { Texture } from "core/Materials/Textures/texture";
 
+import { Rectangle2D } from "../Math/rectangle2D";
 import { Matrix2D } from "../Math/matrix2D";
 import type { ISprite2DRenderData } from "../Rendering/spriteBatchRenderer";
+import type { Scene2D } from "../Scene2D/scene2D";
 import { Sprite2D } from "../Sprite2D/sprite2D";
 
 /**
- * A 9-slice (9-patch) sprite that can be resized without distorting its borders.
+ * A 9-slice sprite that can be resized without distorting its borders.
  */
 export class NineSliceSprite2D extends Sprite2D {
-    /** Left border width in source pixels. */
-    public borderLeft: number = 0;
-    /** Right border width in source pixels. */
-    public borderRight: number = 0;
-    /** Top border height in source pixels. */
-    public borderTop: number = 0;
-    /** Bottom border height in source pixels. */
-    public borderBottom: number = 0;
+    /** Left slice width in source pixels. */
+    public sliceLeft: number = 0;
+    /** Right slice width in source pixels. */
+    public sliceRight: number = 0;
+    /** Top slice height in source pixels. */
+    public sliceTop: number = 0;
+    /** Bottom slice height in source pixels. */
+    public sliceBottom: number = 0;
 
-    /**
-     * Pre-allocated transform matrices for the 9 slices (avoids per-frame allocation).
-     */
+    /** @internal */
+    public get borderLeft(): number {
+        return this.sliceLeft;
+    }
+
+    public set borderLeft(value: number) {
+        this.sliceLeft = value;
+    }
+
+    /** @internal */
+    public get borderRight(): number {
+        return this.sliceRight;
+    }
+
+    public set borderRight(value: number) {
+        this.sliceRight = value;
+    }
+
+    /** @internal */
+    public get borderTop(): number {
+        return this.sliceTop;
+    }
+
+    public set borderTop(value: number) {
+        this.sliceTop = value;
+    }
+
+    /** @internal */
+    public get borderBottom(): number {
+        return this.sliceBottom;
+    }
+
+    public set borderBottom(value: number) {
+        this.sliceBottom = value;
+    }
+
     private _sliceTransforms: Matrix2D[] = Array.from({ length: 9 }, () => Matrix2D.Identity());
     private _compatSliceRenderDataPool: ISprite2DRenderData[] = [];
+    private _nineSliceResolvedSourceRect: Rectangle2D = new Rectangle2D();
+    private _columnCenters: Float32Array = new Float32Array(3);
+    private _columnWidths: Float32Array = new Float32Array(3);
+    private _columnSourceXs: Float32Array = new Float32Array(3);
+    private _columnSourceWidths: Float32Array = new Float32Array(3);
+    private _rowCenters: Float32Array = new Float32Array(3);
+    private _rowHeights: Float32Array = new Float32Array(3);
+    private _rowSourceYs: Float32Array = new Float32Array(3);
+    private _rowSourceHeights: Float32Array = new Float32Array(3);
 
     /**
      * Creates a new NineSliceSprite2D.
      * @param name - Node name.
      * @param texture - The texture containing the 9-slice source graphic.
+     * @param scene - Optional owning scene.
      */
-    constructor(name: string, texture?: BaseTexture) {
-        super(name);
+    constructor(name: string, texture?: ThinTexture, scene?: Scene2D | null) {
+        super(name, scene);
         if (texture) {
             this.texture = texture;
         }
     }
 
     /**
-     * Sets all four border insets at once.
-     * @param left - Left border width in source pixels.
-     * @param right - Right border width in source pixels.
-     * @param top - Top border height in source pixels.
-     * @param bottom - Bottom border height in source pixels.
-     * @returns This instance for chaining.
+     * Sets all four slice insets at once.
+     * @param left - Left slice width.
+     * @param right - Right slice width.
+     * @param top - Top slice height.
+     * @param bottom - Bottom slice height.
      */
-    public setBorders(left: number, right: number, top: number, bottom: number): this {
-        this.borderLeft = left;
-        this.borderRight = right;
-        this.borderTop = top;
-        this.borderBottom = bottom;
-        return this;
+    public setSlices(left: number, right: number, top: number, bottom: number): void {
+        this.sliceLeft = left;
+        this.sliceRight = right;
+        this.sliceTop = top;
+        this.sliceBottom = bottom;
     }
 
     /**
-     * Sets uniform border insets (same on all sides).
-     * @param size - Border size in source pixels.
-     * @returns This instance for chaining.
+     * Sets uniform slice insets.
+     * @param inset - The uniform inset size.
      */
-    public setUniformBorders(size: number): this {
-        this.borderLeft = size;
-        this.borderRight = size;
-        this.borderTop = size;
-        this.borderBottom = size;
+    public setUniformSlices(inset: number): void {
+        this.sliceLeft = inset;
+        this.sliceRight = inset;
+        this.sliceTop = inset;
+        this.sliceBottom = inset;
+    }
+
+    /** @internal */
+    public setBorders(left: number, right: number, top: number, bottom: number): this {
+        this.setSlices(left, right, top, bottom);
+        return this;
+    }
+
+    /** @internal */
+    public setUniformBorders(inset: number): this {
+        this.setUniformSlices(inset);
         return this;
     }
 
@@ -111,36 +163,91 @@ export class NineSliceSprite2D extends Sprite2D {
         }
 
         const texture = this.texture ?? fallbackTexture;
-        const textureSize = this.texture ? this.texture.getSize() : { width: 1, height: 1 };
+        const textureSize = texture.getSize();
         const textureWidth = textureSize.width;
         const textureHeight = textureSize.height;
+        const resolvedSourceRect = this._getResolvedSourceRectToRef(texture, this._nineSliceResolvedSourceRect);
+        const sourceX = resolvedSourceRect.x;
+        const sourceY = resolvedSourceRect.y;
+        const sourceWidth = resolvedSourceRect.width;
+        const sourceHeight = resolvedSourceRect.height;
 
-        const sourceX = this.sourceRect ? this.sourceRect.x : 0;
-        const sourceY = this.sourceRect ? this.sourceRect.y : 0;
-        const sourceWidth = this.sourceRect ? this.sourceRect.width : textureWidth;
-        const sourceHeight = this.sourceRect ? this.sourceRect.height : textureHeight;
+        let displayLeft = this.sliceLeft;
+        let displayRight = this.sliceRight;
+        let displayTop = this.sliceTop;
+        let displayBottom = this.sliceBottom;
 
-        let borderLeft = this.borderLeft;
-        let borderRight = this.borderRight;
-        let borderTop = this.borderTop;
-        let borderBottom = this.borderBottom;
+        const displayHorizontalTotal = displayLeft + displayRight;
+        if (displayHorizontalTotal > displayWidth && displayHorizontalTotal > 0) {
+            const scale = displayWidth / displayHorizontalTotal;
+            displayLeft *= scale;
+            displayRight *= scale;
+        }
 
-        const horizontalScale = borderLeft + borderRight > displayWidth ? displayWidth / (borderLeft + borderRight) : 1;
-        const verticalScale = borderTop + borderBottom > displayHeight ? displayHeight / (borderTop + borderBottom) : 1;
-        borderLeft *= horizontalScale;
-        borderRight *= horizontalScale;
-        borderTop *= verticalScale;
-        borderBottom *= verticalScale;
+        const displayVerticalTotal = displayTop + displayBottom;
+        if (displayVerticalTotal > displayHeight && displayVerticalTotal > 0) {
+            const scale = displayHeight / displayVerticalTotal;
+            displayTop *= scale;
+            displayBottom *= scale;
+        }
 
-        const centerWidth = Math.max(0, displayWidth - borderLeft - borderRight);
-        const middleHeight = Math.max(0, displayHeight - borderTop - borderBottom);
+        let sourceLeft = this.sliceLeft;
+        let sourceRight = this.sliceRight;
+        let sourceTop = this.sliceTop;
+        let sourceBottom = this.sliceBottom;
 
-        const sourceLeft = this.borderLeft;
-        const sourceRight = this.borderRight;
-        const sourceTop = this.borderTop;
-        const sourceBottom = this.borderBottom;
+        const sourceHorizontalTotal = sourceLeft + sourceRight;
+        if (sourceHorizontalTotal > sourceWidth && sourceHorizontalTotal > 0) {
+            const scale = sourceWidth / sourceHorizontalTotal;
+            sourceLeft *= scale;
+            sourceRight *= scale;
+        }
+
+        const sourceVerticalTotal = sourceTop + sourceBottom;
+        if (sourceVerticalTotal > sourceHeight && sourceVerticalTotal > 0) {
+            const scale = sourceHeight / sourceVerticalTotal;
+            sourceTop *= scale;
+            sourceBottom *= scale;
+        }
+
+        const centerWidth = Math.max(0, displayWidth - displayLeft - displayRight);
+        const middleHeight = Math.max(0, displayHeight - displayTop - displayBottom);
         const sourceCenterWidth = Math.max(0, sourceWidth - sourceLeft - sourceRight);
         const sourceMiddleHeight = Math.max(0, sourceHeight - sourceTop - sourceBottom);
+
+        const columnCenters = this._columnCenters;
+        const columnWidths = this._columnWidths;
+        const columnSourceXs = this._columnSourceXs;
+        const columnSourceWidths = this._columnSourceWidths;
+        columnWidths[0] = displayLeft;
+        columnWidths[1] = centerWidth;
+        columnWidths[2] = displayRight;
+        columnCenters[0] = -displayWidth / 2 + displayLeft / 2;
+        columnCenters[1] = -displayWidth / 2 + displayLeft + centerWidth / 2;
+        columnCenters[2] = displayWidth / 2 - displayRight / 2;
+        columnSourceXs[0] = sourceX;
+        columnSourceXs[1] = sourceX + sourceLeft;
+        columnSourceXs[2] = sourceX + sourceWidth - sourceRight;
+        columnSourceWidths[0] = sourceLeft;
+        columnSourceWidths[1] = sourceCenterWidth;
+        columnSourceWidths[2] = sourceRight;
+
+        const rowCenters = this._rowCenters;
+        const rowHeights = this._rowHeights;
+        const rowSourceYs = this._rowSourceYs;
+        const rowSourceHeights = this._rowSourceHeights;
+        rowHeights[0] = displayTop;
+        rowHeights[1] = middleHeight;
+        rowHeights[2] = displayBottom;
+        rowCenters[0] = -displayHeight / 2 + displayTop / 2;
+        rowCenters[1] = -displayHeight / 2 + displayTop + middleHeight / 2;
+        rowCenters[2] = displayHeight / 2 - displayBottom / 2;
+        rowSourceYs[0] = sourceY;
+        rowSourceYs[1] = sourceY + sourceTop;
+        rowSourceYs[2] = sourceY + sourceHeight - sourceBottom;
+        rowSourceHeights[0] = sourceTop;
+        rowSourceHeights[1] = sourceMiddleHeight;
+        rowSourceHeights[2] = sourceBottom;
 
         const worldTransform = this.worldTransform.m;
         const tintR = this.tint.r;
@@ -148,30 +255,29 @@ export class NineSliceSprite2D extends Sprite2D {
         const tintB = this.tint.b;
         const tintA = this.tint.a * worldAlpha;
         const sortingLayer = this.sortingLayer;
-        const invertY = this.texture instanceof Texture ? this.texture.invertY : true;
-
-        const columns = [
-            { x: -displayWidth / 2 + borderLeft / 2, width: borderLeft, sourceX, sourceWidth: sourceLeft },
-            { x: -displayWidth / 2 + borderLeft + centerWidth / 2, width: centerWidth, sourceX: sourceX + sourceLeft, sourceWidth: sourceCenterWidth },
-            { x: displayWidth / 2 - borderRight / 2, width: borderRight, sourceX: sourceX + sourceWidth - sourceRight, sourceWidth: sourceRight },
-        ];
-        const rows = [
-            { y: -displayHeight / 2 + borderTop / 2, height: borderTop, sourceY, sourceHeight: sourceTop },
-            { y: -displayHeight / 2 + borderTop + middleHeight / 2, height: middleHeight, sourceY: sourceY + sourceTop, sourceHeight: sourceMiddleHeight },
-            { y: displayHeight / 2 - borderBottom / 2, height: borderBottom, sourceY: sourceY + sourceHeight - sourceBottom, sourceHeight: sourceBottom },
-        ];
+        const sortKey = (sortingLayer << 16) | (worldZIndex & 0xffff);
+        const invertY = texture instanceof Texture ? texture.invertY : true;
+        const scene = this.scene;
+        const lit = scene !== null && scene.lightingManager !== null && sortingLayer < scene.unlitSortingLayerMin;
 
         let emittedCount = 0;
-        let sliceIndex = 0;
-        for (const row of rows) {
-            for (const column of columns) {
-                if (column.width <= 0 || row.height <= 0) {
-                    sliceIndex++;
+        for (let rowIndex = 0; rowIndex < 3; rowIndex++) {
+            const rowHeight = rowHeights[rowIndex];
+            if (rowHeight <= 0) {
+                continue;
+            }
+
+            const cy = rowCenters[rowIndex];
+            const sourceRowY = rowSourceYs[rowIndex];
+            const sourceRowHeight = rowSourceHeights[rowIndex];
+            for (let columnIndex = 0; columnIndex < 3; columnIndex++) {
+                const columnWidth = columnWidths[columnIndex];
+                if (columnWidth <= 0) {
                     continue;
                 }
 
-                const cx = column.x;
-                const cy = row.y;
+                const cx = columnCenters[columnIndex];
+                const sliceIndex = rowIndex * 3 + columnIndex;
                 const sliceTransform = this._sliceTransforms[sliceIndex];
                 sliceTransform.m[0] = worldTransform[0];
                 sliceTransform.m[1] = worldTransform[1];
@@ -180,29 +286,58 @@ export class NineSliceSprite2D extends Sprite2D {
                 sliceTransform.m[4] = worldTransform[0] * cx + worldTransform[2] * cy + worldTransform[4];
                 sliceTransform.m[5] = worldTransform[1] * cx + worldTransform[3] * cy + worldTransform[5];
 
+                let u0 = textureWidth > 0 ? columnSourceXs[columnIndex] / textureWidth : 0;
+                let u1 = textureWidth > 0 ? (columnSourceXs[columnIndex] + columnSourceWidths[columnIndex]) / textureWidth : 1;
+                let v0 = 0;
+                let v1 = 1;
+                if (textureHeight > 0) {
+                    const sourceTop = sourceRowY / textureHeight;
+                    const sourceBottom = (sourceRowY + sourceRowHeight) / textureHeight;
+                    if (invertY) {
+                        v0 = 1 - sourceTop;
+                        v1 = 1 - sourceBottom;
+                    } else {
+                        v0 = sourceTop;
+                        v1 = sourceBottom;
+                    }
+                }
+                if (this.flipX) {
+                    const temp = u0;
+                    u0 = u1;
+                    u1 = temp;
+                }
+                if (this.flipY) {
+                    const temp = v0;
+                    v0 = v1;
+                    v1 = temp;
+                }
+
                 const renderData = allocator(emittedCount);
+                const color: [number, number, number, number] = renderData.color ?? [1, 1, 1, 1];
+                color[0] = tintR;
+                color[1] = tintG;
+                color[2] = tintB;
+                color[3] = tintA;
+
+                const packedUvs: [number, number, number, number] = renderData.uvs ?? [0, 0, 1, 1];
+                packedUvs[0] = u0;
+                packedUvs[1] = v0;
+                packedUvs[2] = u1;
+                packedUvs[3] = v1;
+
                 renderData.worldTransform = sliceTransform;
-                renderData.width = column.width;
-                renderData.height = row.height;
-                renderData.r = tintR;
-                renderData.g = tintG;
-                renderData.b = tintB;
-                renderData.a = tintA;
-                renderData.cellU = textureWidth > 0 ? column.sourceX / textureWidth : 0;
-                renderData.cellV = textureHeight > 0 ? row.sourceY / textureHeight : 0;
-                renderData.cellW = textureWidth > 0 ? column.sourceWidth / textureWidth : 0;
-                renderData.cellH = textureHeight > 0 ? row.sourceHeight / textureHeight : 0;
-                renderData.flipX = this.flipX;
-                renderData.flipY = this.flipY;
-                renderData.invertY = invertY;
                 renderData.texture = texture;
-                renderData.zIndex = worldZIndex;
-                renderData.sortingLayer = sortingLayer;
+                renderData.uvs = packedUvs;
+                renderData.color = color;
+                renderData.width = columnWidth;
+                renderData.height = rowHeight;
+                renderData.alphaMode = this.alphaMode;
+                renderData.sortKey = sortKey;
+                renderData.insertionOrder = insertionOrderStart + emittedCount;
+                renderData.lit = lit;
                 renderData.scrollFactorX = worldScrollFactorX;
                 renderData.scrollFactorY = worldScrollFactorY;
-                renderData.insertionOrder = insertionOrderStart + emittedCount;
                 emittedCount++;
-                sliceIndex++;
             }
         }
 

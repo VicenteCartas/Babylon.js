@@ -1,191 +1,483 @@
+import type { Observable } from "core/Misc/observable";
 import { Vector2 } from "core/Maths/math.vector";
 
-import type { Node2D } from "../Node2D/node2D";
 import type { IRaycastHit2D } from "../Collision/collisionShapes";
+import type { Rectangle2D } from "../Math/rectangle2D";
+import type { Node2D } from "../Node2D/node2D";
 
 /**
- * Body type for 2D physics bodies
+ * Body type for 2D physics bodies.
  */
 export enum PhysicsBodyType2D {
     /**
-     * Static bodies do not move and are not affected by forces (e.g., terrain, walls)
+     * Static bodies do not move and are not affected by forces.
      */
     Static = 0,
     /**
-     * Dynamic bodies are fully simulated (affected by gravity, forces, collisions)
+     * Dynamic bodies are fully simulated.
      */
     Dynamic = 1,
     /**
-     * Kinematic bodies move by setting velocity directly, not affected by forces
+     * Kinematic bodies move via velocity and are not affected by gravity.
      */
     Kinematic = 2,
 }
 
 /**
- * Shape definition for creating physics bodies
+ * Supported joint types for 2D physics bodies.
  */
-export type PhysicsShape2DOptions =
-    | { type: "box"; width: number; height: number }
-    | { type: "circle"; radius: number }
-    | { type: "polygon"; vertices: Vector2[] };
+export enum PhysicsJointType2D {
+    /**
+     * Maintains a fixed distance between two anchor points.
+     */
+    Distance = 0,
+    /**
+     * Constrains two bodies around a pivot point.
+     */
+    Revolute = 1,
+    /**
+     * Constrains motion along an axis.
+     */
+    Prismatic = 2,
+    /**
+     * Fuses two bodies together.
+     */
+    Weld = 3,
+    /**
+     * Limits the maximum distance between two bodies.
+     */
+    Rope = 4,
+    /**
+     * Simulates a wheel suspension joint.
+     */
+    Wheel = 5,
+}
 
 /**
- * Options for creating a 2D physics body
+ * Allowed one-way platform directions.
+ */
+export type OneWayDirection2D = "up" | "down" | "left" | "right";
+
+/**
+ * Shape definition for creating physics bodies.
+ */
+export type PhysicsShape2DOptions =
+    | { type: "box"; width: number; height: number; angle?: number }
+    | { type: "circle"; radius: number }
+    | { type: "polygon"; vertices: Vector2[] }
+    | { type: "capsule"; width: number; height: number }
+    | { type: "edge"; v1: Vector2; v2: Vector2; ghost?: boolean };
+
+/**
+ * Options for creating a 2D physics body.
  */
 export interface IPhysicsBody2DOptions {
     /**
-     * Body type (static, dynamic, kinematic)
+     * Body type (static, dynamic, kinematic).
      */
     bodyType: PhysicsBodyType2D;
     /**
-     * Collision shape
+     * Collision shape definition.
      */
     shape: PhysicsShape2DOptions;
     /**
-     * Density (affects mass). Default: 1
+     * Density affecting the computed mass. Default: 1.
      */
     density?: number;
     /**
-     * Friction coefficient (0-1). Default: 0.3
+     * Friction coefficient. Default: 0.3.
      */
     friction?: number;
     /**
-     * Restitution/bounciness (0-1). Default: 0
+     * Restitution / bounciness. Default: 0.
      */
     restitution?: number;
     /**
-     * Whether this is a sensor (detects overlap but doesn't collide). Default: false
+     * Whether the body acts as a sensor. Default: false.
      */
     isSensor?: boolean;
     /**
-     * Whether to prevent rotation. Default: false
+     * Whether the body should be prevented from rotating. Default: false.
      */
     fixedRotation?: boolean;
     /**
-     * Collision layer bitmask. Default: 1
+     * Collision layer bitmask. Default: 1.
      */
     layer?: number;
     /**
-     * Collision mask bitmask. Default: 0xFFFFFFFF
+     * Collision mask bitmask. Default: 0xFFFF.
      */
     mask?: number;
+    /**
+     * Initial linear velocity in pixels per second.
+     */
+    linearVelocity?: Vector2;
+    /**
+     * Initial angular velocity in radians per second.
+     */
+    angularVelocity?: number;
+    /**
+     * Linear damping. Default: 0.
+     */
+    linearDamping?: number;
+    /**
+     * Angular damping. Default: 0.
+     */
+    angularDamping?: number;
+    /**
+     * Enables one-way platform behavior. Default: false.
+     */
+    isOneWayPlatform?: boolean;
+    /**
+     * The blocking direction for a one-way platform. Default: "up".
+     */
+    oneWayDirection?: OneWayDirection2D;
+}
+
+/**
+ * Collision event payload emitted by physics bodies.
+ */
+export interface ICollisionEvent2D {
+    /**
+     * The other body involved in the collision.
+     */
+    readonly other: IPhysicsBody2D;
+    /**
+     * Contact points valid only for the callback frame.
+     */
+    readonly contactPoints: ReadonlyArray<Vector2>;
+    /**
+     * Contact normal pointing from the other body into this body.
+     */
+    readonly normal: Vector2;
+    /**
+     * Relative impact speed in pixels per second.
+     */
+    readonly impactSpeed: number;
+}
+
+/**
+ * Sensor overlap event payload emitted by physics bodies.
+ */
+export interface ISensorEvent2D {
+    /**
+     * The other body involved in the overlap.
+     */
+    readonly other: IPhysicsBody2D;
+}
+
+/**
+ * Joint creation options.
+ */
+export interface IPhysicsJoint2DOptions {
+    /**
+     * The joint type to create.
+     */
+    type: PhysicsJointType2D;
+    /**
+     * The first connected body.
+     */
+    bodyA: IPhysicsBody2D;
+    /**
+     * The second connected body.
+     */
+    bodyB: IPhysicsBody2D;
+    /**
+     * Local-space anchor on body A. Default: body center.
+     */
+    anchorA?: Vector2;
+    /**
+     * Local-space anchor on body B. Default: body center.
+     */
+    anchorB?: Vector2;
+    /**
+     * Whether connected bodies can collide. Default: false.
+     */
+    collideConnected?: boolean;
+    /**
+     * Target length for distance and rope joints.
+     */
+    length?: number;
+    /**
+     * Softness frequency for spring-style joints.
+     */
+    frequencyHz?: number;
+    /**
+     * Spring damping ratio.
+     */
+    dampingRatio?: number;
+    /**
+     * Enables joint limits for supported joint types.
+     */
+    enableLimit?: boolean;
+    /**
+     * Lower angle limit in radians for revolute joints.
+     * Lower translation limit in pixels for prismatic joints.
+     */
+    lowerAngle?: number;
+    /**
+     * Upper angle limit in radians for revolute joints.
+     * Upper translation limit in pixels for prismatic joints.
+     */
+    upperAngle?: number;
+    /**
+     * Enables a motor for supported joint types.
+     */
+    enableMotor?: boolean;
+    /**
+     * Motor speed in radians or units per second, depending on joint type.
+     */
+    motorSpeed?: number;
+    /**
+     * Maximum motor torque for revolute and wheel joints.
+     */
+    maxMotorTorque?: number;
+    /**
+     * Local axis direction for prismatic and wheel joints. Default: (1, 0).
+     */
+    axis?: Vector2;
+}
+
+/**
+ * Handle to an active 2D physics joint.
+ */
+export interface IPhysicsJoint2D {
+    /**
+     * The joint type.
+     */
+    readonly type: PhysicsJointType2D;
+    /**
+     * The first connected body.
+     */
+    readonly bodyA: IPhysicsBody2D;
+    /**
+     * The second connected body.
+     */
+    readonly bodyB: IPhysicsBody2D;
+    /**
+     * Whether the joint is still active.
+     */
+    readonly isActive: boolean;
+    /**
+     * Motor speed for supported joint types.
+     */
+    motorSpeed?: number;
+    /**
+     * Disposes the joint and removes it from the simulation.
+     * @returns Nothing.
+     */
+    dispose(): void;
 }
 
 /**
  * Handle to a physics body in the simulation.
- * Returned by IPhysicsEngine2D.addBody().
+ * Returned by {@link IPhysicsEngine2D.addBody}.
  */
 export interface IPhysicsBody2D {
     /**
-     * The Node2D this body is attached to
+     * The Node2D this body is attached to.
      */
     readonly node: Node2D;
     /**
-     * The body type (static, dynamic, kinematic)
+     * Gets or sets the linear velocity in pixels per second.
      */
-    readonly bodyType: PhysicsBodyType2D;
+    linearVelocity: Vector2;
     /**
-     * The shape options used to create this body (for debug rendering)
+     * Gets or sets the angular velocity in radians per second.
      */
-    readonly shapeOptions: PhysicsShape2DOptions;
+    angularVelocity: number;
     /**
-     * Sets the linear velocity
-     * @param velocity - Velocity in pixels/second
+     * Gets or sets the body world position in pixels.
      */
-    setLinearVelocity(velocity: Vector2): void;
+    position: Vector2;
     /**
-     * Gets the current linear velocity
-     * @returns Velocity in pixels/second
+     * Gets or sets the body world rotation in radians.
      */
-    getLinearVelocity(): Vector2;
+    rotation: number;
     /**
-     * Applies a force at the body's center of mass
-     * @param force - Force vector
+     * The computed body mass.
+     */
+    readonly mass: number;
+    /**
+     * Whether the body is currently sleeping.
+     */
+    readonly isSleeping: boolean;
+    /**
+     * Fires when this body begins touching another non-sensor body.
+     */
+    readonly onCollisionBegin: Observable<ICollisionEvent2D>;
+    /**
+     * Fires when this body stops touching another non-sensor body.
+     */
+    readonly onCollisionEnd: Observable<ICollisionEvent2D>;
+    /**
+     * Fires when this body begins overlapping a sensor interaction.
+     */
+    readonly onSensorBegin: Observable<ISensorEvent2D>;
+    /**
+     * Fires when this body ends overlapping a sensor interaction.
+     */
+    readonly onSensorEnd: Observable<ISensorEvent2D>;
+    /**
+     * Applies a world-space force at the body's center.
+     * @param force - The force vector.
+     * @returns Nothing.
      */
     applyForce(force: Vector2): void;
     /**
-     * Applies an impulse at the body's center of mass
-     * @param impulse - Impulse vector
+     * Applies a world-space force at a world-space point.
+     * @param force - The force vector.
+     * @param worldPoint - The world-space application point.
+     * @returns Nothing.
+     */
+    applyForceAtPoint(force: Vector2, worldPoint: Vector2): void;
+    /**
+     * Applies an impulse at the body's center.
+     * @param impulse - The impulse vector.
+     * @returns Nothing.
      */
     applyImpulse(impulse: Vector2): void;
     /**
-     * Gets the body's mass
-     * @returns Mass in kg
+     * Applies torque to the body.
+     * @param torque - The torque value.
+     * @returns Nothing.
      */
-    getMass(): number;
+    applyTorque(torque: number): void;
     /**
-     * Teleports the body to a new position (in pixels).
-     * Also updates the attached node's position.
-     * @param position - New position in pixels
+     * Wakes the body if it is sleeping.
+     * @returns Nothing.
      */
-    setPosition(position: Vector2): void;
+    wakeUp(): void;
+    /**
+     * Changes the body type at runtime.
+     * @param type - The new body type.
+     * @returns Nothing.
+     */
+    setBodyType(type: PhysicsBodyType2D): void;
+    /**
+     * Enables or disables sensor behavior for all fixtures on the body.
+     * @param isSensor - Whether fixtures should behave as sensors.
+     * @returns Nothing.
+     */
+    setSensor(isSensor: boolean): void;
+    /**
+     * Updates the body's collision layer and mask.
+     * @param layer - The collision layer bitmask.
+     * @param mask - The collision mask bitmask.
+     * @returns Nothing.
+     */
+    setCollisionFilter(layer: number, mask: number): void;
+    /**
+     * Enables or disables one-way platform behavior for the body.
+     * @param enabled - Whether one-way behavior should be enabled.
+     * @param direction - The one-way blocking direction.
+     * @returns Nothing.
+     */
+    setOneWayPlatform(enabled: boolean, direction?: OneWayDirection2D): void;
+    /**
+     * Disposes the body and removes it from the simulation.
+     * @returns Nothing.
+     */
+    dispose(): void;
 }
 
 /**
- * Callback for physics collision events
- */
-export type PhysicsContactCallback = (bodyA: IPhysicsBody2D, bodyB: IPhysicsBody2D) => void;
-
-/**
  * Plugin interface for 2D physics engines.
- * Mirrors the pattern of Babylon's 3D physics (IPhysicsEngine with Havok/Ammo backends).
- * Default implementation: PlanckPhysicsEngine (Planck.js).
  */
 export interface IPhysicsEngine2D {
     /**
-     * Sets the gravity vector
-     * @param gravity - Gravity in pixels/second^2 (e.g., new Vector2(0, 980) for Y-down)
+     * Gets or sets gravity in pixels per second squared.
      */
-    setGravity(gravity: Vector2): void;
+    gravity: Vector2;
     /**
-     * Gets the current gravity vector
-     * @returns Gravity vector
-     */
-    getGravity(): Vector2;
-    /**
-     * Adds a physics body to the simulation attached to a Node2D
-     * @param node - The node to attach the body to
-     * @param options - Body configuration
-     * @returns A handle to the created body
+     * Adds a physics body attached to a Node2D.
+     * @param node - The node to drive from simulation.
+     * @param options - The body configuration.
+     * @returns The created body wrapper.
      */
     addBody(node: Node2D, options: IPhysicsBody2DOptions): IPhysicsBody2D;
     /**
-     * Removes a physics body from the simulation
-     * @param body - The body to remove
+     * Removes a physics body from the simulation.
+     * @param body - The body to remove.
+     * @returns Nothing.
      */
     removeBody(body: IPhysicsBody2D): void;
     /**
-     * Steps the physics simulation
-     * @param deltaTime - Time step in seconds
+     * Adds a joint connecting two bodies.
+     * @param options - The joint configuration.
+     * @returns The created joint wrapper.
+     */
+    addJoint(options: IPhysicsJoint2DOptions): IPhysicsJoint2D;
+    /**
+     * Removes a joint from the simulation.
+     * @param joint - The joint to remove.
+     * @returns Nothing.
+     */
+    removeJoint(joint: IPhysicsJoint2D): void;
+    /**
+     * Casts a ray and returns all hits sorted by distance.
+     * @param origin - Ray origin in world pixels.
+     * @param direction - Ray direction.
+     * @param maxDistance - Maximum ray distance in pixels.
+     * @param layerMask - Optional collision layer filter.
+     * @returns Raycast hits sorted nearest-first.
+     */
+    raycast(origin: Vector2, direction: Vector2, maxDistance: number, layerMask?: number): IRaycastHit2D[];
+    /**
+     * Returns bodies overlapping a rectangle.
+     * @param rect - The rectangle in world pixels.
+     * @param layerMask - Optional collision layer filter.
+     * @returns Overlapping bodies.
+     */
+    overlapRect(rect: Rectangle2D, layerMask?: number): IPhysicsBody2D[];
+    /**
+     * Returns bodies overlapping a circle.
+     * @param center - The circle center in world pixels.
+     * @param radius - The circle radius in pixels.
+     * @param layerMask - Optional collision layer filter.
+     * @returns Overlapping bodies.
+     */
+    overlapCircle(center: Vector2, radius: number, layerMask?: number): IPhysicsBody2D[];
+    /**
+     * Steps the physics simulation.
+     * @param deltaTime - Time step in seconds.
+     * @returns Nothing.
      */
     step(deltaTime: number): void;
     /**
-     * Casts a ray and returns the closest hit
-     * @param origin - Ray origin in world pixels
-     * @param direction - Ray direction (will be normalized)
-     * @param maxDistance - Maximum distance in pixels
-     * @param mask - Collision mask filter
-     * @returns The closest hit, or null
-     */
-    raycast(origin: Vector2, direction: Vector2, maxDistance: number, mask?: number): IRaycastHit2D | null;
-    /**
-     * Registers a callback for when two bodies begin contact
-     * @param callback - The callback function
-     */
-    onBeginContact(callback: PhysicsContactCallback): void;
-    /**
-     * Registers a callback for when two bodies end contact
-     * @param callback - The callback function
-     */
-    onEndContact(callback: PhysicsContactCallback): void;
-    /**
-     * Disposes the physics engine and all bodies
+     * Disposes the physics engine and all managed bodies and joints.
+     * @returns Nothing.
      */
     dispose(): void;
+}
+
+/**
+ * Debug body metadata exposed to engine-internal tooling.
+ * @internal
+ */
+export interface IPhysicsDebugBody2D {
     /**
-     * Gets all physics bodies currently in the simulation.
-     * Primarily used for debug rendering.
-     * @returns An array of all physics bodies
+     * The Node2D driven by the body.
      */
-    getAllBodies(): IPhysicsBody2D[];
+    readonly node: Node2D;
+    /**
+     * The current body type.
+     */
+    readonly bodyType: PhysicsBodyType2D;
+    /**
+     * The body shape definition.
+     */
+    readonly shape: PhysicsShape2DOptions;
+}
+
+/**
+ * Internal debug data source contract for physics backends.
+ * @internal
+ */
+export interface IPhysicsDebugDataSource2D {
+    /**
+     * Returns debug body metadata for the current world state.
+     * @returns The current debug body metadata.
+     */
+    _getDebugBodies(): readonly IPhysicsDebugBody2D[];
 }

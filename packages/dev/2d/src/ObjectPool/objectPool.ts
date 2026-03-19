@@ -1,159 +1,155 @@
-/**
- * Optional interface for objects that want lifecycle hooks when acquired or released from a pool.
- * Objects implementing this interface will have their onAcquire/onRelease methods called automatically.
- */
-export interface IPoolable {
-    /**
-     * Called when the object is acquired from the pool.
-     * Use this to initialize or reset state for reuse.
-     */
-    onAcquire?(): void;
-
-    /**
-     * Called when the object is released back to the pool.
-     * Use this to clean up state before recycling.
-     */
-    onRelease?(): void;
+function isDisposableObject(obj: unknown): obj is { dispose: () => void } {
+    return typeof obj === "object" && obj !== null && "dispose" in obj && typeof obj.dispose === "function";
 }
 
 /**
- * Type guard to check if an object implements the IPoolable interface.
- * @param obj The object to check
- * @returns True if the object implements IPoolable
- */
-function isPoolable(obj: unknown): obj is IPoolable {
-    return typeof obj === "object" && obj !== null && ("onAcquire" in obj || "onRelease" in obj);
-}
-
-/**
- * Type guard to check if an object has a settable parent property (like Node2D).
- * Uses duck-typing to avoid coupling ObjectPool to Node2D directly.
- */
-function hasParent(obj: unknown): obj is { parent: unknown | null } {
-    return typeof obj === "object" && obj !== null && "parent" in obj;
-}
-
-/**
- * Configuration options for creating an ObjectPool.
+ * Compatibility constructor options for creating an ObjectPool.
+ * @param factory - Factory function used when the pool is empty.
+ * @param reset - Optional reset function called on release.
+ * @param initialSize - Optional initial number of objects to prewarm.
+ * @param maxPoolSize - Optional maximum number of free objects to retain.
+ * @param name - Optional debug label.
  */
 export interface IObjectPoolOptions<T> {
-    /**
-     * Factory function that creates a new instance of T.
-     * Called when the pool is empty and needs to create a new object.
-     */
+    /** Factory function used when the pool is empty. */
     factory: () => T;
-
-    /**
-     * Function that resets an object to its initial state when released back to the pool.
-     * This is called on release, so objects are ready to use immediately when acquired.
-     * @param obj The object to reset
-     */
-    reset: (obj: T) => void;
-
-    /**
-     * Maximum number of objects to keep in the pool.
-     * If undefined, the pool has no size limit.
-     * When the pool is at capacity, excess released objects are discarded.
-     */
+    /** Optional reset function called on release. */
+    reset?: (obj: T) => void;
+    /** Optional initial number of objects to prewarm. */
+    initialSize?: number;
+    /** Optional maximum number of free objects to retain. */
     maxPoolSize?: number;
-
-    /**
-     * Optional name for debugging purposes
-     */
+    /** Optional debug label. */
     name?: string;
 }
 
 /**
- * Generic object pool to avoid GC spikes in action games.
- * Useful for frequently created/destroyed objects like bullets, particles, enemies, etc.
- *
- * @example
- * ```typescript
- * // Create a pool for bullets
- * const bulletPool = new ObjectPool({
- *     factory: () => new Bullet(),
- *     reset: (bullet) => {
- *         bullet.position.set(0, 0);
- *         bullet.velocity.set(0, 0);
- *         bullet.visible = false;
- *     },
- *     maxPoolSize: 100
- * });
- *
- * // Pre-warm the pool
- * bulletPool.prewarm(20);
- *
- * // Acquire a bullet from the pool
- * const bullet = bulletPool.acquire();
- * bullet.position.set(playerX, playerY);
- * bullet.visible = true;
- *
- * // When done, release it back
- * bulletPool.release(bullet);
- * ```
+ * Generic object pool for reusing allocated objects.
  */
 export class ObjectPool<T> {
-    private _factory: () => T;
-    private _reset: (obj: T) => void;
-    private _maxPoolSize: number | undefined;
-    private _name: string;
-    private _freeObjects: T[] = [];
-    private _activeObjects: Set<T> = new Set();
+    private readonly _factory: () => T;
+    private readonly _reset: ((obj: T) => void) | undefined;
+    private readonly _maxPoolSize: number | undefined;
+    private readonly _name: string;
+    private readonly _free: T[] = [];
     private _totalCreated: number = 0;
+    private _activeCount: number = 0;
     private _isDisposed: boolean = false;
 
     /**
-     * Creates a new ObjectPool instance.
-     * @param options Configuration options for the pool
+     * Creates a new ObjectPool.
+     * @param optionsOrFactory - Either a configuration object or a factory function.
+     * @param reset - Optional reset function when using the positional overload.
+     * @param initialSize - Optional initial prewarm count when using the positional overload.
      */
-    constructor(options: IObjectPoolOptions<T>) {
-        this._factory = options.factory;
-        this._reset = options.reset;
-        this._maxPoolSize = options.maxPoolSize;
-        this._name = options.name || "ObjectPool";
+    constructor(optionsOrFactory: IObjectPoolOptions<T> | (() => T), reset?: (obj: T) => void, initialSize?: number) {
+        if (typeof optionsOrFactory === "function") {
+            this._factory = optionsOrFactory;
+            this._reset = reset;
+            this._maxPoolSize = undefined;
+            this._name = "ObjectPool";
+            if ((initialSize ?? 0) > 0) {
+                this.prewarm(initialSize!);
+            }
+            return;
+        }
+
+        this._factory = optionsOrFactory.factory;
+        this._reset = optionsOrFactory.reset;
+        this._maxPoolSize = optionsOrFactory.maxPoolSize;
+        this._name = optionsOrFactory.name ?? "ObjectPool";
+        if ((optionsOrFactory.initialSize ?? 0) > 0) {
+            this.prewarm(optionsOrFactory.initialSize!);
+        }
     }
 
     /**
-     * Gets the number of currently active objects (acquired but not released).
+     * Current number of objects waiting in the pool.
+     * @returns The number of available objects.
      */
-    public get activeCount(): number {
-        return this._activeObjects.size;
+    public get available(): number {
+        return this._free.length;
     }
 
     /**
-     * Gets the number of free objects available in the pool.
-     */
-    public get freeCount(): number {
-        return this._freeObjects.length;
-    }
-
-    /**
-     * Gets the total number of objects ever created by this pool.
+     * Total objects ever created by this pool.
+     * @returns The total created count.
      */
     public get totalCreated(): number {
         return this._totalCreated;
     }
 
     /**
-     * Gets the name of this pool (for debugging).
+     * Compatibility alias for the number of active objects.
+     * @returns The active object count.
+     */
+    public get activeCount(): number {
+        return this._activeCount;
+    }
+
+    /**
+     * Compatibility alias for the number of free objects.
+     * @returns The free object count.
+     */
+    public get freeCount(): number {
+        return this.available;
+    }
+
+    /**
+     * Compatibility debug label.
+     * @returns The configured pool name.
      */
     public get name(): string {
         return this._name;
     }
 
     /**
-     * Gets a readonly array of all currently active (acquired) objects.
-     * Returns a snapshot of active objects at the time of the call.
-     * @returns A readonly array of active objects
+     * Whether this pool has been disposed.
+     * @returns True when disposed.
      */
-    public get activeObjects(): readonly T[] {
-        return Object.freeze([...this._activeObjects]);
+    public get isDisposed(): boolean {
+        return this._isDisposed;
     }
 
     /**
-     * Pre-allocates a specified number of objects in the pool.
-     * Useful to avoid allocation spikes during gameplay.
-     * @param count Number of objects to pre-allocate
+     * Returns a pooled object or creates a new one.
+     * @returns A pooled or newly created object.
+     */
+    public acquire(): T {
+        if (this._isDisposed) {
+            throw new Error(`Cannot acquire from disposed pool '${this._name}'`);
+        }
+
+        const object = this._free.length > 0 ? this._free.pop()! : this._createObject();
+        this._activeCount++;
+        return object;
+    }
+
+    /**
+     * Returns an object to the pool.
+     * @param obj - Object to release back to the pool.
+     * @returns Nothing.
+     */
+    public release(obj: T): void {
+        if (this._isDisposed) {
+            return;
+        }
+
+        if (this._activeCount > 0) {
+            this._activeCount--;
+        }
+
+        this._reset?.(obj);
+
+        if (this._maxPoolSize === undefined || this._free.length < this._maxPoolSize) {
+            this._free.push(obj);
+        }
+    }
+
+    /**
+     * Pre-allocates free objects in the pool.
+     * @param count - Number of objects to create.
+     * @returns Nothing.
      */
     public prewarm(count: number): void {
         if (this._isDisposed) {
@@ -161,138 +157,61 @@ export class ObjectPool<T> {
         }
 
         for (let i = 0; i < count; i++) {
-            // Respect max pool size during prewarm
-            if (this._maxPoolSize !== undefined && this._freeObjects.length >= this._maxPoolSize) {
+            if (this._maxPoolSize !== undefined && this._free.length >= this._maxPoolSize) {
                 break;
             }
-            const obj = this._factory();
-            this._totalCreated++;
-            this._freeObjects.push(obj);
+
+            this._free.push(this._createObject());
         }
     }
 
     /**
-     * Iterates over all currently active (acquired) objects.
-     * @param callback Function to call for each active object
-     */
-    public forEachActive(callback: (obj: T) => void): void {
-        for (const obj of this._activeObjects) {
-            callback(obj);
-        }
-    }
-
-    /**
-     * Acquires an object from the pool.
-     * If the pool is empty, a new object is created.
-     * If the object implements IPoolable, its onAcquire method is called.
-     * @returns An object from the pool
-     */
-    public acquire(): T {
-        if (this._isDisposed) {
-            throw new Error(`Cannot acquire from disposed pool '${this._name}'`);
-        }
-
-        let obj: T;
-
-        if (this._freeObjects.length > 0) {
-            obj = this._freeObjects.pop()!;
-        } else {
-            obj = this._factory();
-            this._totalCreated++;
-        }
-
-        this._activeObjects.add(obj);
-
-        // Call onAcquire if the object implements IPoolable
-        if (isPoolable(obj) && obj.onAcquire) {
-            try {
-                obj.onAcquire();
-            } catch (error) {
-                // Pool state is already consistent (object added to active set)
-                // Re-throw the error so caller knows acquisition failed
-                throw error;
-            }
-        }
-
-        return obj;
-    }
-
-    /**
-     * Releases an object back to the pool.
-     * The reset function is called to clean up the object's state.
-     * If the object implements IPoolable, its onRelease method is called.
-     * If the pool is at capacity, the object is discarded instead of pooled.
-     * @param obj The object to release
-     */
-    public release(obj: T): void {
-        if (this._isDisposed) {
-            // Silently ignore releases to disposed pools
-            return;
-        }
-
-        if (!this._activeObjects.has(obj)) {
-            // Object wasn't acquired from this pool or was already released
-            return;
-        }
-
-        this._activeObjects.delete(obj);
-
-        // Call onRelease if the object implements IPoolable
-        if (isPoolable(obj) && obj.onRelease) {
-            try {
-                obj.onRelease();
-            } catch (error) {
-                // Pool state is already consistent (object removed from active set)
-                // Re-throw the error so caller knows release hook failed
-                throw error;
-            }
-        }
-
-        // Auto-remove from scene graph if the object has a parent (e.g. Node2D)
-        if (hasParent(obj) && obj.parent != null) {
-            obj.parent = null;
-        }
-
-        // Reset the object to initial state
-        this._reset(obj);
-
-        // Check if we can add to the pool or should discard
-        if (this._maxPoolSize === undefined || this._freeObjects.length < this._maxPoolSize) {
-            this._freeObjects.push(obj);
-        }
-        // Otherwise, let it be garbage collected
-    }
-
-    /**
-     * Clears all free objects from the pool.
-     * Active objects are not affected.
+     * Clears currently free objects from the pool.
+     * @returns Nothing.
      */
     public clear(): void {
         if (this._isDisposed) {
             return;
         }
 
-        this._freeObjects.length = 0;
+        this._disposeObjects(this._free);
+        this._free.length = 0;
     }
 
     /**
-     * Disposes the pool and clears all objects.
-     * After disposal, the pool cannot be used.
+     * Disposes all currently free pooled objects.
+     * @returns Nothing.
      */
     public dispose(): void {
         if (this._isDisposed) {
             return;
         }
 
+        this.clear();
+        this._activeCount = 0;
         this._isDisposed = true;
-        this._freeObjects.length = 0;
-        this._activeObjects.clear();
     }
 
     /**
-     * Gets whether this pool has been disposed.
+     * Creates a new object and updates stats.
+     * @returns The created object.
      */
-    public get isDisposed(): boolean {
-        return this._isDisposed;
+    private _createObject(): T {
+        const object = this._factory();
+        this._totalCreated++;
+        return object;
+    }
+
+    /**
+     * Disposes disposable objects in the provided list.
+     * @param objects - Objects to dispose.
+     * @returns Nothing.
+     */
+    private _disposeObjects(objects: readonly T[]): void {
+        for (const object of objects) {
+            if (isDisposableObject(object)) {
+                object.dispose();
+            }
+        }
     }
 }

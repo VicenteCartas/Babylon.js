@@ -22,39 +22,54 @@ import { Scene2DStore } from "./scene2DStore";
 import { RectMask2D } from "../Masking/rectMask2D";
 import { SpriteMask2D } from "../Masking/spriteMask2D";
 import { RenderCommandType } from "../Masking/renderCommand2D";
-import type { RenderCommand2D, IPushRectMaskCommand, IPushSpriteMaskCommand } from "../Masking/renderCommand2D";
+import type { RenderCommand2D, MaskPushRenderCommand, IPushRectMaskCommand, IPushSpriteMaskCommand } from "../Masking/renderCommand2D";
 import { MaskStateManager } from "../Masking/maskStateManager";
+import type { SceneTransition2D } from "../Transition/sceneTransition2D";
 
 interface IRenderEntry2D {
     type: "sprite" | "group";
-    sortingLayer: number;
-    zIndex: number;
+    sortKey: number;
     insertionOrder: number;
     spriteData: ISprite2DRenderData | null;
     pushCommand: IPushRectMaskCommand | IPushSpriteMaskCommand | null;
     children: IRenderEntry2D[];
 }
 
-const _identityViewTransform = Matrix2D.Identity();
+const _identityViewProjection = Matrix2D.Identity();
+
+function _packSortKey(sortingLayer: number, zIndex: number): number {
+    return (sortingLayer << 16) | (zIndex & 0xffff);
+}
 
 function _compareRenderEntries(left: IRenderEntry2D, right: IRenderEntry2D): number {
-    if (left.sortingLayer !== right.sortingLayer) {
-        return left.sortingLayer - right.sortingLayer;
-    }
-    if (left.zIndex !== right.zIndex) {
-        return left.zIndex - right.zIndex;
+    if (left.sortKey !== right.sortKey) {
+        return left.sortKey - right.sortKey;
     }
     return left.insertionOrder - right.insertionOrder;
 }
 
 function _compareSpriteRenderData(left: ISprite2DRenderData, right: ISprite2DRenderData): number {
-    if (left.sortingLayer !== right.sortingLayer) {
-        return left.sortingLayer - right.sortingLayer;
+    if (left.sortKey !== right.sortKey) {
+        return left.sortKey - right.sortKey;
     }
-    if (left.zIndex !== right.zIndex) {
-        return left.zIndex - right.zIndex;
-    }
-    return (left.insertionOrder ?? 0) - (right.insertionOrder ?? 0);
+    return left.insertionOrder - right.insertionOrder;
+}
+
+function _createMaskRectRenderData(): ISprite2DRenderData {
+    return {
+        worldTransform: Matrix2D.Identity(),
+        texture: null!,
+        uvs: [0, 0, 1, 1],
+        color: [1, 1, 1, 1],
+        width: 0,
+        height: 0,
+        alphaMode: Constants.ALPHA_DISABLE,
+        sortKey: 0,
+        insertionOrder: 0,
+        lit: false,
+        scrollFactorX: 1,
+        scrollFactorY: 1,
+    };
 }
 /**
  * Represents a 2D scene that manages a hierarchy of Node2D entities.
@@ -157,12 +172,23 @@ export class Scene2D {
     private _spriteBatchTemp: ISprite2DRenderData[] = [];
     /** Reusable array for mask sprite data in _processRenderCommands */
     private _maskSpriteDataTemp: ISprite2DRenderData[] = [];
+    /** Reusable screen-space quads for inverted RectMask2D stencil rendering. */
+    private _maskScreenRectSpritePoolTemp: ISprite2DRenderData[] = [
+        _createMaskRectRenderData(),
+        _createMaskRectRenderData(),
+        _createMaskRectRenderData(),
+        _createMaskRectRenderData(),
+    ];
+    /** Reusable batch view over the current inverted rect stencil quads. */
+    private _maskScreenRectSpriteBatchTemp: ISprite2DRenderData[] = [];
+    /** Reusable stack mirroring active mask push commands while processing render commands. */
+    private _maskPushCommandStackTemp: MaskPushRenderCommand[] = [];
     /** Reusable sorted sprite buffer for the no-mask fast path. */
     private _sortedSpriteDataTemp: ISprite2DRenderData[] = [];
-    /** Reusable lit sprite buffer for the no-mask fast path. */
-    private _litSpriteDataTemp: ISprite2DRenderData[] = [];
-    /** Reusable unlit sprite buffer for the no-mask fast path. */
-    private _unlitSpriteDataTemp: ISprite2DRenderData[] = [];
+    /** Reusable per-node render-data collection buffer for non-sprite renderables. */
+    private _nodeRenderDataTemp: ISprite2DRenderData[] = [];
+    /** Reusable view-projection matrix used when a render pass applies a screen-space offset. */
+    private _offsetViewProjectionTemp: Matrix2D = Matrix2D.Identity();
     private _maskStateManager: MaskStateManager | null = null;
     /** Timestamp (ms) of the last auto-update, for computing dt independently of the 3D engine */
     private _lastAutoUpdateTime: number = -1;
@@ -172,6 +198,7 @@ export class Scene2D {
      * @internal
      */
     private _overlayNodes: Node2D[] = [];
+    private _activeTransition: SceneTransition2D | null = null;
 
     /**
      * Creates a new Scene2D
@@ -231,6 +258,10 @@ export class Scene2D {
      */
     public executeWhenReady(func: () => void): void {
         this.onReadyObservable.addOnce(func);
+
+        if (this._activeTransition && this._activeTransition.isRunning) {
+            this._activeTransition.cancel();
+        }
 
         if (this._executeWhenReadyTimeoutId !== null) {
             return;
@@ -386,6 +417,18 @@ export class Scene2D {
     }
 
     /**
+     * @internal
+     * Iterates all nodes currently owned by the scene without allocating a temporary array.
+     * @param callback - Callback invoked for each node.
+     * @returns Nothing.
+     */
+    public _forEachNode(callback: (node: Node2D) => void): void {
+        for (const node of this._allNodes.values()) {
+            callback(node);
+        }
+    }
+
+    /**
      * Updates all nodes in the scene.
      * @param deltaTime - Time elapsed since last frame in seconds.
      */
@@ -453,6 +496,35 @@ export class Scene2D {
     }
 
     /**
+     * @internal
+     * Associates a running scene transition with this scene.
+     * @param transition - The transition to attach.
+     */
+    public _attachSceneTransition(transition: SceneTransition2D): void {
+        this._activeTransition = transition;
+    }
+
+    /**
+     * @internal
+     * Removes a previously attached scene transition.
+     * @param transition - The transition to detach.
+     */
+    public _detachSceneTransition(transition: SceneTransition2D): void {
+        if (this._activeTransition === transition) {
+            this._activeTransition = null;
+        }
+    }
+
+    /**
+     * @internal
+     * Gets the currently attached scene transition, if any.
+     * @returns The active transition or null.
+     */
+    public _getSceneTransition(): SceneTransition2D | null {
+        return this._activeTransition;
+    }
+
+    /**
      * Gets or creates the 1x1 white fallback texture (for untextured sprites).
      */
     private _getWhiteTexture(): ThinTexture {
@@ -493,8 +565,7 @@ export class Scene2D {
         if (this._renderEntryCount >= this._renderEntryPool.length) {
             this._renderEntryPool.push({
                 type: "sprite",
-                sortingLayer: 0,
-                zIndex: 0,
+                sortKey: 0,
                 insertionOrder: 0,
                 spriteData: null,
                 pushCommand: null,
@@ -505,8 +576,7 @@ export class Scene2D {
         const entry = this._renderEntryPool[this._renderEntryCount];
         this._renderEntryCount++;
         entry.type = "sprite";
-        entry.sortingLayer = 0;
-        entry.zIndex = 0;
+        entry.sortKey = 0;
         entry.insertionOrder = 0;
         entry.spriteData = null;
         entry.pushCommand = null;
@@ -539,9 +609,8 @@ export class Scene2D {
                 const entry = this._acquireRenderEntry();
                 entry.type = "sprite";
                 entry.spriteData = spriteData;
-                entry.sortingLayer = spriteData.sortingLayer;
-                entry.zIndex = spriteData.zIndex;
-                entry.insertionOrder = spriteData.insertionOrder ?? 0;
+                entry.sortKey = spriteData.sortKey;
+                entry.insertionOrder = spriteData.insertionOrder;
                 entries.push(entry);
             }
 
@@ -559,10 +628,32 @@ export class Scene2D {
         const entry = this._acquireRenderEntry();
         entry.type = "sprite";
         entry.spriteData = spriteData;
-        entry.sortingLayer = spriteData.sortingLayer;
-        entry.zIndex = spriteData.zIndex;
+        entry.sortKey = spriteData.sortKey;
         entry.insertionOrder = insertionOrder;
         entries.push(entry);
+    }
+
+    private _appendCollectedRenderEntries(entries: IRenderEntry2D[], node: RenderableNode2D): void {
+        const collected = this._nodeRenderDataTemp;
+        collected.length = 0;
+        node._collectRenderData(collected, this._getWhiteTexture());
+
+        for (let i = 0; i < collected.length; i++) {
+            const spriteData = collected[i];
+            const insertionOrder = this._nextRenderInsertionOrder++;
+            spriteData.insertionOrder = insertionOrder;
+            this._spriteDataPool[this._spriteDataCount] = spriteData;
+            this._spriteDataCount++;
+
+            const entry = this._acquireRenderEntry();
+            entry.type = "sprite";
+            entry.spriteData = spriteData;
+            entry.sortKey = spriteData.sortKey;
+            entry.insertionOrder = insertionOrder;
+            entries.push(entry);
+        }
+
+        collected.length = 0;
     }
 
     private _collectRenderEntries(node: Node2D, entries: IRenderEntry2D[], parentAlpha: number, parentScrollFactorX: number, parentScrollFactorY: number): void {
@@ -590,8 +681,7 @@ export class Scene2D {
             if (mask && mask.enabled) {
                 groupEntry = this._acquireRenderEntry();
                 groupEntry.type = "group";
-                groupEntry.sortingLayer = node.sortingLayer;
-                groupEntry.zIndex = node.worldZIndex;
+                groupEntry.sortKey = _packSortKey(node.sortingLayer, node.worldZIndex);
                 groupEntry.insertionOrder = this._nextRenderInsertionOrder++;
                 groupEntry.pushCommand = mask instanceof RectMask2D ? { type: RenderCommandType.PushRectMask, rectMask: mask, maskOwner: node } : { type: RenderCommandType.PushSpriteMask, spriteMask: mask as SpriteMask2D, maskOwner: node };
                 targetEntries = groupEntry.children;
@@ -601,6 +691,8 @@ export class Scene2D {
 
         if (node instanceof Sprite2D) {
             this._appendSpriteEntry(targetEntries, node, worldAlpha, worldScrollFactorX, worldScrollFactorY);
+        } else if (node instanceof RenderableNode2D) {
+            this._appendCollectedRenderEntries(targetEntries, node);
         }
 
         for (const child of node.children) {
@@ -632,7 +724,7 @@ export class Scene2D {
             const pushCommand = entry.pushCommand!;
             commands.push(pushCommand);
             this._flattenRenderEntries(entry.children, commands);
-            commands.push({ type: RenderCommandType.PopMask, pushCommand });
+            commands.push({ type: RenderCommandType.PopMask });
         }
     }
 
@@ -671,11 +763,10 @@ export class Scene2D {
     private _processRenderCommands(
         commands: RenderCommand2D[],
         renderer: SpriteBatchRenderer,
-        viewTransform: Matrix2D,
+        viewProjection: Readonly<Matrix2D>,
         vpWidth: number,
         vpHeight: number,
-        camPos: { x: number; y: number } | null,
-        unlitSortingLayerMin: number = Infinity
+        camPos: { x: number; y: number } | null
     ): void {
         if (!this._maskStateManager) {
             this._maskStateManager = new MaskStateManager(this.engine);
@@ -689,45 +780,43 @@ export class Scene2D {
         engine.setDepthBuffer(false);
         engine.setState(false);
 
-        // Reuse pre-allocated arrays
         const spriteBatch = this._spriteBatchTemp;
         spriteBatch.length = 0;
+        const maskPushCommands = this._maskPushCommandStackTemp;
+        maskPushCommands.length = 0;
+        const tempLocalRect = new Rectangle2D();
+        const tempViewportRect = new Rectangle2D();
 
         const flushSpriteBatch = () => {
             if (spriteBatch.length > 0) {
-                // Toggle lighting based on whether this batch is above the unlit threshold
-                const batchLayer = spriteBatch[0].sortingLayer;
-                renderer.lightingManager = (batchLayer < unlitSortingLayerMin) ? this.lightingManager : null;
-                renderer.renderBatch(spriteBatch, vpWidth, vpHeight, viewTransform, camPos);
+                renderer.render(spriteBatch, viewProjection, this.lightingManager, vpWidth, vpHeight);
                 spriteBatch.length = 0;
             }
         };
-
-        // Reusable rect for PushRectMask viewport conversion
-        const tempViewportRect = new Rectangle2D();
 
         for (let i = 0; i < commands.length; i++) {
             const cmd = commands[i];
 
             switch (cmd.type) {
                 case RenderCommandType.Sprite: {
-                    // Flush if crossing the lit/unlit boundary
-                    const sd = cmd.spriteData;
-                    if (spriteBatch.length > 0) {
-                        const prevLayer = spriteBatch[0].sortingLayer;
-                        const prevLit = prevLayer < unlitSortingLayerMin;
-                        const currLit = sd.sortingLayer < unlitSortingLayerMin;
-                        if (prevLit !== currLit) {
-                            flushSpriteBatch();
-                        }
-                    }
-                    spriteBatch.push(sd);
+                    spriteBatch.push(cmd.spriteData);
                     break;
                 }
 
                 case RenderCommandType.PushRectMask: {
                     flushSpriteBatch();
-                    this._pushRectMaskToGPU(cmd, viewTransform, camPos, maskMgr, tempViewportRect);
+                    this._resolveRectMaskLocalRect(cmd.rectMask, cmd.maskOwner, tempLocalRect);
+                    this._computeMaskViewportRect(tempLocalRect, cmd.maskOwner, viewProjection, camPos, tempViewportRect);
+
+                    if (cmd.rectMask.inverted) {
+                        this._renderInvertedRectMaskStencil(tempViewportRect, renderer, vpWidth, vpHeight, maskMgr, false);
+                        maskMgr.pushSpriteMask(false);
+                    } else {
+                        this._clampRectToViewport(tempViewportRect, vpWidth, vpHeight, tempViewportRect);
+                        maskMgr.pushRectMask(tempViewportRect, false);
+                    }
+
+                    maskPushCommands.push(cmd);
                     break;
                 }
 
@@ -735,39 +824,36 @@ export class Scene2D {
                     flushSpriteBatch();
 
                     const mask = cmd.spriteMask;
-                    const sprite = mask.sprite;
-
-                    // Collect the mask sprite's render data
-                    const maskSpriteData = this._collectMaskSpriteData(sprite);
-
+                    const maskSpriteData = this._collectMaskSpriteData(mask.sprite);
                     if (maskSpriteData.length > 0) {
-                        // Configure stencil for mask writing (INCR)
                         maskMgr.beginStencilMaskWrite();
-
-                        // Render the mask sprite into the stencil buffer
-                        renderer.renderMaskSprite(maskSpriteData[0], mask.alphaThreshold, vpWidth, vpHeight, viewTransform, camPos);
+                        renderer.renderMaskSprites(maskSpriteData, mask.alphaThreshold, vpWidth, vpHeight, viewProjection, camPos);
                     }
 
-                    // Configure stencil for masked content rendering
                     maskMgr.pushSpriteMask(mask.inverted);
+                    maskPushCommands.push(cmd);
                     break;
                 }
 
                 case RenderCommandType.PopMask: {
                     flushSpriteBatch();
 
-                    // For sprite masks, re-render the mask sprite with DECR to undo stencil writes
-                    const pushCmd = cmd.pushCommand;
-                    if (pushCmd.type === RenderCommandType.PushSpriteMask) {
-                        const mask = pushCmd.spriteMask;
-                        const sprite = mask.sprite;
-                        const maskSpriteData = this._collectMaskSpriteData(sprite);
+                    const pushCommand = maskPushCommands.pop();
+                    if (!pushCommand) {
+                        break;
+                    }
 
+                    if (pushCommand.type === RenderCommandType.PushSpriteMask) {
+                        const mask = pushCommand.spriteMask;
+                        const maskSpriteData = this._collectMaskSpriteData(mask.sprite);
                         if (maskSpriteData.length > 0) {
-                            // Configure stencil for mask erasing (DECR)
                             maskMgr.beginStencilMaskErase();
-                            renderer.renderMaskSprite(maskSpriteData[0], mask.alphaThreshold, vpWidth, vpHeight, viewTransform, camPos);
+                            renderer.renderMaskSprites(maskSpriteData, mask.alphaThreshold, vpWidth, vpHeight, viewProjection, camPos);
                         }
+                    } else if (pushCommand.rectMask.inverted) {
+                        this._resolveRectMaskLocalRect(pushCommand.rectMask, pushCommand.maskOwner, tempLocalRect);
+                        this._computeMaskViewportRect(tempLocalRect, pushCommand.maskOwner, viewProjection, camPos, tempViewportRect);
+                        this._renderInvertedRectMaskStencil(tempViewportRect, renderer, vpWidth, vpHeight, maskMgr, true);
                     }
 
                     maskMgr.popMask();
@@ -777,37 +863,25 @@ export class Scene2D {
         }
 
         flushSpriteBatch();
+        maskPushCommands.length = 0;
 
         engine.setDepthBuffer(true);
         engine.setAlphaMode(Constants.ALPHA_DISABLE);
     }
 
     /**
-     * Transforms a PushRectMask command's local-space rectangle into viewport
-     * space and pushes it onto the mask state manager.
+     * Transforms a RectMask2D local rectangle into viewport pixels.
      */
-    private _pushRectMaskToGPU(
-        cmd: IPushRectMaskCommand,
-        viewTransform: Matrix2D,
+    private _computeMaskViewportRect(
+        localRect: Readonly<Rectangle2D>,
+        owner: RenderableNode2D,
+        viewTransform: Readonly<Matrix2D>,
         camPos: { x: number; y: number } | null,
-        maskMgr: MaskStateManager,
         outRect: Rectangle2D
     ): void {
-        const mask = cmd.rectMask;
-        const owner = cmd.maskOwner;
-        const wt = owner.worldTransform;
-        const r = mask.rect;
-        const pad = mask.padding;
-
-        const lx = r.x - pad;
-        const ly = r.y - pad;
-        const lw = r.width + pad * 2;
-        const lh = r.height + pad * 2;
-
-        const wtm = wt.m;
+        const wtm = owner.worldTransform.m;
         const cm = viewTransform.m;
 
-        // Parallax correction
         const sfx = owner.worldScrollFactorX;
         const sfy = owner.worldScrollFactorY;
         let parallaxDx = 0;
@@ -817,12 +891,18 @@ export class Scene2D {
             parallaxDy = camPos.y * (1 - sfy);
         }
 
-        // Compute AABB of transformed corners (unrolled ΓÇö no temp arrays)
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        const cx0 = lx, cy0 = ly;
-        const cx1 = lx + lw, cy1 = ly;
-        const cx2 = lx + lw, cy2 = ly + lh;
-        const cx3 = lx, cy3 = ly + lh;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        const cx0 = localRect.x;
+        const cy0 = localRect.y;
+        const cx1 = localRect.x + localRect.width;
+        const cy1 = localRect.y;
+        const cx2 = localRect.x + localRect.width;
+        const cy2 = localRect.y + localRect.height;
+        const cx3 = localRect.x;
+        const cy3 = localRect.y + localRect.height;
 
         for (let ci = 0; ci < 4; ci++) {
             const px = ci === 0 ? cx0 : ci === 1 ? cx1 : ci === 2 ? cx2 : cx3;
@@ -831,17 +911,162 @@ export class Scene2D {
             const wy = wtm[1] * px + wtm[3] * py + wtm[5] + parallaxDy;
             const vx = cm[0] * wx + cm[2] * wy + cm[4];
             const vy = cm[1] * wx + cm[3] * wy + cm[5];
-            if (vx < minX) { minX = vx; }
-            if (vy < minY) { minY = vy; }
-            if (vx > maxX) { maxX = vx; }
-            if (vy > maxY) { maxY = vy; }
+            if (vx < minX) {
+                minX = vx;
+            }
+            if (vy < minY) {
+                minY = vy;
+            }
+            if (vx > maxX) {
+                maxX = vx;
+            }
+            if (vy > maxY) {
+                maxY = vy;
+            }
         }
 
-        outRect.x = minX;
-        outRect.y = minY;
-        outRect.width = maxX - minX;
-        outRect.height = maxY - minY;
-        maskMgr.pushRectMask(outRect, mask.inverted);
+        outRect.set(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    private _clampRectToViewport(rect: Readonly<Rectangle2D>, vpWidth: number, vpHeight: number, outRect: Rectangle2D): void {
+        const left = Math.min(Math.max(rect.x, 0), vpWidth);
+        const top = Math.min(Math.max(rect.y, 0), vpHeight);
+        const right = Math.min(Math.max(rect.x + rect.width, 0), vpWidth);
+        const bottom = Math.min(Math.max(rect.y + rect.height, 0), vpHeight);
+        outRect.set(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+    }
+
+    private _resolveRectMaskLocalRect(mask: RectMask2D, owner: RenderableNode2D, outRect: Rectangle2D): void {
+        const rect = mask.rect;
+        let x = rect.x;
+        let y = rect.y;
+        let width = rect.width;
+        let height = rect.height;
+
+        if ((width <= 0 || height <= 0) && owner._getMaskLocalBounds(outRect)) {
+            if (width <= 0) {
+                x = outRect.x + rect.x;
+                width = outRect.width;
+            }
+            if (height <= 0) {
+                y = outRect.y + rect.y;
+                height = outRect.height;
+            }
+        }
+
+        const padding = mask.padding;
+        outRect.x = x - padding;
+        outRect.y = y - padding;
+        outRect.width = Math.max(0, width + padding * 2);
+        outRect.height = Math.max(0, height + padding * 2);
+    }
+
+    private _renderInvertedRectMaskStencil(
+        viewportRect: Readonly<Rectangle2D>,
+        renderer: SpriteBatchRenderer,
+        vpWidth: number,
+        vpHeight: number,
+        maskMgr: MaskStateManager,
+        erase: boolean
+    ): void {
+        const maskSprites = this._collectInvertedRectMaskSprites(viewportRect, vpWidth, vpHeight);
+        if (maskSprites.length === 0) {
+            return;
+        }
+
+        if (erase) {
+            maskMgr.beginStencilMaskErase();
+        } else {
+            maskMgr.beginStencilMaskWrite();
+        }
+
+        renderer.renderMaskSprites(maskSprites, 0.5, vpWidth, vpHeight, _identityViewProjection, null);
+    }
+
+    private _collectInvertedRectMaskSprites(viewportRect: Readonly<Rectangle2D>, vpWidth: number, vpHeight: number): ISprite2DRenderData[] {
+        const batch = this._maskScreenRectSpriteBatchTemp;
+        batch.length = 0;
+
+        if (vpWidth <= 0 || vpHeight <= 0) {
+            return batch;
+        }
+
+        const left = Math.min(Math.max(viewportRect.x, 0), vpWidth);
+        const top = Math.min(Math.max(viewportRect.y, 0), vpHeight);
+        const right = Math.min(Math.max(viewportRect.x + viewportRect.width, 0), vpWidth);
+        const bottom = Math.min(Math.max(viewportRect.y + viewportRect.height, 0), vpHeight);
+        const overlapWidth = Math.max(0, right - left);
+        const overlapHeight = Math.max(0, bottom - top);
+
+        if (overlapWidth <= 0 || overlapHeight <= 0) {
+            this._appendScreenMaskRectSprite(batch, 0, 0, vpWidth, vpHeight);
+            return batch;
+        }
+
+        if (top > 0) {
+            this._appendScreenMaskRectSprite(batch, 0, 0, vpWidth, top);
+        }
+        if (bottom < vpHeight) {
+            this._appendScreenMaskRectSprite(batch, 0, bottom, vpWidth, vpHeight - bottom);
+        }
+        if (left > 0) {
+            this._appendScreenMaskRectSprite(batch, 0, top, left, overlapHeight);
+        }
+        if (right < vpWidth) {
+            this._appendScreenMaskRectSprite(batch, right, top, vpWidth - right, overlapHeight);
+        }
+
+        return batch;
+    }
+
+    private _appendScreenMaskRectSprite(batch: ISprite2DRenderData[], x: number, y: number, width: number, height: number): void {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        const sprite = this._maskScreenRectSpritePoolTemp[batch.length];
+        this._populateMaskRectSprite(sprite, _identityViewProjection, x, y, x + width, y + height, 1, 1);
+        batch.push(sprite);
+    }
+
+    private _populateMaskRectSprite(
+        target: ISprite2DRenderData,
+        worldTransform: Matrix2D,
+        left: number,
+        top: number,
+        right: number,
+        bottom: number,
+        scrollFactorX: number,
+        scrollFactorY: number
+    ): void {
+        target.worldTransform = worldTransform;
+        target.texture = this._getWhiteTexture();
+        target.width = Math.max(0, right - left);
+        target.height = Math.max(0, bottom - top);
+        target.alphaMode = Constants.ALPHA_DISABLE;
+        target.sortKey = 0;
+        target.insertionOrder = 0;
+        target.lit = false;
+        target.localLeft = left;
+        target.localTop = top;
+        target.localRight = right;
+        target.localBottom = bottom;
+        target.uvs[0] = 0;
+        target.uvs[1] = 0;
+        target.uvs[2] = 1;
+        target.uvs[3] = 1;
+        target.color[0] = 1;
+        target.color[1] = 1;
+        target.color[2] = 1;
+        target.color[3] = 1;
+        target.uvOriginU = 0;
+        target.uvOriginV = 0;
+        target.uvAxisXU = 1;
+        target.uvAxisXV = 0;
+        target.uvAxisYU = 0;
+        target.uvAxisYV = 1;
+        target.scrollFactorX = scrollFactorX;
+        target.scrollFactorY = scrollFactorY;
     }
 
     /**
@@ -869,9 +1094,15 @@ export class Scene2D {
     public render(): void;
     public render(deltaTime: number): void;
     public render(deltaTime?: number): void {
+        const transition = this._activeTransition;
+        if (transition && transition.isRunning) {
+            transition._render(true, true, true, deltaTime);
+            return;
+        }
+
         const engine = this.engine;
         engine.beginFrame();
-        this.renderContent(true, true, deltaTime);
+        this._renderContentDirect(true, true, deltaTime);
         engine.endFrame();
     }
 
@@ -882,6 +1113,23 @@ export class Scene2D {
      * @param deltaTime - Optional caller-supplied delta time in seconds.
      */
     public renderContent(clear: boolean = true, autoUpdate: boolean = true, deltaTime?: number): void {
+        const transition = this._activeTransition;
+        if (transition && transition.isRunning) {
+            transition._render(false, clear, autoUpdate, deltaTime);
+            return;
+        }
+
+        this._renderContentDirect(clear, autoUpdate, deltaTime);
+    }
+
+    /**
+     * @internal
+     * Renders this scene's own content without transition interception.
+     * @param clear - Whether to clear the framebuffer before rendering.
+     * @param autoUpdate - Whether to automatically update camera and nodes.
+     * @param deltaTime - Optional caller-supplied delta time in seconds.
+     */
+    public _renderContentDirect(clear: boolean = true, autoUpdate: boolean = true, deltaTime?: number): void {
         const engine = this.engine;
 
         this.onBeforeRender.notifyObservers(this);
@@ -894,6 +1142,26 @@ export class Scene2D {
             this.update(resolvedDeltaTime);
         }
 
+        this._renderPreparedContent(clear, null, 0, 0);
+        this.onAfterRender.notifyObservers(this);
+    }
+
+    /**
+     * @internal
+     * Renders a single node subtree into the currently bound framebuffer.
+     * @param rootNode - Root node whose subtree should be rendered.
+     * @param clear - Whether to clear before rendering.
+     * @param viewportOffsetX - Horizontal screen-space offset in pixels.
+     * @param viewportOffsetY - Vertical screen-space offset in pixels.
+     */
+    public _renderSubtreeContent(rootNode: Node2D, clear: boolean = true, viewportOffsetX: number = 0, viewportOffsetY: number = 0): void {
+        this.onBeforeRender.notifyObservers(this);
+        this._renderPreparedContent(clear, rootNode, viewportOffsetX, viewportOffsetY);
+        this.onAfterRender.notifyObservers(this);
+    }
+
+    private _renderPreparedContent(clear: boolean, rootNode: Node2D | null, viewportOffsetX: number, viewportOffsetY: number): void {
+        const engine = this.engine;
         engine.setViewport({ x: 0, y: 0, width: 1, height: 1 });
 
         const renderer = this._getBatchRenderer();
@@ -910,28 +1178,27 @@ export class Scene2D {
             this._renderEntries.length = 0;
             this._renderCommands.length = 0;
 
-            for (const root of this._rootNodes) {
-                this._collectRenderEntries(root, this._renderEntries, 1, 1, 1);
-            }
-            for (const overlay of this._overlayNodes) {
-                this._collectRenderEntries(overlay, this._renderEntries, 1, 1, 1);
+            if (rootNode) {
+                this._collectRenderEntries(rootNode, this._renderEntries, 1, 1, 1);
+            } else {
+                for (const root of this._rootNodes) {
+                    this._collectRenderEntries(root, this._renderEntries, 1, 1, 1);
+                }
+                for (const overlay of this._overlayNodes) {
+                    this._collectRenderEntries(overlay, this._renderEntries, 1, 1, 1);
+                }
             }
 
             const vpWidth = engine.getRenderWidth();
             const vpHeight = engine.getRenderHeight();
-            const viewTransform = this.camera ? this.camera.getViewTransform() : _identityViewTransform;
+            const viewProjection = this._resolveViewProjection(viewportOffsetX, viewportOffsetY);
             const camPos = this.camera ? this.camera.position : null;
-            const unlitMin = this.unlitSortingLayerMin;
 
             if (this._hasMasks) {
                 this._sortRenderEntries(this._renderEntries);
                 this._flattenRenderEntries(this._renderEntries, this._renderCommands);
 
-                if (this.lightingManager) {
-                    this.lightingManager.packLightUniforms(viewTransform.m);
-                }
-
-                this._processRenderCommands(this._renderCommands, renderer, viewTransform, vpWidth, vpHeight, camPos, unlitMin);
+                this._processRenderCommands(this._renderCommands, renderer, viewProjection, vpWidth, vpHeight, camPos);
             } else if (this._spriteDataCount > 0) {
                 const sortedSprites = this._sortedSpriteDataTemp;
                 sortedSprites.length = this._spriteDataCount;
@@ -940,55 +1207,41 @@ export class Scene2D {
                 }
                 sortedSprites.sort(_compareSpriteRenderData);
 
-                const hasLighting = this.lightingManager !== null;
-                const needsSplit = hasLighting && unlitMin !== Infinity;
-                if (needsSplit) {
-                    const litSprites = this._litSpriteDataTemp;
-                    const unlitSprites = this._unlitSpriteDataTemp;
-                    litSprites.length = 0;
-                    unlitSprites.length = 0;
-
-                    for (let i = 0; i < sortedSprites.length; i++) {
-                        const sprite = sortedSprites[i];
-                        if (sprite.sortingLayer < unlitMin) {
-                            litSprites.push(sprite);
-                        } else {
-                            unlitSprites.push(sprite);
-                        }
-                    }
-
-                    if (litSprites.length > 0) {
-                        this.lightingManager!.packLightUniforms(viewTransform.m);
-                        renderer.lightingManager = this.lightingManager;
-                        renderer.render(litSprites, vpWidth, vpHeight, viewTransform, camPos);
-                    }
-
-                    if (unlitSprites.length > 0) {
-                        renderer.lightingManager = null;
-                        renderer.render(unlitSprites, vpWidth, vpHeight, viewTransform, camPos);
-                    }
-                } else {
-                    if (hasLighting) {
-                        this.lightingManager!.packLightUniforms(viewTransform.m);
-                        renderer.lightingManager = this.lightingManager;
-                    } else {
-                        renderer.lightingManager = null;
-                    }
-                    renderer.render(sortedSprites, vpWidth, vpHeight, viewTransform, camPos);
-                }
+                renderer.render(sortedSprites, viewProjection, this.lightingManager, vpWidth, vpHeight);
             }
 
             if (this.debugRenderer && this.debugRenderer.enabled) {
-                this.debugRenderer.render(viewTransform, vpWidth, vpHeight);
+                if (rootNode === null && viewportOffsetX === 0 && viewportOffsetY === 0) {
+                    this.debugRenderer.render(this, this.camera);
+                } else {
+                    this.debugRenderer.render(viewProjection, vpWidth, vpHeight);
+                }
             }
         }
 
         this._hasMasksLastFrame = this._hasMasks;
-        this.onAfterRender.notifyObservers(this);
     }
+
+    private _resolveViewProjection(viewportOffsetX: number, viewportOffsetY: number): Readonly<Matrix2D> {
+        const baseViewProjection = this.camera ? this.camera.getViewProjectionMatrix() : _identityViewProjection;
+        if (viewportOffsetX === 0 && viewportOffsetY === 0) {
+            return baseViewProjection;
+        }
+
+        const offsetViewProjection = this._offsetViewProjectionTemp;
+        offsetViewProjection.copyFrom(baseViewProjection);
+        offsetViewProjection.m[4] += viewportOffsetX;
+        offsetViewProjection.m[5] += viewportOffsetY;
+        return offsetViewProjection;
+    }
+
     public dispose(): void {
         if (this._isDisposed) {
             return;
+        }
+
+        if (this._activeTransition && this._activeTransition.isRunning) {
+            this._activeTransition.cancel();
         }
 
         if (this._executeWhenReadyTimeoutId !== null) {
@@ -1012,8 +1265,7 @@ export class Scene2D {
         this._renderEntries.length = 0;
         this._renderCommands.length = 0;
         this._sortedSpriteDataTemp.length = 0;
-        this._litSpriteDataTemp.length = 0;
-        this._unlitSpriteDataTemp.length = 0;
+        this._nodeRenderDataTemp.length = 0;
         this._spriteBatchTemp.length = 0;
         this._maskSpriteDataTemp.length = 0;
         this._spriteDataCount = 0;

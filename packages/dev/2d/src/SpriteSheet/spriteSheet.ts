@@ -1,148 +1,260 @@
-import type { BaseTexture } from "core/Materials/Textures/baseTexture";
+import type { ThinTexture } from "core/Materials/Textures/thinTexture";
 
+import type { ISpriteAtlasFrame, SpriteAtlasData } from "../SpriteAtlas/spriteAtlas";
 import { Rectangle2D } from "../Math/rectangle2D";
 
 /**
- * Defines a named animation as a sequence of frame indices and a frame rate.
+ * Additional atlas metadata associated with a frame rectangle.
  */
-export interface ISpriteAnimation {
-    /**
-     * Name of the animation
-     */
-    name: string;
-    /**
-     * Array of frame indices in the sprite sheet
-     */
-    frames: number[];
-    /**
-     * Frames per second
-     */
-    frameRate: number;
+export interface ISpriteSheetFrameMetadata {
+    /** Whether the frame is stored rotated 90° clockwise inside the atlas texture. */
+    readonly rotated: boolean;
+    /** The logical source width before trimming. */
+    readonly sourceWidth: number;
+    /** The logical source height before trimming. */
+    readonly sourceHeight: number;
+    /** The X offset of the trimmed content within the logical source bounds. */
+    readonly trimX: number;
+    /** The Y offset of the trimmed content within the logical source bounds. */
+    readonly trimY: number;
+    /** The visible content width before any runtime scaling. */
+    readonly trimWidth: number;
+    /** The visible content height before any runtime scaling. */
+    readonly trimHeight: number;
+}
+
+interface IFrameRecord {
+    rect: Rectangle2D;
+    metadata: ISpriteSheetFrameMetadata | null;
+}
+
+const _spriteSheetFrameMetadata = new WeakMap<Rectangle2D, ISpriteSheetFrameMetadata>();
+
+/**
+ * Returns the atlas metadata associated with a frame rectangle, when present.
+ * @param rect - The rectangle to query.
+ * @returns The associated metadata, or null when the rectangle is a plain grid frame.
+ */
+export function getSpriteSheetFrameMetadata(rect: Rectangle2D | null | undefined): ISpriteSheetFrameMetadata | null {
+    if (!rect) {
+        return null;
+    }
+
+    return _spriteSheetFrameMetadata.get(rect) ?? null;
 }
 
 /**
- * A sprite sheet that defines frames (regions) within a texture.
- * Supports both uniform grid-based layouts and JSON atlas data.
+ * Associates atlas metadata with a rectangle returned by SpriteSheet or SpriteAtlas APIs.
+ * @param rect - The rectangle receiving the metadata.
+ * @param metadata - The metadata to associate, or null to clear it.
+ * @internal
+ */
+export function setSpriteSheetFrameMetadata(rect: Rectangle2D, metadata: ISpriteSheetFrameMetadata | null): void {
+    if (metadata) {
+        _spriteSheetFrameMetadata.set(rect, metadata);
+        return;
+    }
+
+    _spriteSheetFrameMetadata.delete(rect);
+}
+
+/**
+ * Creates normalized runtime metadata from a TexturePacker atlas frame entry.
+ * @param frame - The atlas frame entry.
+ * @returns Runtime metadata, or null when the frame does not need special handling.
+ */
+export function createSpriteSheetFrameMetadata(frame: ISpriteAtlasFrame): ISpriteSheetFrameMetadata | null {
+    const rotated = frame.rotated === true;
+    const trimWidth = frame.spriteSourceSize?.w ?? (rotated ? frame.frame.h : frame.frame.w);
+    const trimHeight = frame.spriteSourceSize?.h ?? (rotated ? frame.frame.w : frame.frame.h);
+    const sourceWidth = frame.sourceSize?.w ?? trimWidth;
+    const sourceHeight = frame.sourceSize?.h ?? trimHeight;
+    const trimX = frame.spriteSourceSize?.x ?? 0;
+    const trimY = frame.spriteSourceSize?.y ?? 0;
+
+    if (!rotated && trimX === 0 && trimY === 0 && sourceWidth === trimWidth && sourceHeight === trimHeight) {
+        return null;
+    }
+
+    return {
+        rotated,
+        sourceWidth,
+        sourceHeight,
+        trimX,
+        trimY,
+        trimWidth,
+        trimHeight,
+    };
+}
+
+/**
+ * Defines frame rectangles within a sprite-sheet texture.
+ * Supports both uniform grid sheets and JSON atlas data.
  */
 export class SpriteSheet {
     /**
-     * The source texture containing all frames
+     * The backing texture.
      */
-    public readonly texture: BaseTexture;
+    public readonly texture: ThinTexture;
 
-    private _frames: Rectangle2D[] = [];
-    private _animations: Map<string, ISpriteAnimation> = new Map();
+    private _frames: IFrameRecord[] = [];
+    private _namedFrameIndices: Map<string, number> = new Map();
 
     /**
-     * Creates a new SpriteSheet
-     * @param texture - The source texture
+     * Creates a new SpriteSheet.
+     * @param texture - The backing texture.
      */
-    constructor(texture: BaseTexture) {
+    constructor(texture: ThinTexture) {
         this.texture = texture;
     }
 
     /**
-     * Creates a SpriteSheet from a uniform grid layout
-     * @param texture - The source texture
-     * @param frameWidth - Width of each frame in pixels
-     * @param frameHeight - Height of each frame in pixels
-     * @param frameCount - Optional total number of frames (defaults to all cells in grid)
-     * @param startFrame - Optional first frame index (defaults to 0)
-     * @returns A new SpriteSheet
-     */
-    public static FromGrid(texture: BaseTexture, frameWidth: number, frameHeight: number, frameCount?: number, startFrame: number = 0): SpriteSheet {
-        const sheet = new SpriteSheet(texture);
-        const size = texture.getSize();
-
-        if (size.width === 0 || size.height === 0) {
-            return sheet;
-        }
-
-        const cols = Math.floor(size.width / frameWidth);
-        const rows = Math.floor(size.height / frameHeight);
-        const maxFrames = cols * rows;
-        const count = frameCount !== undefined ? Math.min(frameCount, maxFrames - startFrame) : maxFrames - startFrame;
-
-        for (let i = 0; i < count; i++) {
-            const frameIndex = startFrame + i;
-            const col = frameIndex % cols;
-            const row = Math.floor(frameIndex / cols);
-            sheet._frames.push(new Rectangle2D(col * frameWidth, row * frameHeight, frameWidth, frameHeight));
-        }
-
-        return sheet;
-    }
-
-    /**
-     * Creates a SpriteSheet from JSON atlas data (supports TexturePacker JSON Hash and JSON Array formats)
-     * @param texture - The source texture
-     * @param atlasData - The parsed JSON atlas data
-     * @returns A new SpriteSheet
-     */
-    public static FromAtlas(texture: BaseTexture, atlasData: { frames: any }): SpriteSheet {
-        const sheet = new SpriteSheet(texture);
-        const frames = atlasData.frames;
-
-        if (Array.isArray(frames)) {
-            // JSON Array format
-            for (const frame of frames) {
-                const f = frame.frame;
-                sheet._frames.push(new Rectangle2D(f.x, f.y, f.w, f.h));
-            }
-        } else {
-            // JSON Hash format
-            for (const key of Object.keys(frames)) {
-                const f = frames[key].frame;
-                sheet._frames.push(new Rectangle2D(f.x, f.y, f.w, f.h));
-            }
-        }
-
-        return sheet;
-    }
-
-    /**
-     * Gets the number of frames in this sprite sheet
+     * Total number of frames.
      */
     public get frameCount(): number {
         return this._frames.length;
     }
 
     /**
-     * Gets the source rectangle for a frame by index (in pixels)
-     * @param index - The frame index
-     * @returns The frame rectangle, or a zero rectangle if out of bounds
+     * Creates a uniform grid spritesheet.
+     * @param texture - The backing texture.
+     * @param frameWidth - Width of each frame in pixels.
+     * @param frameHeight - Height of each frame in pixels.
+     * @param margin - Outer margin around the grid in pixels.
+     * @param spacing - Spacing between grid cells in pixels.
+     * @returns The created SpriteSheet.
      */
-    public getFrame(index: number): Rectangle2D {
-        if (index < 0 || index >= this._frames.length) {
-            return new Rectangle2D();
+    public static fromGrid(texture: ThinTexture, frameWidth: number, frameHeight: number, margin: number = 0, spacing: number = 0): SpriteSheet {
+        const sheet = new SpriteSheet(texture);
+        if (frameWidth <= 0 || frameHeight <= 0) {
+            return sheet;
         }
-        return this._frames[index];
+
+        const size = texture.getSize();
+        if (size.width <= 0 || size.height <= 0) {
+            return sheet;
+        }
+
+        const stepX = frameWidth + spacing;
+        const stepY = frameHeight + spacing;
+        const maxX = size.width - margin;
+        const maxY = size.height - margin;
+
+        for (let y = margin; y + frameHeight <= maxY; y += stepY) {
+            for (let x = margin; x + frameWidth <= maxX; x += stepX) {
+                sheet._frames.push({
+                    rect: new Rectangle2D(x, y, frameWidth, frameHeight),
+                    metadata: null,
+                });
+            }
+        }
+
+        return sheet;
     }
 
     /**
-     * Defines a named animation
-     * @param name - The animation name
-     * @param frames - Array of frame indices
-     * @param frameRate - Frames per second
+     * Creates a spritesheet from TexturePacker-style JSON atlas data.
+     * @param texture - The backing texture.
+     * @param data - The parsed atlas data.
+     * @returns The created SpriteSheet.
      */
-    public defineAnimation(name: string, frames: number[], frameRate: number): void {
-        this._animations.set(name, { name, frames, frameRate });
+    public static fromAtlasJson(texture: ThinTexture, data: SpriteAtlasData): SpriteSheet {
+        const sheet = new SpriteSheet(texture);
+        const frames = data.frames;
+
+        if (Array.isArray(frames)) {
+            for (let i = 0; i < frames.length; i++) {
+                const entry = frames[i];
+                sheet._namedFrameIndices.set(entry.filename, sheet._frames.length);
+                sheet._frames.push(SpriteSheet._createFrameRecord(entry));
+            }
+            return sheet;
+        }
+
+        for (const frameName of Object.keys(frames)) {
+            const entry = frames[frameName];
+            sheet._namedFrameIndices.set(frameName, sheet._frames.length);
+            sheet._frames.push(SpriteSheet._createFrameRecord(entry));
+        }
+
+        return sheet;
     }
 
     /**
-     * Gets a named animation definition
-     * @param name - The animation name
-     * @returns The animation definition, or undefined if not found
+     * Backward-compatible alias for {@link SpriteSheet.fromGrid}.
+     * @param texture - The backing texture.
+     * @param frameWidth - Width of each frame in pixels.
+     * @param frameHeight - Height of each frame in pixels.
+     * @param margin - Outer margin around the grid in pixels.
+     * @param spacing - Spacing between grid cells in pixels.
+     * @returns The created SpriteSheet.
      */
-    public getAnimation(name: string): ISpriteAnimation | undefined {
-        return this._animations.get(name);
+    public static FromGrid(texture: ThinTexture, frameWidth: number, frameHeight: number, margin: number = 0, spacing: number = 0): SpriteSheet {
+        return SpriteSheet.fromGrid(texture, frameWidth, frameHeight, margin, spacing);
     }
 
     /**
-     * Gets all defined animation names
-     * @returns Array of animation names
+     * Backward-compatible alias for {@link SpriteSheet.fromAtlasJson}.
+     * @param texture - The backing texture.
+     * @param data - The parsed atlas data.
+     * @returns The created SpriteSheet.
      */
-    public getAnimationNames(): string[] {
-        return Array.from(this._animations.keys());
+    public static FromAtlas(texture: ThinTexture, data: SpriteAtlasData): SpriteSheet {
+        return SpriteSheet.fromAtlasJson(texture, data);
+    }
+
+    /**
+     * Writes the frame rectangle for the given frame index into `out`.
+     * @param frameIndex - The frame index.
+     * @param out - Output rectangle.
+     * @returns The output rectangle.
+     */
+    public getFrameRect(frameIndex: number, out: Rectangle2D): Rectangle2D {
+        const frame = this._frames[frameIndex];
+        if (!frame) {
+            out.x = 0;
+            out.y = 0;
+            out.width = 0;
+            out.height = 0;
+            setSpriteSheetFrameMetadata(out, null);
+            return out;
+        }
+
+        out.x = frame.rect.x;
+        out.y = frame.rect.y;
+        out.width = frame.rect.width;
+        out.height = frame.rect.height;
+        setSpriteSheetFrameMetadata(out, frame.metadata);
+        return out;
+    }
+
+    /**
+     * Writes the rectangle for the given named frame into `out`.
+     * @param frameName - The atlas frame name.
+     * @param out - Output rectangle.
+     * @returns The output rectangle, or null when the frame name is unknown.
+     */
+    public getNamedFrameRect(frameName: string, out: Rectangle2D): Rectangle2D | null {
+        const frameIndex = this._namedFrameIndices.get(frameName);
+        if (frameIndex === undefined) {
+            out.x = 0;
+            out.y = 0;
+            out.width = 0;
+            out.height = 0;
+            setSpriteSheetFrameMetadata(out, null);
+            return null;
+        }
+
+        return this.getFrameRect(frameIndex, out);
+    }
+
+    private static _createFrameRecord(entry: ISpriteAtlasFrame): IFrameRecord {
+        const rect = new Rectangle2D(entry.frame.x, entry.frame.y, entry.frame.w, entry.frame.h);
+        const metadata = createSpriteSheetFrameMetadata(entry);
+        setSpriteSheetFrameMetadata(rect, metadata);
+        return {
+            rect,
+            metadata,
+        };
     }
 }
