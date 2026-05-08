@@ -19,66 +19,14 @@ import { type BoundingBox, GetShapesBoundingBox, GetTextBoundingBox } from "../m
 
 import { type AnimationConfiguration } from "../animationConfiguration";
 import { type LottieAtlasCanvas, type LottieAtlasTexture, type LottieAtlasTextureFactory } from "../rendering/lottieAtlas";
+import { type LottieSpriteAtlasPacker, type SpriteAtlasInfo } from "./lottieAtlasPacker";
+
+export type { LottieSpriteAtlasPacker, SpriteAtlasInfo } from "./lottieAtlasPacker";
 
 /**
  * Type alias for the 2D drawing context used by the sprite packer.
  */
 type DrawingContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
-
-/**
- * Information about a sprite in the sprite atlas.
- */
-export type SpriteAtlasInfo = {
-    /**
-     * Offset in the x axis of the sprite in the atlas.
-     * Normalized between 0 and 1, left to right.
-     */
-    uOffset: number;
-    /**
-     * Offset in the y axis of the sprite in the atlas.
-     * Normalized between 0 and 1, top to bottom.
-     */
-    vOffset: number;
-
-    /**
-     * Width of the sprite in the atlas.
-     * In pixels.
-     */
-    cellWidth: number;
-
-    /**
-     * Height of the sprite in the atlas.
-     * In pixels.
-     */
-    cellHeight: number;
-
-    /**
-     * Width of the sprite in the screen.
-     * In pixels.
-     */
-    widthPx: number;
-    /**
-     * Height of the sprite in the screen.
-     * In pixels.
-     */
-    heightPx: number;
-
-    /**
-     * X coordinate of the center of the sprite bounding box, used for final positioning in the screen
-     */
-    centerX: number;
-
-    /**
-     * Y coordinate of the center of the sprite bounding box, used for final positioning in the screen
-     */
-    centerY: number;
-
-    /**
-     * Index of the atlas page this sprite belongs to.
-     * Used when the animation has more sprites than fit in a single atlas texture.
-     */
-    atlasIndex: number;
-};
 
 /**
  * Information about a gradient stop.
@@ -107,7 +55,7 @@ type AtlasPage<TextureType = unknown> = {
  * SpritePacker is a class that handles the packing of sprites into a texture atlas.
  * If sprites exceed the capacity of a single atlas texture, additional atlas pages are created.
  */
-export class SpritePacker<TextureType = unknown> {
+export class SpritePacker<TextureType = unknown> implements LottieSpriteAtlasPacker<TextureType> {
     private readonly _textureFactory: LottieAtlasTextureFactory<TextureType>;
     private readonly _isHtmlCanvas: boolean;
     private _atlasScale: number;
@@ -147,6 +95,14 @@ export class SpritePacker<TextureType = unknown> {
      * @param rawFonts A map of font names to RawFont objects.
      */
     public set rawFonts(rawFonts: Map<string, RawFont>) {
+        this.setRawFonts(rawFonts);
+    }
+
+    /**
+     * Sets the fonts that will be used to render text in the sprite atlas.
+     * @param rawFonts A map of font names to RawFont objects.
+     */
+    public setRawFonts(rawFonts: Map<string, RawFont>): void {
         this._rawFonts = rawFonts;
     }
 

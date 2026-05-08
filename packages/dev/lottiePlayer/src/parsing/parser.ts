@@ -16,7 +16,7 @@ import {
 } from "./rawTypes";
 import { type AnimationInfo, type ScalarKeyframe, type ScalarProperty, type Transform, type Vector2Keyframe, type Vector2Property } from "./parsedTypes";
 
-import { type SpriteAtlasInfo, type SpritePacker } from "./spritePacker";
+import { type LottieSpriteAtlasPacker, type SpriteAtlasInfo } from "./lottieAtlasPacker";
 import { SpriteNode } from "../nodes/spriteNode";
 
 import { BezierCurve } from "../maths/bezier";
@@ -102,7 +102,7 @@ export async function GetRawAnimationDataAsync(urlToFile: string): Promise<RawLo
  * Important: not all lottie features are supported, you can call .debug() after parsing an animation to see what features were not supported.
  */
 export class Parser<TextureType = unknown> {
-    private _packer: SpritePacker<TextureType>;
+    private _packer: LottieSpriteAtlasPacker<TextureType>;
     private readonly _configuration: AnimationConfiguration;
     private readonly _animationInfo: AnimationInfo;
     private readonly _renderingManager: LottieSpriteRenderer<TextureType>;
@@ -133,7 +133,7 @@ export class Parser<TextureType = unknown> {
      * @param renderingManager Object that creates and renders the sprites in the animation.
      */
     public constructor(
-        packer: SpritePacker<TextureType>,
+        packer: LottieSpriteAtlasPacker<TextureType>,
         animationData: RawLottieAnimation,
         configuration: AnimationConfiguration,
         renderingManager: LottieSpriteRenderer<TextureType>
@@ -224,7 +224,7 @@ export class Parser<TextureType = unknown> {
                 this._rawFonts.set(font.fName, font);
             }
 
-            this._packer.rawFonts = this._rawFonts;
+            this._packer.setRawFonts(this._rawFonts);
         }
     }
 

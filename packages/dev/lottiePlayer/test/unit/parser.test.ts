@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { Parser } from "../../src/parsing/parser";
-import { type SpritePacker, type SpriteAtlasInfo } from "../../src/parsing/spritePacker";
+import { type LottieSpriteAtlasPacker, type SpriteAtlasInfo } from "../../src/parsing/lottieAtlasPacker";
 import { type LottieSprite, type LottieSpriteCreationOptions, type LottieSpriteRenderer } from "../../src/rendering/lottieSprite";
 import { SpriteNode } from "../../src/nodes/spriteNode";
 import { ControlNode } from "../../src/nodes/controlNode";
@@ -14,7 +14,7 @@ function makeTransform(anchorPoint: number[] = [0, 0]): RawTransform {
     return { a: { a: 0, k: anchorPoint, l: 2 } };
 }
 
-// Minimal valid text data. Content does not matter because the SpritePacker is mocked,
+// Minimal valid text data. Content does not matter because the atlas packer is mocked,
 // but the type requires these fields.
 function makeTextData(justification: RawTextJustify = 0): RawTextLayer["t"] {
     return {
@@ -39,9 +39,9 @@ function makeTextData(justification: RawTextJustify = 0): RawTextLayer["t"] {
     };
 }
 
-// Builds a SpritePacker mock that returns deterministic SpriteAtlasInfo for both
+// Builds an atlas packer mock that returns deterministic SpriteAtlasInfo for both
 // shape and text additions.
-function makeMockPacker(): SpritePacker {
+function makeMockPacker(): LottieSpriteAtlasPacker {
     const baseInfo: SpriteAtlasInfo = {
         uOffset: 0,
         vOffset: 0,
@@ -65,10 +65,10 @@ function makeMockPacker(): SpritePacker {
         get unsupportedFeatures() {
             return [];
         },
-        set rawFonts(_: unknown) {},
+        setRawFonts: (_: unknown) => {},
     };
 
-    return mock as unknown as SpritePacker;
+    return mock;
 }
 
 function makeMockSprite(width: number, height: number): LottieSprite {
@@ -130,8 +130,8 @@ describe("Parser scene graph structure", () => {
             get unsupportedFeatures() {
                 return [];
             },
-            set rawFonts(_: unknown) {},
-        } as unknown as SpritePacker<MockTexture>;
+            setRawFonts: (_: unknown) => {},
+        } as LottieSpriteAtlasPacker<MockTexture>;
 
         let readyTextures: MockTexture[] | undefined;
         const renderer: LottieSpriteRenderer<MockTexture> = {
@@ -546,9 +546,9 @@ describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
 });
 
 describe("Parser layer-level shape decorators", () => {
-    // Builds a SpritePacker mock that records every addLottieShape invocation so tests can
+    // Builds an atlas packer mock that records every addLottieShape invocation so tests can
     // assert which raw elements were rasterized into each sprite.
-    function makeRecordingPacker(): { packer: SpritePacker; calls: RawElement[][] } {
+    function makeRecordingPacker(): { packer: LottieSpriteAtlasPacker; calls: RawElement[][] } {
         const calls: RawElement[][] = [];
         const baseInfo: SpriteAtlasInfo = {
             uOffset: 0,
@@ -577,10 +577,10 @@ describe("Parser layer-level shape decorators", () => {
             get unsupportedFeatures() {
                 return [];
             },
-            set rawFonts(_: unknown) {},
+            setRawFonts: (_: unknown) => {},
         };
 
-        return { packer: mock as unknown as SpritePacker, calls };
+        return { packer: mock, calls };
     }
 
     // Mirrors the real-world structure that surfaced this bug (Lottie EDU_V2_07 "Search" layer):
@@ -695,7 +695,7 @@ describe("Parser layer-level shape decorators", () => {
 describe("Parser solid layer (ty:1)", () => {
     // Same recording packer pattern as the layer-level decorator suite above. Defined inline so each
     // describe block is self-contained.
-    function makeRecordingPacker(): { packer: SpritePacker; calls: RawElement[][] } {
+    function makeRecordingPacker(): { packer: LottieSpriteAtlasPacker; calls: RawElement[][] } {
         const calls: RawElement[][] = [];
         const baseInfo: SpriteAtlasInfo = {
             uOffset: 0,
@@ -723,10 +723,10 @@ describe("Parser solid layer (ty:1)", () => {
             get unsupportedFeatures() {
                 return [];
             },
-            set rawFonts(_: unknown) {},
+            setRawFonts: (_: unknown) => {},
         };
 
-        return { packer: mock as unknown as SpritePacker, calls };
+        return { packer: mock, calls };
     }
 
     // Recording sprite renderer so tests can assert the on-screen sprite dimensions handed to the
