@@ -1,5 +1,4 @@
 import { type IVector2Like } from "core/Maths/math.like";
-import { ThinSprite } from "core/Sprites/thinSprite";
 
 import {
     type RawElement,
@@ -22,7 +21,7 @@ import { SpriteNode } from "../nodes/spriteNode";
 
 import { BezierCurve } from "../maths/bezier";
 
-import { type RenderingManager } from "../rendering/renderingManager";
+import { type LottieSprite, type LottieSpriteRenderer } from "../rendering/lottieSprite";
 import { Node } from "../nodes/node";
 import { ControlNode } from "../nodes/controlNode";
 
@@ -106,7 +105,7 @@ export class Parser {
     private _packer: SpritePacker;
     private readonly _configuration: AnimationConfiguration;
     private readonly _animationInfo: AnimationInfo;
-    private readonly _renderingManager: RenderingManager;
+    private readonly _renderingManager: LottieSpriteRenderer;
 
     private _rawFonts: Map<string, RawFont> = new Map<string, RawFont>(); // Map of font names to raw font data
     private _unsupportedFeatures: string[];
@@ -131,9 +130,9 @@ export class Parser {
      * @param packer Object that packs the sprites from the animation into a texture atlas.
      * @param animationData The raw lottie animation as a JSON object.
      * @param configuration Configuration options for the animation parser.
-     * @param renderingManager Object that manages the rendering of the sprites in the animation.
+     * @param renderingManager Object that creates and renders the sprites in the animation.
      */
-    public constructor(packer: SpritePacker, animationData: RawLottieAnimation, configuration: AnimationConfiguration, renderingManager: RenderingManager) {
+    public constructor(packer: SpritePacker, animationData: RawLottieAnimation, configuration: AnimationConfiguration, renderingManager: LottieSpriteRenderer) {
         this._packer = packer;
         this._configuration = configuration;
         this._renderingManager = renderingManager;
@@ -450,16 +449,7 @@ export class Parser {
         // tiny atlas cell while sizing the on-screen sprite to the layer's full sw*sh. The sprite
         // is positioned with its center at (sw/2, -sh/2) in the layer's local space so its top-left
         // sits at the layer origin (0, 0) — matching how After Effects positions a solid layer.
-        const sprite = new ThinSprite();
-        sprite._xOffset = spriteInfo.uOffset;
-        sprite._yOffset = spriteInfo.vOffset;
-        sprite._xSize = spriteInfo.cellWidth;
-        sprite._ySize = spriteInfo.cellHeight;
-        sprite.width = layer.sw;
-        sprite.height = layer.sh;
-        sprite.invertV = true;
-
-        this._renderingManager.addSprite(sprite, this._currentLayerOriginalIndex, spriteInfo.atlasIndex);
+        const sprite = this._createSprite(spriteInfo, layer.sw, layer.sh);
 
         const positionProperty: Vector2Property = {
             startValue: { x: layer.sw / 2, y: -layer.sh / 2 },
@@ -493,21 +483,7 @@ export class Parser {
         const useBabylon8TextPlacement = this._configuration.textLayerCompatibilityMode === "babylon8";
         const spriteParent = useBabylon8TextPlacement ? parent : this._parseNullLayer(layer, transform, parent);
 
-        // Build the ThinSprite from the texture packer information
-        const sprite = new ThinSprite();
-
-        // Set sprite UV coordinates
-        sprite._xOffset = spriteInfo.uOffset;
-        sprite._yOffset = spriteInfo.vOffset;
-        sprite._xSize = spriteInfo.cellWidth;
-        sprite._ySize = spriteInfo.cellHeight;
-
-        // Set sprite dimensions for rendering
-        sprite.width = spriteInfo.widthPx;
-        sprite.height = spriteInfo.heightPx;
-        sprite.invertV = true;
-
-        this._renderingManager.addSprite(sprite, this._currentLayerOriginalIndex, spriteInfo.atlasIndex);
+        const sprite = this._createSprite(spriteInfo, spriteInfo.widthPx, spriteInfo.heightPx);
 
         const positionProperty = useBabylon8TextPlacement ? this._getBabylon8TextPosition(layer, transform, spriteInfo) : this._getTextPosition(spriteInfo);
 
@@ -636,21 +612,7 @@ export class Parser {
         const currentScale = this._getRasterizationScale(parent, rasterizationFrame);
         const spriteInfo = this._packer.addLottieShape(elements, currentScale, this._currentLayerName);
 
-        // Build the ThinSprite from the texture packer information
-        const sprite = new ThinSprite();
-
-        // Set sprite UV coordinates
-        sprite._xOffset = spriteInfo.uOffset;
-        sprite._yOffset = spriteInfo.vOffset;
-        sprite._xSize = spriteInfo.cellWidth;
-        sprite._ySize = spriteInfo.cellHeight;
-
-        // Set sprite dimensions for rendering
-        sprite.width = spriteInfo.widthPx;
-        sprite.height = spriteInfo.heightPx;
-        sprite.invertV = true;
-
-        this._renderingManager.addSprite(sprite, this._currentLayerOriginalIndex, spriteInfo.atlasIndex);
+        const sprite = this._createSprite(spriteInfo, spriteInfo.widthPx, spriteInfo.heightPx);
 
         const positionProperty: Vector2Property = {
             startValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
@@ -666,6 +628,22 @@ export class Parser {
             undefined, // Scale is not used for sprites final transform
             undefined, // Opacity is not used for sprites final transform
             parent
+        );
+    }
+
+    private _createSprite(spriteInfo: SpriteAtlasInfo, widthPx: number, heightPx: number): LottieSprite {
+        return this._renderingManager.createSprite(
+            {
+                uOffset: spriteInfo.uOffset,
+                vOffset: spriteInfo.vOffset,
+                cellWidth: spriteInfo.cellWidth,
+                cellHeight: spriteInfo.cellHeight,
+                widthPx,
+                heightPx,
+                invertV: true,
+            },
+            this._currentLayerOriginalIndex,
+            spriteInfo.atlasIndex
         );
     }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { Parser } from "../../src/parsing/parser";
 import { type SpritePacker, type SpriteAtlasInfo } from "../../src/parsing/spritePacker";
-import { type RenderingManager } from "../../src/rendering/renderingManager";
+import { type LottieSprite, type LottieSpriteCreationOptions, type LottieSpriteRenderer } from "../../src/rendering/lottieSprite";
 import { SpriteNode } from "../../src/nodes/spriteNode";
 import { ControlNode } from "../../src/nodes/controlNode";
 import { Node } from "../../src/nodes/node";
@@ -71,13 +71,23 @@ function makeMockPacker(): SpritePacker {
     return mock as unknown as SpritePacker;
 }
 
-// Builds a minimal RenderingManager mock — only the surface called by Parser is implemented.
-function makeMockRenderingManager(): RenderingManager {
+function makeMockSprite(width: number, height: number): LottieSprite {
+    return {
+        position: { x: 1, y: 1, z: 1 },
+        color: { r: 1, g: 1, b: 1, a: 1 },
+        width,
+        height,
+        angle: 0,
+    };
+}
+
+// Builds a minimal sprite renderer mock — only the surface called by Parser is implemented.
+function makeMockRenderingManager(): LottieSpriteRenderer {
     const mock = {
-        addSprite: () => {},
+        createSprite: (options: LottieSpriteCreationOptions) => makeMockSprite(options.widthPx, options.heightPx),
         ready: () => {},
     };
-    return mock as unknown as RenderingManager;
+    return mock;
 }
 
 function makeConfiguration(configuration: Partial<AnimationConfiguration> = {}): AnimationConfiguration {
@@ -668,19 +678,20 @@ describe("Parser solid layer (ty:1)", () => {
         return { packer: mock as unknown as SpritePacker, calls };
     }
 
-    // Recording rendering manager so tests can assert the on-screen sprite dimensions handed to the
+    // Recording sprite renderer so tests can assert the on-screen sprite dimensions handed to the
     // sprite renderer. Solid layers stretch a 1x1 atlas cell to full sw*sh, so the on-screen size
     // is the meaningful surface — distinct from `widthPx` reported by the packer.
-    function makeRecordingRenderingManager(): { rm: RenderingManager; sprites: { width: number; height: number }[] } {
+    function makeRecordingRenderingManager(): { rm: LottieSpriteRenderer; sprites: { width: number; height: number }[] } {
         const sprites: { width: number; height: number }[] = [];
         const mock = {
-            addSprite: (sprite: { width: number; height: number }) => {
+            createSprite: (options: LottieSpriteCreationOptions) => {
                 // Snapshot at call time — the parser may continue mutating the sprite afterwards.
-                sprites.push({ width: sprite.width, height: sprite.height });
+                sprites.push({ width: options.widthPx, height: options.heightPx });
+                return makeMockSprite(options.widthPx, options.heightPx);
             },
             ready: () => {},
         };
-        return { rm: mock as unknown as RenderingManager, sprites };
+        return { rm: mock, sprites };
     }
 
     it("rasterizes a ty:1 solid layer using a 1x1 atlas cell stretched to full sw*sh on screen", () => {

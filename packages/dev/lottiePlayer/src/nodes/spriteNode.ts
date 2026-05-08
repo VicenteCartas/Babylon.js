@@ -1,6 +1,5 @@
-import { type ThinSprite } from "core/Sprites/thinSprite";
-
 import { type ScalarProperty, type Vector2Property } from "../parsing/parsedTypes";
+import { type LottieSprite } from "../rendering/lottieSprite";
 
 import { Node } from "./node";
 
@@ -13,7 +12,7 @@ const TempScale = { x: 1, y: 1 };
  * Represents a sprite in the scene graph.
  */
 export class SpriteNode extends Node {
-    private _sprite: ThinSprite;
+    private _sprite: LottieSprite;
     private _originalWidth: number;
     private _originalHeight: number;
 
@@ -29,7 +28,7 @@ export class SpriteNode extends Node {
      * @param opacity The opacity of the sprite.
      * @param parent The parent node in the scene graph.
      */
-    public constructor(id: string, sprite: ThinSprite, position?: Vector2Property, rotation?: ScalarProperty, scale?: Vector2Property, opacity?: ScalarProperty, parent?: Node) {
+    public constructor(id: string, sprite: LottieSprite, position?: Vector2Property, rotation?: ScalarProperty, scale?: Vector2Property, opacity?: ScalarProperty, parent?: Node) {
         super(id, position, rotation, scale, opacity, parent);
 
         this._sprite = sprite;

@@ -4,10 +4,11 @@ import "core/Shaders/sprites.fragment";
 
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { type ThinTexture } from "core/Materials/Textures/thinTexture";
-import { type ThinSprite } from "core/Sprites/thinSprite";
+import { ThinSprite } from "core/Sprites/thinSprite";
 import { SpriteRenderer } from "core/Sprites/spriteRenderer";
 
 import { type ThinMatrix } from "../maths/matrix";
+import { type LottieSprite, type LottieSpriteCreationOptions, type LottieSpriteRenderer } from "./lottieSprite";
 
 import { type AnimationConfiguration } from "../animationConfiguration";
 
@@ -16,7 +17,7 @@ import { type AnimationConfiguration } from "../animationConfiguration";
  * Supports multiple atlas pages — when sprites span more than one texture,
  * render() performs one pass per page, switching the SpriteRenderer texture between passes.
  */
-export class RenderingManager {
+export class RenderingManager implements LottieSpriteRenderer<ThinTexture> {
     private readonly _engine: ThinEngine;
     private _spritesRenderer: SpriteRenderer;
     private _spritesTextures: ThinTexture[];
@@ -44,6 +45,28 @@ export class RenderingManager {
         this._spritesRenderer.disableDepthWrite = true;
         this._spritesRenderer.autoResetAlpha = false;
         this._spritesRenderer.fogEnabled = false;
+    }
+
+    /**
+     * Creates a sprite for the current rendering adapter and registers it for rendering.
+     * @param options Atlas placement and initial on-screen size for the sprite.
+     * @param layerIndex The original layer index from the Lottie file, used to determine rendering order.
+     * @param atlasIndex The atlas page index this sprite belongs to.
+     * @returns Engine-neutral sprite state that the Lottie scene graph can update.
+     */
+    public createSprite(options: LottieSpriteCreationOptions, layerIndex: number, atlasIndex: number): LottieSprite {
+        const sprite = new ThinSprite();
+        sprite._xOffset = options.uOffset;
+        sprite._yOffset = options.vOffset;
+        sprite._xSize = options.cellWidth;
+        sprite._ySize = options.cellHeight;
+        sprite.width = options.widthPx;
+        sprite.height = options.heightPx;
+        sprite.invertV = options.invertV;
+
+        this.addSprite(sprite, layerIndex, atlasIndex);
+
+        return sprite;
     }
 
     /**
