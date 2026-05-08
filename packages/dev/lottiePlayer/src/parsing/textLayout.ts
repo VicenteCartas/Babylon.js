@@ -1,6 +1,5 @@
-import { type IVector2Like } from "core/Maths/math.like";
-
 import { type LottieTextCompatibilityMode } from "../animationConfiguration";
+import { type LottieVector2Like } from "../maths/lottieMathTypes";
 import { type RawFont, type RawTextData, type RawTextDocument, type RawTextJustify } from "./rawTypes";
 
 /**
@@ -102,11 +101,11 @@ export type ResolvedLottieText = {
     /**
      * Optional paragraph box top-left position relative to the text anchor.
      */
-    boxPosition?: IVector2Like;
+    boxPosition?: LottieVector2Like;
     /**
      * Optional paragraph box size.
      */
-    boxSize?: IVector2Like;
+    boxSize?: LottieVector2Like;
     /**
      * Resolved text justification.
      */

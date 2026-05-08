@@ -1,5 +1,3 @@
-import { type IVector2Like } from "core/Maths/math.like";
-
 import {
     type RawElement,
     type RawEllipseShape,
@@ -16,6 +14,7 @@ import { GetInitialColorValue, GetInitialScalarValue, GetInitialVectorValues, Ge
 import { ApplyLottieTextContext, DrawLottieText, MeasureLottieText, ResolveLottieText } from "./textLayout";
 
 import { type BoundingBox, GetShapesBoundingBox, GetTextBoundingBox } from "../maths/boundingBox";
+import { type LottieVector2Like } from "../maths/lottieMathTypes";
 
 import { type AnimationConfiguration } from "../animationConfiguration";
 import { type LottieAtlasCanvas, type LottieAtlasTexture, type LottieAtlasTextureFactory } from "../rendering/lottieAtlas";
@@ -149,7 +148,7 @@ export class SpritePacker<TextureType = unknown> implements LottieSpriteAtlasPac
      * @param debugName Optional human-readable identifier (e.g. owning layer name) included in oversize warnings.
      * @returns The information on how to find the sprite in the atlas.
      */
-    public addLottieShape(rawElements: RawElement[], scalingFactor: IVector2Like, debugName?: string): SpriteAtlasInfo {
+    public addLottieShape(rawElements: RawElement[], scalingFactor: LottieVector2Like, debugName?: string): SpriteAtlasInfo {
         const boundingBox = GetShapesBoundingBox(rawElements);
 
         const layerScaleX = scalingFactor.x;
@@ -195,7 +194,7 @@ export class SpritePacker<TextureType = unknown> implements LottieSpriteAtlasPac
      * @param debugName Optional human-readable identifier (e.g. owning layer name) included in oversize warnings.
      * @returns The information on how to find the sprite in the atlas.
      */
-    public addLottieText(textData: RawTextData, scalingFactor: IVector2Like, debugName?: string): SpriteAtlasInfo | undefined {
+    public addLottieText(textData: RawTextData, scalingFactor: LottieVector2Like, debugName?: string): SpriteAtlasInfo | undefined {
         if (this._rawFonts === undefined) {
             return undefined;
         }
@@ -366,7 +365,7 @@ export class SpritePacker<TextureType = unknown> implements LottieSpriteAtlasPac
         kind: "shape" | "text",
         debugName: string | undefined,
         boundingBox: BoundingBox,
-        scalingFactor: IVector2Like,
+        scalingFactor: LottieVector2Like,
         layerScaleX: number,
         layerScaleY: number
     ): void {
@@ -482,7 +481,7 @@ export class SpritePacker<TextureType = unknown> implements LottieSpriteAtlasPac
         }
     }
 
-    private _drawVectorShape(rawElements: RawElement[], boundingBox: BoundingBox, scalingFactor: IVector2Like, page: AtlasPage<TextureType>): void {
+    private _drawVectorShape(rawElements: RawElement[], boundingBox: BoundingBox, scalingFactor: LottieVector2Like, page: AtlasPage<TextureType>): void {
         page.context.save();
         page.context.globalCompositeOperation = "destination-over";
 
@@ -535,7 +534,7 @@ export class SpritePacker<TextureType = unknown> implements LottieSpriteAtlasPac
         page.context.restore();
     }
 
-    private _drawText(textData: RawTextData, scalingFactor: IVector2Like, page: AtlasPage<TextureType>): void {
+    private _drawText(textData: RawTextData, scalingFactor: LottieVector2Like, page: AtlasPage<TextureType>): void {
         if (this._rawFonts === undefined) {
             return;
         }

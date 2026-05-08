@@ -1,5 +1,4 @@
-import { type IVector2Like } from "core/Maths/math.like";
-
+import { type LottieVector2Like } from "../maths/lottieMathTypes";
 import { type RawElement, type RawFont, type RawTextData } from "./rawTypes";
 
 /**
@@ -71,7 +70,7 @@ export type LottieSpriteAtlasPacker<TextureType = unknown> = {
      * @param debugName Optional human-readable identifier included in oversize warnings.
      * @returns The information on how to find the sprite in the atlas.
      */
-    addLottieShape(rawElements: RawElement[], scalingFactor: IVector2Like, debugName?: string): SpriteAtlasInfo;
+    addLottieShape(rawElements: RawElement[], scalingFactor: LottieVector2Like, debugName?: string): SpriteAtlasInfo;
     /**
      * Adds a text element that comes from Lottie data to the sprite atlas.
      * @param textData The raw text data to add to the atlas.
@@ -79,7 +78,7 @@ export type LottieSpriteAtlasPacker<TextureType = unknown> = {
      * @param debugName Optional human-readable identifier included in oversize warnings.
      * @returns The information on how to find the sprite in the atlas, or undefined when the text cannot be rasterized.
      */
-    addLottieText(textData: RawTextData, scalingFactor: IVector2Like, debugName?: string): SpriteAtlasInfo | undefined;
+    addLottieText(textData: RawTextData, scalingFactor: LottieVector2Like, debugName?: string): SpriteAtlasInfo | undefined;
     /** Updates all dirty atlas page textures with the latest canvas content. */
     updateAtlasTexture(): void;
     /** Releases any temporary canvas resources owned by the packer. */

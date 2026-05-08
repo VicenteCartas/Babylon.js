@@ -1,5 +1,4 @@
-import { type IVector2Like } from "core/Maths/math.like";
-
+import { type LottieVector2Like } from "../maths/lottieMathTypes";
 import { type ScalarProperty, type Vector2Property } from "../parsing/parsedTypes";
 
 import { ThinMatrix } from "../maths/matrix";
@@ -100,21 +99,21 @@ export class Node {
      * Gets the initial scale of this node.
      * @returns The initial scale.
      */
-    public get startScale(): IVector2Like {
+    public get startScale(): LottieVector2Like {
         return this._scale.startValue;
     }
 
     /**
      * Gets the local position start value.
      */
-    public get positionStart(): IVector2Like {
+    public get positionStart(): LottieVector2Like {
         return this._position.startValue;
     }
 
     /**
      * Gets the local position current value.
      */
-    public get positionCurrent(): IVector2Like {
+    public get positionCurrent(): LottieVector2Like {
         return this._position.currentValue;
     }
 
@@ -135,14 +134,14 @@ export class Node {
     /**
      * Gets the local scale start value.
      */
-    public get scaleStart(): IVector2Like {
+    public get scaleStart(): LottieVector2Like {
         return this._scale.startValue;
     }
 
     /**
      * Gets the local scale current value.
      */
-    public get scaleCurrent(): IVector2Like {
+    public get scaleCurrent(): LottieVector2Like {
         return this._scale.currentValue;
     }
 
@@ -311,7 +310,7 @@ export class Node {
      * @param translation Output vector to receive the decomposed translation.
      * @returns The rotation in radians.
      */
-    public decomposeWorldMatrixAtFrame(frame: number, scale: IVector2Like, translation: IVector2Like): number {
+    public decomposeWorldMatrixAtFrame(frame: number, scale: LottieVector2Like, translation: LottieVector2Like): number {
         // Collect the chain from this node up to the root.
         const chain: Node[] = [this];
         let parent = this._parent;
@@ -337,7 +336,7 @@ export class Node {
         return acc.decompose(scale, translation);
     }
 
-    private _composeLocalAtFrame(frame: number, output: ThinMatrix, scratchScale: IVector2Like, scratchPos: IVector2Like): void {
+    private _composeLocalAtFrame(frame: number, output: ThinMatrix, scratchScale: LottieVector2Like, scratchPos: LottieVector2Like): void {
         const scaleIdx = Node._InterpolateVector2AtFrame(this._scale, frame, 0, scratchScale);
         const scale = scaleIdx >= 0 ? scratchScale : this._scale.startValue;
 
@@ -357,8 +356,8 @@ export class Node {
     private static readonly _ScalarScratch: { value: number } = { value: 0 };
     private static readonly _ComposeScratchA: ThinMatrix = new ThinMatrix();
     private static readonly _ComposeScratchB: ThinMatrix = new ThinMatrix();
-    private static readonly _ComposeScratchScale: IVector2Like = { x: 0, y: 0 };
-    private static readonly _ComposeScratchPos: IVector2Like = { x: 0, y: 0 };
+    private static readonly _ComposeScratchScale: LottieVector2Like = { x: 0, y: 0 };
+    private static readonly _ComposeScratchPos: LottieVector2Like = { x: 0, y: 0 };
 
     /**
      * Interpolates a Vector2 property at a given frame and writes the result into `output`.
@@ -370,7 +369,7 @@ export class Node {
      * or `-1` if the frame is before the first keyframe or the property has no keyframes (in which case
      * `output` is left unchanged).
      */
-    private static _InterpolateVector2AtFrame(property: Vector2Property, frame: number, startIndex: number, output: IVector2Like): number {
+    private static _InterpolateVector2AtFrame(property: Vector2Property, frame: number, startIndex: number, output: LottieVector2Like): number {
         const keyframes = property.keyframes;
         if (!keyframes || keyframes.length === 0) {
             return -1;

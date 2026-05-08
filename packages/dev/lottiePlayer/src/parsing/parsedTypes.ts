@@ -1,6 +1,5 @@
-import { type IVector2Like } from "core/Maths/math.like";
-
 import { type BezierCurve } from "../maths/bezier";
+import { type LottieVector2Like } from "../maths/lottieMathTypes";
 
 import { type Node } from "../nodes/node";
 
@@ -108,11 +107,11 @@ export type Vector2Property = {
     /**
      * The initial value at the start of the animation.
      */
-    startValue: IVector2Like;
+    startValue: LottieVector2Like;
     /**
      * The current value during the animation.
      */
-    currentValue: IVector2Like;
+    currentValue: LottieVector2Like;
     /**
      * An array of keyframes for the property.
      */
@@ -130,7 +129,7 @@ export type Vector2Keyframe = {
     /**
      * The value at this keyframe.
      */
-    value: IVector2Like;
+    value: LottieVector2Like;
     /**
      * The time at which this keyframe occurs in the animation, in frames.
      */

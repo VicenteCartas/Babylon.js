@@ -1,5 +1,3 @@
-import { type IVector2Like } from "core/Maths/math.like";
-
 import {
     type RawElement,
     type RawFont,
@@ -20,6 +18,7 @@ import { type LottieSpriteAtlasPacker, type SpriteAtlasInfo } from "./lottieAtla
 import { SpriteNode } from "../nodes/spriteNode";
 
 import { BezierCurve } from "../maths/bezier";
+import { type LottieVector2Like } from "../maths/lottieMathTypes";
 
 import { type LottieSprite, type LottieSpriteRenderer } from "../rendering/lottieSprite";
 import { Node } from "../nodes/node";
@@ -39,12 +38,12 @@ type ScalarType = "Rotation" | "Opacity";
 /**
  * Default scale value for the scale property of a Lottie transform.
  */
-const DefaultScale: IVector2Like = { x: 1, y: 1 };
+const DefaultScale: LottieVector2Like = { x: 1, y: 1 };
 
 /**
  * Default position value for the position property of a Lottie transform.
  */
-const DefaultPosition: IVector2Like = { x: 0, y: 0 };
+const DefaultPosition: LottieVector2Like = { x: 0, y: 0 };
 
 /**
  * Tree structure used to reorder layers into a child-parent hierarchy.
@@ -685,7 +684,7 @@ export class Parser<TextureType = unknown> {
         return fallback;
     }
 
-    private _getRasterizationScale(parent: Node, rasterizationFrame: number): IVector2Like {
+    private _getRasterizationScale(parent: Node, rasterizationFrame: number): LottieVector2Like {
         const scale = { x: 1, y: 1 };
         const tempPosition = { x: 0, y: 0 };
 
@@ -810,7 +809,7 @@ export class Parser<TextureType = unknown> {
         };
     }
 
-    private _fromLottieVector2ToBabylonVector2(property: RawVectorProperty | undefined, vectorType: VectorType, defaultValue: IVector2Like): Vector2Property {
+    private _fromLottieVector2ToBabylonVector2(property: RawVectorProperty | undefined, vectorType: VectorType, defaultValue: LottieVector2Like): Vector2Property {
         if (!property) {
             return {
                 startValue: defaultValue,
@@ -920,7 +919,7 @@ export class Parser<TextureType = unknown> {
         };
     }
 
-    private _calculateFinalVector(x: number, y: number, vectorType: VectorType): IVector2Like {
+    private _calculateFinalVector(x: number, y: number, vectorType: VectorType): LottieVector2Like {
         const result = { x, y };
 
         if (vectorType === "Position") {

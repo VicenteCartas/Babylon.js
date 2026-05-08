@@ -274,7 +274,7 @@ function CalculatePointsWithTangentZero(
 }
 
 // Alternative implementation for bounding box calculation using sampling of the bezier curve instead of finding points where the tangent is zero.
-// function bezierBoundingBoxSampled(boxCorners: Corners, start:IVector2Like, outTangent:IVector2Like, inTangent:IVector2Like, end:IVector2Like) {
+// function bezierBoundingBoxSampled(boxCorners: Corners, start:LottieVector2Like, outTangent:LottieVector2Like, inTangent:LottieVector2Like, end:LottieVector2Like) {
 //     for (let i = 0; i <= SamplingSteps; i++) {
 //         const t = i / SamplingSteps;
 

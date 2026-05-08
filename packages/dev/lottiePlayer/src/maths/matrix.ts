@@ -1,5 +1,4 @@
-import { type IMatrixLike, type IVector2Like } from "core/Maths/math.like";
-import { type Tuple } from "core/types";
+import { type LottieMatrixLike, type LottieMatrixValues, type LottieVector2Like } from "./lottieMathTypes";
 
 /**
  * Represents a Babylon.js thin version of a Matrix
@@ -7,7 +6,7 @@ import { type Tuple } from "core/types";
  * the Lottie Renderer project preventing the dependency on the full
  * Babylon.js math system.
  */
-export class ThinMatrix implements IMatrixLike {
+export class ThinMatrix implements LottieMatrixLike {
     /**
      * Prevents global conflicts on update as shader programs are shared.
      */
@@ -134,7 +133,7 @@ export class ThinMatrix implements IMatrixLike {
      * @param translation defines the translation vector
      * @returns the updated ThinMatrix instance
      */
-    public compose(scale: IVector2Like, roll: number, translation: IVector2Like): ThinMatrix {
+    public compose(scale: LottieVector2Like, roll: number, translation: LottieVector2Like): ThinMatrix {
         // Produces a quaternion from Euler angles in the z-y-x orientation (Tait-Bryan angles)
         const halfRoll = roll * 0.5;
         const z = Math.sin(halfRoll),
@@ -201,8 +200,8 @@ export class ThinMatrix implements IMatrixLike {
      * Returns the matrix data array.
      * @returns The matrix data
      */
-    public asArray(): Tuple<number, 16> {
-        return this._data as any as Tuple<number, 16>;
+    public asArray(): LottieMatrixValues {
+        return this._data as any as LottieMatrixValues;
     }
 
     /**
@@ -211,7 +210,7 @@ export class ThinMatrix implements IMatrixLike {
      * @param translation Translation vector to store the translation values
      * @returns The rotation in radians
      */
-    public decompose(scale: IVector2Like, translation: IVector2Like): number {
+    public decompose(scale: LottieVector2Like, translation: LottieVector2Like): number {
         const m00 = this._data[0]; // scaleX * cos(θ)
         const m01 = this._data[1]; // -scaleY * sin(θ)
         const m10 = this._data[4]; // scaleX * sin(θ)
