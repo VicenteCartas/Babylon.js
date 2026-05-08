@@ -101,11 +101,11 @@ export async function GetRawAnimationDataAsync(urlToFile: string): Promise<RawLo
  * Parses a lottie animation file and converts it into a format that can be rendered by Babylon.js
  * Important: not all lottie features are supported, you can call .debug() after parsing an animation to see what features were not supported.
  */
-export class Parser {
-    private _packer: SpritePacker;
+export class Parser<TextureType = unknown> {
+    private _packer: SpritePacker<TextureType>;
     private readonly _configuration: AnimationConfiguration;
     private readonly _animationInfo: AnimationInfo;
-    private readonly _renderingManager: LottieSpriteRenderer;
+    private readonly _renderingManager: LottieSpriteRenderer<TextureType>;
 
     private _rawFonts: Map<string, RawFont> = new Map<string, RawFont>(); // Map of font names to raw font data
     private _unsupportedFeatures: string[];
@@ -132,7 +132,12 @@ export class Parser {
      * @param configuration Configuration options for the animation parser.
      * @param renderingManager Object that creates and renders the sprites in the animation.
      */
-    public constructor(packer: SpritePacker, animationData: RawLottieAnimation, configuration: AnimationConfiguration, renderingManager: LottieSpriteRenderer) {
+    public constructor(
+        packer: SpritePacker<TextureType>,
+        animationData: RawLottieAnimation,
+        configuration: AnimationConfiguration,
+        renderingManager: LottieSpriteRenderer<TextureType>
+    ) {
         this._packer = packer;
         this._configuration = configuration;
         this._renderingManager = renderingManager;

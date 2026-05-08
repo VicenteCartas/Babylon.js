@@ -1,9 +1,4 @@
-import "core/Engines/Extensions/engine.dynamicTexture";
-
-import { type ThinEngine } from "core/Engines/thinEngine";
-import { type InternalTexture } from "core/Materials/Textures/internalTexture";
 import { type IVector2Like } from "core/Maths/math.like";
-import { ThinTexture } from "core/Materials/Textures/thinTexture";
 
 import {
     type RawElement,
@@ -23,6 +18,7 @@ import { ApplyLottieTextContext, DrawLottieText, MeasureLottieText, ResolveLotti
 import { type BoundingBox, GetShapesBoundingBox, GetTextBoundingBox } from "../maths/boundingBox";
 
 import { type AnimationConfiguration } from "../animationConfiguration";
+import { type LottieAtlasCanvas, type LottieAtlasTexture, type LottieAtlasTextureFactory } from "../rendering/lottieAtlas";
 
 /**
  * Type alias for the 2D drawing context used by the sprite packer.
@@ -97,11 +93,10 @@ type GradientStop = {
  * Represents a single page in the sprite atlas. When sprites exceed the capacity of one
  * texture, additional pages are created automatically.
  */
-type AtlasPage = {
-    canvas: OffscreenCanvas | HTMLCanvasElement;
+type AtlasPage<TextureType = unknown> = {
+    canvas: LottieAtlasCanvas;
     context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
-    internalTexture: InternalTexture;
-    texture: ThinTexture;
+    atlasTexture: LottieAtlasTexture<TextureType>;
     isDirty: boolean;
     currentX: number;
     currentY: number;
@@ -112,15 +107,15 @@ type AtlasPage = {
  * SpritePacker is a class that handles the packing of sprites into a texture atlas.
  * If sprites exceed the capacity of a single atlas texture, additional atlas pages are created.
  */
-export class SpritePacker {
-    private readonly _engine: ThinEngine;
+export class SpritePacker<TextureType = unknown> {
+    private readonly _textureFactory: LottieAtlasTextureFactory<TextureType>;
     private readonly _isHtmlCanvas: boolean;
     private _atlasScale: number;
     private readonly _variables: Map<string, string>;
     private readonly _configuration: AnimationConfiguration;
     private _rawFonts: Map<string, RawFont> | undefined;
 
-    private _pages: AtlasPage[];
+    private _pages: AtlasPage<TextureType>[];
 
     // Variable to avoid allocations
     private _spriteAtlasInfo: SpriteAtlasInfo;
@@ -135,8 +130,8 @@ export class SpritePacker {
      * Gets the textures for all atlas pages.
      * @returns An array of textures, one per atlas page.
      */
-    public get textures(): ThinTexture[] {
-        return this._pages.map((p) => p.texture);
+    public get textures(): TextureType[] {
+        return this._pages.map((p) => p.atlasTexture.texture);
     }
 
     /**
@@ -157,14 +152,20 @@ export class SpritePacker {
 
     /**
      * Creates a new instance of SpritePacker.
-     * @param engine Engine that will render the sprites.
+     * @param textureFactory Adapter that creates and updates engine textures for atlas pages.
      * @param isHtmlCanvas Whether we should render the atlas in an HTMLCanvasElement or an OffscreenCanvas.
      * @param atlasScale The atlas scale factor to apply to the sprites (always \>= 1 to keep sprites crisp).
      * @param variables Map of variables to replace in the animation file.
      * @param configuration Configuration options for the sprite packer.
      */
-    public constructor(engine: ThinEngine, isHtmlCanvas: boolean, atlasScale: number, variables: Map<string, string>, configuration: AnimationConfiguration) {
-        this._engine = engine;
+    public constructor(
+        textureFactory: LottieAtlasTextureFactory<TextureType>,
+        isHtmlCanvas: boolean,
+        atlasScale: number,
+        variables: Map<string, string>,
+        configuration: AnimationConfiguration
+    ) {
+        this._textureFactory = textureFactory;
         this._isHtmlCanvas = isHtmlCanvas;
         this._atlasScale = atlasScale;
         this._variables = variables;
@@ -299,7 +300,7 @@ export class SpritePacker {
             if (!page.isDirty) {
                 continue;
             }
-            this._engine.updateDynamicTexture(page.internalTexture, page.canvas, false);
+            page.atlasTexture.update(page.canvas);
             page.isDirty = false;
         }
     }
@@ -314,8 +315,8 @@ export class SpritePacker {
         }
     }
 
-    private _createPage(): AtlasPage {
-        let canvas: OffscreenCanvas | HTMLCanvasElement;
+    private _createPage(): AtlasPage<TextureType> {
+        let canvas: LottieAtlasCanvas;
         let context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
         if (this._isHtmlCanvas) {
@@ -328,18 +329,16 @@ export class SpritePacker {
             context = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
         }
 
-        const internalTexture = this._engine.createDynamicTexture(this._configuration.spriteAtlasWidth, this._configuration.spriteAtlasHeight, false, 2);
-        this._engine.updateDynamicTexture(internalTexture, canvas, false);
-
-        const texture = new ThinTexture(internalTexture);
-        texture.wrapU = 0;
-        texture.wrapV = 0;
+        const atlasTexture = this._textureFactory.createAtlasTexture({
+            canvas,
+            width: this._configuration.spriteAtlasWidth,
+            height: this._configuration.spriteAtlasHeight,
+        });
 
         return {
             canvas,
             context,
-            internalTexture,
-            texture,
+            atlasTexture,
             isDirty: false,
             currentX: this._configuration.gapSize,
             currentY: this._configuration.gapSize,
@@ -354,7 +353,7 @@ export class SpritePacker {
      * @param cellHeight The height of the sprite cell in pixels.
      * @returns An atlas page with enough room for the sprite.
      */
-    private _getPageWithRoom(cellWidth: number, cellHeight: number): AtlasPage {
+    private _getPageWithRoom(cellWidth: number, cellHeight: number): AtlasPage<TextureType> {
         let page = this._pages[this._pages.length - 1];
 
         // Defensive clamp: _applyAtlasScaleAndFit should have already downscaled oversized cells
@@ -463,7 +462,7 @@ export class SpritePacker {
         scalingFactor.y = effectiveScaleY;
     }
 
-    private _extrudeSpriteEdges(page: AtlasPage, x: number, y: number, width: number, height: number): void {
+    private _extrudeSpriteEdges(page: AtlasPage<TextureType>, x: number, y: number, width: number, height: number): void {
         const padding = Math.min(2, Math.floor(this._configuration.gapSize / 2));
         const pixelX = Math.floor(x);
         const pixelY = Math.floor(y);
@@ -527,7 +526,7 @@ export class SpritePacker {
         }
     }
 
-    private _drawVectorShape(rawElements: RawElement[], boundingBox: BoundingBox, scalingFactor: IVector2Like, page: AtlasPage): void {
+    private _drawVectorShape(rawElements: RawElement[], boundingBox: BoundingBox, scalingFactor: IVector2Like, page: AtlasPage<TextureType>): void {
         page.context.save();
         page.context.globalCompositeOperation = "destination-over";
 
@@ -580,7 +579,7 @@ export class SpritePacker {
         page.context.restore();
     }
 
-    private _drawText(textData: RawTextData, scalingFactor: IVector2Like, page: AtlasPage): void {
+    private _drawText(textData: RawTextData, scalingFactor: IVector2Like, page: AtlasPage<TextureType>): void {
         if (this._rawFonts === undefined) {
             return;
         }

@@ -110,6 +110,57 @@ function findDescendantByIdPrefix(root: Node, prefix: string): Node | undefined 
 }
 
 describe("Parser scene graph structure", () => {
+    it("forwards opaque atlas textures to the sprite renderer after updating the atlas", () => {
+        type MockTexture = { name: string };
+
+        const calls: string[] = [];
+        const textures: MockTexture[] = [{ name: "atlas-0" }, { name: "atlas-1" }];
+        const packer = {
+            addLottieShape: () => undefined as unknown as SpriteAtlasInfo,
+            addLottieText: () => undefined,
+            updateAtlasTexture: () => {
+                calls.push("updateAtlasTexture");
+            },
+            releaseCanvas: () => {
+                calls.push("releaseCanvas");
+            },
+            get textures() {
+                return textures;
+            },
+            get unsupportedFeatures() {
+                return [];
+            },
+            set rawFonts(_: unknown) {},
+        } as unknown as SpritePacker<MockTexture>;
+
+        let readyTextures: MockTexture[] | undefined;
+        const renderer: LottieSpriteRenderer<MockTexture> = {
+            createSprite: (options) => makeMockSprite(options.widthPx, options.heightPx),
+            ready: (spriteTextures) => {
+                calls.push("ready");
+                readyTextures = spriteTextures;
+            },
+        };
+
+        new Parser<MockTexture>(
+            packer,
+            {
+                v: "5.0.0",
+                fr: 30,
+                ip: 0,
+                op: 60,
+                w: 100,
+                h: 100,
+                layers: [],
+            },
+            makeConfiguration(),
+            renderer
+        );
+
+        expect(calls).toEqual(["updateAtlasTexture", "ready", "releaseCanvas"]);
+        expect(readyTextures).toBe(textures);
+    });
+
     it("parses a text layer into ControlNode (TRS) -> Node (Anchor) -> SpriteNode", () => {
         const animation: RawLottieAnimation = {
             v: "5.0.0",

@@ -8,11 +8,13 @@ import { type Node } from "../nodes/node";
 import { type AnimationConfiguration, UpdateConfiguration } from "../animationConfiguration";
 
 import { ThinEngine } from "core/Engines/thinEngine";
+import { type ThinTexture } from "core/Materials/Textures/thinTexture";
 import { Viewport } from "core/Maths/math.viewport";
 import { RenderingManager } from "./renderingManager";
 import { ThinMatrix } from "../maths/matrix";
 import { Parser } from "../parsing/parser";
 import { SpritePacker } from "../parsing/spritePacker";
+import { CreateBabylonLottieAtlasTextureFactory } from "./babylonAtlasTexture";
 
 /**
  * Defines the babylon combine alpha value to prevent a large import.
@@ -31,7 +33,7 @@ export class AnimationController {
     private readonly _variables: Map<string, string>;
     private _configuration: AnimationConfiguration;
     private readonly _engine: ThinEngine;
-    private readonly _spritePacker: SpritePacker;
+    private readonly _spritePacker: SpritePacker<ThinTexture>;
 
     private _animation?: AnimationInfo;
 
@@ -149,7 +151,13 @@ export class AnimationController {
         this._engine.stencilState.stencilTest = false;
         this._engine.setAlphaMode(ALPHA_PREMULTIPLIED);
 
-        this._spritePacker = new SpritePacker(this._engine, this._isHtmlCanvas(canvas), this._atlasScale, this._variables, this._configuration);
+        this._spritePacker = new SpritePacker(
+            CreateBabylonLottieAtlasTextureFactory(this._engine),
+            this._isHtmlCanvas(canvas),
+            this._atlasScale,
+            this._variables,
+            this._configuration
+        );
         this._renderingManager = new RenderingManager(this._engine, this._configuration);
 
         this._projectionMatrix = new ThinMatrix();
