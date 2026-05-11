@@ -1,6 +1,40 @@
 {
-    "fromTag": "9.5.2",
+    "fromTag": "9.6.1",
     "changelog": {
+        "9.6.2": [],
+        "9.6.1": [
+            {
+                "pr": "18435",
+                "title": "Clean up observers when parsing Node Materials",
+                "description": "Before this change, repeatedly parsing NodeMaterial attached a new image-processing observer each time without rebinding through the normal attach/detach path. Over time, those observers accumulated and caused a memory leak.\n\nThis change preserves the existing observer/configuration state across ParseProperties and reattaches the parsed configuration through _attachImageProcessingConfiguration, so only one active observer is kept per material lifecycle.\n\nA unit regression test was added to verify observer count remains stable across repeated parse + dispose cycles.",
+                "author": {
+                    "name": "abogartz",
+                    "url": "https://github.com/abogartz"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/Node/nodeMaterial.ts",
+                    "packages/dev/core/test/unit/Materials/Node/babylon.nodeMaterials.parse.test.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "materials"
+                ]
+            },
+            {
+                "pr": "18436",
+                "title": "Lottie: fix issue parsing font lists",
+                "description": "If the fonts were a list instead of a single font, we were not managing them correctly and we were double quoting them.",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/lottiePlayer/src/parsing/textLayout.ts",
+                    "packages/dev/lottiePlayer/test/unit/lottieTextLayout.test.ts"
+                ],
+                "tags": []
+            }
+        ],
         "9.6.0": [
             {
                 "pr": "18428",
