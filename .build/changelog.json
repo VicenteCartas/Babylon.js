@@ -1,6 +1,671 @@
 {
-    "fromTag": "9.6.1",
+    "fromTag": "9.7.0",
     "changelog": {
+        "9.7.0": [
+            {
+                "pr": "18432",
+                "title": "Add OpenPBR support to Viewer",
+                "description": "This adds support for the useOpenPBR flag. It also adds a material dropdown in the test viewer that triggers a reload of the model. I had to add some tracking for the current model so that it didn't keep reloading the default UFO model. Similarly for the Viewer Configurator.",
+                "author": {
+                    "name": "MiiBond",
+                    "url": "https://github.com/MiiBond"
+                },
+                "files": [
+                    "packages/tools/viewer-configurator/src/components/configurator/configurator.tsx",
+                    "packages/tools/viewer/src/viewer.ts",
+                    "packages/tools/viewer/src/viewerElement.ts",
+                    "packages/tools/viewer/test/apps/web/index.html",
+                    "packages/tools/viewer/test/viewer.test.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18454",
+                "title": "fix(buildTools): handle file deletion in asset watcher gracefully",
+                "description": "> 🤖 *This PR was created by the create-pr skill.*\n\n## Problem\n\nWhen switching git branches in VS Code, the **\"Watch all for CDN (Dev)\"** task crashes with a \"no such file or directory\" error. This happens because files that existed on the old branch but not the new one trigger chokidar file watcher events, and `ProcessFile` attempts to copy a source file that no longer exists — throwing an unhandled ENOENT exception that kills the watcher process.\n\n## Fix\n\nThree defensive changes in `packages/dev/buildTools/src/copyAssets.ts`:\n\n1. **Skip `unlink` events** — `ProcessFile` only copies/builds files; it never actually handled deletions (the old code just crashed trying to copy a nonexistent file). Skipping the event is the correct behavior.\n2. **Wrap `ProcessFile` in try-catch** — handles the race condition where a file disappears between the chokidar event firing and the actual copy attempt (e.g., rapid branch switching or rebasing).\n3. **Add `.on(\"error\")` handler** — chokidar itself can emit errors when watched paths vanish; without a handler these become unhandled exceptions that kill the process.\n\n## Testing\n\n- Verified no new lint errors or TypeScript errors introduced.\n- Pre-existing lint warnings (missing JSDoc on `processAssets`) are unchanged.\n",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/dev/buildTools/src/copyAssets.ts"
+                ],
+                "tags": [
+                    "bug"
+                ]
+            },
+            {
+                "pr": "18430",
+                "title": "OpenPBR - Support importing glTF surface tinting",
+                "description": "OpenPBR doesn't support surface-only tinting of volumetric materials so, when we import a glTF that uses both surface tinting and volumes, we need to use the coat layer to mimic this tinting.\r\n\r\ni.e. If the glTF has `KHR_materials_transmission` and `baseColor` or `KHR_materials_diffuse_transmission` and `diffuseTransmissionColor` along with a volume described by `KHR_materials_volume`, we need to do some special handling for OpenPBR. This basically involves copying base properties like roughness, ior, etc. to the coat layer so that the resulting material looks mostly the same as it would in a native glTF renderer.\r\n\r\nIf the material already has a coat layer, we need to some additional logic to merge the existing coat with the new coat and this requires some texture baking. I've also added some logic for this that also handles baking UV transforms when they don't match between textures.\r\n\r\nI have an asset that I may submit to BabylonAssets that can be used to test this behaviour:\r\n<img width=\"757\" height=\"596\" alt=\"Screenshot 2026-05-06 at 1 00 38 PM\" src=\"https://github.com/user-attachments/assets/5dea3997-2191-4e06-b68e-652d508b6b35\" />\r\n",
+                "author": {
+                    "name": "MiiBond",
+                    "url": "https://github.com/MiiBond"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/PBR/openpbrMaterial.ts",
+                    "packages/dev/core/src/Materials/Textures/Procedurals/proceduralTexture.ts",
+                    "packages/dev/core/src/Materials/Textures/index.ts",
+                    "packages/dev/core/src/Materials/Textures/textureMerger.ts",
+                    "packages/dev/core/src/Materials/Textures/textureProcessor.ts",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrBackgroundTransmission.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrBaseLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrDirectLighting.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrEnvironmentLighting.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrSubsurfaceLayerData.fx",
+                    "packages/dev/core/src/Shaders/geometry.fragment.fx",
+                    "packages/dev/core/src/Shaders/openpbr.fragment.fx",
+                    "packages/dev/core/src/Shaders/textureProcessor.fragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrBackgroundTransmission.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrBaseLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrCoatLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrDirectLighting.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrEnvironmentLighting.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrFuzzLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrSubsurfaceLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrTransmissionLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrUboDeclaration.fx",
+                    "packages/dev/core/src/ShadersWGSL/geometry.fragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/openpbr.fragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/openpbr.vertex.fx",
+                    "packages/dev/core/src/ShadersWGSL/textureProcessor.fragment.fx",
+                    "packages/dev/core/test/unit/Materials/Textures/textureProcessor.test.ts",
+                    "packages/dev/inspector-v2/src/components/properties/materials/openpbrMaterialProperties.tsx",
+                    "packages/dev/loaders/src/glTF/2.0/Extensions/KHR_materials_pbrSpecularGlossiness.ts",
+                    "packages/dev/loaders/src/glTF/2.0/glTFLoader.ts",
+                    "packages/dev/loaders/src/glTF/2.0/materialLoadingAdapter.ts",
+                    "packages/dev/loaders/src/glTF/2.0/openpbrMaterialLoadingAdapter.ts",
+                    "packages/dev/loaders/src/glTF/2.0/pbrMaterialLoadingAdapter.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-Analytic-Lights-Coat-Color-vs-Coat-Darkening.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-Analytic-Lights-Coat-Color-vs-Coat-IOR.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-IBL-Coat-Color-vs-Coat-Darkening.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-IBL-Coat-Color-vs-Coat-IOR.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-IBL-Furnace-Test-for-Thin-Film-Transparency.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-Thin-Walled-Transmission-IOR-vs-Roughness---IBL.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-Transmission-Dense-Scattering---IBL.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-Transmission-Dense-Scattering---SH.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/OpenPBR-glTF-Surface-Tinting.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "enhancement",
+                    "openpbr"
+                ]
+            },
+            {
+                "pr": "18448",
+                "title": "feat: Add texture repetition breaking for Standard, PBR, and OpenPBR materials",
+                "description": "## Summary\r\n\r\nAdd built-in support for breaking visible texture tiling patterns using 4 techniques, directly in Standard, PBR, and OpenPBR materials.\r\n\r\n## New API\r\n\r\n```typescript\r\n// Set the mode (ordered by cost)\r\nmaterial.textureRepetitionMode = Constants.TEXTURE_REPETITION_NOISE_BLEND;       // 3 fetches\r\nmaterial.textureRepetitionMode = Constants.TEXTURE_REPETITION_HEX_TILING;        // 3 fetches\r\nmaterial.textureRepetitionMode = Constants.TEXTURE_REPETITION_TILE_RANDOMIZATION; // 4 fetches\r\nmaterial.textureRepetitionMode = Constants.TEXTURE_REPETITION_VORONOI_BOMBING;   // 9 fetches\r\n\r\n// Hex tiling has 4 configurable parameters\r\nmaterial.textureRepetitionHexTilingParams = [1.0, 0.6, 7.0, 0.5];\r\n// [rotationStrength, fallOffContrast, exponent, contrast]\r\n```\r\n\r\nDefault is `TEXTURE_REPETITION_NONE` (0) — zero overhead, `TEXRD` macro compiles to plain `texture2D` / `textureSample`.\r\n\r\n## Techniques\r\n\r\n| Mode | Fetches | Description |\r\n|------|---------|-------------|\r\n| Noise Blend | 2 | Low-frequency noise-driven offset blending ([Inigo Quilez](https://iquilezles.org/articles/texturerepetition/)) |\r\n| Hex Tiling | 3 | Hex-tile grid with per-tile rotation and luminance-weighted blending ([Mikkelsen, JCGT 2022](https://jcgt.org/published/0011/03/05/)) |\r\n| Tile Randomization | 4 | Per-tile random offset and mirror (Inigo Quilez) |\r\n| Voronoi Bombing | 9 | Smooth Voronoi with Gaussian-weighted blending (Inigo Quilez) |\r\n\r\n## Implementation\r\n\r\n- A `TEXRD` macro in a new shader include replaces `texture2D` / `textureSample` calls for all tiling surface textures\r\n- When mode is 0 (default), `TEXRD` compiles to plain `texture2D` / `textureSample` — zero cost\r\n- Property lives on `Material` base class, available to all material types\r\n- Both GLSL and WGSL supported (WebGL + WebGPU)\r\n- Inspector v2 support with mode dropdown and hex tiling parameter sliders\r\n\r\n## Visualization Tests\r\n\r\n3 new tests added, one per material type (Standard, PBR, OpenPBR), each showing 4 ground planes with the 4 repetition modes.\r\n\r\n## Demo Playground\r\n\r\nhttps://playground.babylonjs.com/#7XUUXW#0\r\n\r\n## Documentation\r\n\r\nDocumentation will follow once the PR is merged.\r\n",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/constants.ts",
+                    "packages/dev/core/src/Materials/Node/Blocks/Fragment/perturbNormalBlock.ts",
+                    "packages/dev/core/src/Materials/PBR/openpbrMaterial.ts",
+                    "packages/dev/core/src/Materials/PBR/pbrBaseMaterial.ts",
+                    "packages/dev/core/src/Materials/material.ts",
+                    "packages/dev/core/src/Materials/standardMaterial.ts",
+                    "packages/dev/core/src/Shaders/ShadersInclude/bumpFragment.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/bumpFragmentMainFunctions.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/defaultFragmentDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/defaultUboDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/defaultVertexDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrAmbientOcclusionData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrBaseLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrCoatLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrFragmentDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrFuzzLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrNormalMapFragment.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrSubsurfaceLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrThinFilmLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrTransmissionLayerData.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrUboDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/openpbrVertexDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/pbrBlockFinalUnlitComponents.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/pbrBlockLightmapInit.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/pbrFragmentDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/pbrHelperFunctions.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/pbrUboDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/pbrVertexDeclaration.fx",
+                    "packages/dev/core/src/Shaders/ShadersInclude/textureRepetitionFunctions.fx",
+                    "packages/dev/core/src/Shaders/default.fragment.fx",
+                    "packages/dev/core/src/Shaders/openpbr.fragment.fx",
+                    "packages/dev/core/src/Shaders/pbr.fragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/bumpFragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/bumpFragmentMainFunctions.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/defaultUboDeclaration.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrAmbientOcclusionData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrBaseLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrCoatLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrFuzzLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrIblFunctions.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrNormalMapFragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrSubsurfaceLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrThinFilmLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrTransmissionLayerData.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/openpbrUboDeclaration.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/pbrBlockFinalUnlitComponents.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/pbrBlockLightmapInit.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/pbrHelperFunctions.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/pbrUboDeclaration.fx",
+                    "packages/dev/core/src/ShadersWGSL/ShadersInclude/textureRepetitionFunctions.fx",
+                    "packages/dev/core/src/ShadersWGSL/default.fragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/openpbr.fragment.fx",
+                    "packages/dev/core/src/ShadersWGSL/pbr.fragment.fx",
+                    "packages/dev/inspector-v2/src/components/properties/materials/materialProperties.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/properties/materialPropertiesService.tsx",
+                    "packages/tools/tests/test/visualization/ReferenceImages/texture-repetition-openpbr-material.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/texture-repetition-pbr-material.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/texture-repetition-standard-material.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "materials",
+                    "new feature",
+                    "texture"
+                ]
+            },
+            {
+                "pr": "18453",
+                "title": "Fix PBRCustomMaterial shader source cleanup on dispose",
+                "description": "`PBRCustomMaterial` generates per-instance shader names and stores generated vertex/pixel shader source strings in `Effect.ShadersStore`. These keys are not reused by future material instances, so disposing the material left unreachable shader source strings behind.\n\nThis change deletes the generated `custompbr_*VertexShader` and `custompbr_*PixelShader` entries when the material is disposed, then delegates to the base PBR material disposal path.\n\nFixes the memory leak reported at https://forum.babylonjs.com/t/pbrcustommaterial-shadersstore-memory-leak-on-dispose/63452.\n\nTest coverage: added a unit regression test that builds a `PBRCustomMaterial`, verifies the generated shader entries exist, disposes the material, and verifies the generated entries are removed.\n\nValidation:\n- `npx vitest run --project=unit packages\\dev\\materials\\test\\unit\\custom\\pbrCustomMaterial.test.ts`\n- `npx prettier --check \"packages/dev/materials/src/custom/pbrCustomMaterial.ts\" \"packages/dev/materials/test/unit/custom/pbrCustomMaterial.test.ts\"`\n- `npx eslint \"packages/dev/materials/src/custom/pbrCustomMaterial.ts\" \"packages/dev/materials/test/unit/custom/pbrCustomMaterial.test.ts\" --quiet --no-warn-ignored`\n- `npm run compile -w @dev/materials`\n\nNote: `npm run lint:check` currently fails on unrelated upstream curly-rule errors in `packages/tools/babylonServer/src/createScene.js`.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/materials/src/custom/pbrCustomMaterial.ts",
+                    "packages/dev/materials/test/unit/custom/pbrCustomMaterial.test.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "materials"
+                ]
+            },
+            {
+                "pr": "18449",
+                "title": "feat(physics): add maxStepHeight to PhysicsCharacterController",
+                "description": "Adds a Unity-style `stepOffset` to `PhysicsCharacterController` (Havok v2). When `maxStepHeight > 0`, the controller can climb onto obstacles up to that height and treats anything taller as a wall — independent of the capsule radius. Default `0` keeps existing behavior.\n\nForum context: https://forum.babylonjs.com/t/physics-character-controller-step-height/61069\n\n### What changed\n- New `public maxStepHeight = 0` and `public footOffset` (defaults to half the capsule height; override for custom shapes).\n- `_tryStepUp` (up → forward → down shape casts) snaps the character onto a walkable landing when the simplex would otherwise be blocked. Only fires against STATIC/ANIMATED bodies; one step per `integrate()` call.\n- `_addStepHeightWallPlane` mirrors `_addMaxSlopePlane` and demotes any \"walkable\" contact more than `maxStepHeight` above the foot into an extra horizontal wall constraint, so the capsule's rounded bottom no longer lets it roll over obstacles shorter than its radius.\n\n### Behavior (default capsule R = 0.6)\n| Step height | Before (no `maxStepHeight`) | After, `maxStepHeight = 0.3` |\n|---|---|---|\n| 0.2 m | rolls over | rolls over |\n| 0.4 m | rolls over | **blocked** |\n| 0.7 m | blocked | blocked |\n| 0.4 m, `maxStepHeight = 0.5` | blocked | climbs |\n\n### Trade-off\nThe contact-height filter also caps walkable slopes at `cos(θ) ≥ 1 − maxStepHeight / capsuleRadius`. Documented on the property. For typical values (0.2–0.4) this stays compatible with a 45° `maxSlopeCosine` limit.\r\n",
+                "author": {
+                    "name": "CedricGuillemet",
+                    "url": "https://github.com/CedricGuillemet"
+                },
+                "files": [
+                    "packages/dev/core/src/Physics/v2/characterController.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18433",
+                "title": "Add staged precommit linting",
+                "description": "> 🤖 *This PR was created by Copilot on behalf of @RaananW.*\n\n## Summary\n- Add Husky and lint-staged as root dev dependencies.\n- Install Husky from the existing root `prepare` workflow.\n- Add a `precommit` script and `.husky/pre-commit` hook that runs `lint-staged`.\n- Configure lint-staged to format staged `packages/**/src` source files and lint staged `ts`, `tsx`, `js`, and `json` files.\n\n## Behavior when Husky is enabled\nAfter `npm install` runs, Husky configures Git's hook path to `.husky/_`. On commit, Git invokes the Husky pre-commit hook, which runs:\n\n```sh\nnpm run precommit\n```\n\nThat executes `lint-staged`, so only files staged for the commit are processed:\n\n- `packages/**/src/**/*.{ts,tsx,js,json}`: `prettier --write`, then `eslint --quiet --cache --no-warn-ignored`\n- `packages/**/src/**/*.{scss,css}`: `prettier --write`\n\nThis does not run lint across the whole repo on every commit.\n\n## Verification\n- Ran `npm install` and confirmed `git config --get core.hooksPath` returns `.husky/_`.\n- Confirmed `npm ls husky lint-staged --depth=0` resolves the new dependencies.\n- Ran `npm run precommit`; for this config-only commit, lint-staged reported no staged files matching the configured `packages/**/src` tasks.\n- Created the commit with Husky enabled; the pre-commit hook ran and produced the same no-matching-files result for this PR's staged config files.",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    ".githooks/pre-commit",
+                    "package-lock.json",
+                    "package.json",
+                    "scripts/setupGitHooks.mjs"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18434",
+                "title": "Add Smart Assets module for managing scene asset references",
+                "description": "> 🤖 *This PR was created by the create-pr skill.*\r\n\r\nIntroduces **Smart Assets**, a new `@babylonjs/core` module for tracking, swapping, and reloading the asset files that back a scene (models, textures, asset maps), plus an Inspector pane and Playground integration that build on it.\r\n\r\n### How this fits into the larger `.babylonproj` effort\r\n\r\nThis PR is a **standalone slice** of the broader `.babylonproj` work — a planned zip-based project format that lets a scene round-trip with all its mutable side-channel state (assets, property overrides, edits made in the Inspector) instead of treating each asset file as immutable.\r\n\r\nThe full `.babylonproj` work breaks into two cooperating pieces:\r\n1. **Smart Assets** *(this PR)* — the registry and lifecycle for swappable scene assets (models, textures, asset maps). It owns the *what's loaded* half: registering keys, resolving URLs, reloading from disk, missing-file prompts, auto-disposal with the scene.\r\n2. **Overrides** *(future PR)* — captures user-driven modifications to scene properties on top of those assets so they can be persisted alongside them.\r\n\r\nTogether, Smart Assets + Overrides become the load/save backbone of the `.babylonproj` format. Landing Smart Assets first keeps the change reviewable in isolation and gives the Inspector / Playground a useful asset-management feature today, even before the project-file format ships.\r\n\r\n### What's new\r\n\r\n**`packages/dev/core/src/SmartAssets/`** — module-level API for a `SmartAssetManager` attached to each `Scene`:\r\n- Register, resolve, load, unload, reload, and swap assets by string key\r\n- Auto-tracks loaded `AssetContainer` and texture objects so they can be located by key later\r\n- Optional `onAssetNotFound` callback for missing-file fallbacks (URL or `File`)\r\n- `AddSmartAssetManagerCreatedObserver` for cross-cutting subscribers (Playground, Inspector)\r\n- JSON serialize/deserialize (`SerializeSmartAssetManagerMap` / `LoadSmartAssetMapAsync`) for persisting the asset table\r\n- Auto-disposes when its owning scene is disposed\r\n\r\n**`packages/dev/inspector-v2/`** — Smart Assets pane:\r\n- Asset list with click-to-select, reload, swap, and remove\r\n- Save/load asset map JSON\r\n- Modal dialog prompting the user to locate or skip a missing asset\r\n\r\n**`packages/tools/playground/`** — Playground delegates missing-asset prompts to the Inspector, and shows the wait-ring while replacement assets load.\r\n\r\n**`packages/dev/sharedUiComponents/src/fluent/primitives/dialog.tsx`** — new shared Fluent Dialog primitive used by the prompt service.\r\n\r\n### Tests\r\n\r\n- 32 unit tests for the Smart Asset manager\r\n- Inspector handler test for the missing-asset prompt queue\r\n- Playground tests covering inspector reopening and the wait-ring flow\r\n",
+                "author": {
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
+                },
+                "files": [
+                    "packages/dev/core/src/SmartAssets/index.ts",
+                    "packages/dev/core/src/SmartAssets/smartAssetManager.ts",
+                    "packages/dev/core/src/SmartAssets/smartAssetSerializer.ts",
+                    "packages/dev/core/src/index.ts",
+                    "packages/dev/core/test/unit/SmartAssets/smartAssetManager.test.ts",
+                    "packages/dev/inspector-v2/src/index.ts",
+                    "packages/dev/inspector-v2/src/inspector.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/smartAssetsService.tsx",
+                    "packages/dev/inspector-v2/src/services/panes/tools/smartAssetToolsService.tsx",
+                    "packages/dev/inspector-v2/src/services/smartAssetHandler.tsx",
+                    "packages/dev/inspector-v2/src/services/smartAssetPromptService.tsx",
+                    "packages/dev/inspector-v2/test/unit/smartAssetHandler.test.ts",
+                    "packages/dev/sharedUiComponents/src/fluent/primitives/dialog.tsx",
+                    "packages/tools/playground/src/components/rendererComponent.tsx",
+                    "packages/tools/playground/test/unit/rendererComponent.test.ts"
+                ],
+                "tags": [
+                    "inspector",
+                    "Playground",
+                    "new feature"
+                ]
+            },
+            {
+                "pr": "18450",
+                "title": "Fix AnimatorAvatar.retargetAnimationGroup clobbering active animations",
+                "description": "> 🤖 *This PR was created by the create-pr skill.*\r\n\r\nFixes the bug reported on the forum: [After Anim Retarget Stopping Current Animation Jumps to Rest Pose](https://forum.babylonjs.com/t/after-anim-retarget-stopping-current-animation-jumps-to-rest-pose/63379).\r\n\r\nRepro: <https://playground.babylonjs.com/#K1QFZD#9>\r\n\r\n## Root cause\r\n\r\n`AnimatorAvatar.retargetAnimationGroup` was returning every avatar skeleton to its rest pose internally:\r\n\r\n- `_computeBoneWorldMatrices()` (called unconditionally near the top) calls `skeleton.returnToRest()` on every skeleton.\r\n- `_resetStates()` (called after `_fixRootPosition` / `_fixGroundReference` when those flags are enabled) does the same.\r\n\r\nWhile another animation was driving the avatar, those resets were overwritten every frame, so visually nothing looked wrong. But the moment that animation was stopped (`testAnim.stop()`), nothing was overwriting the rest pose anymore and the avatar visibly snapped to T-pose.\r\n\r\nThe bug reproduces regardless of the `fixRootPosition` / `fixGroundReference` flags, since `_computeBoneWorldMatrices` runs unconditionally.\r\n\r\n## Fix\r\n\r\nCapture the avatar's bone state once at the top of `retargetAnimationGroup` and restore it once before returning. The internal helpers (`_computeBoneWorldMatrices`, `_fixRootPosition`, `_fixGroundReference`, `_resetStates`) are unchanged — the call no longer clobbers any animation already playing on the avatar.\r\n\r\nTwo new private helpers do the work:\r\n\r\n- `_captureAvatarSkeletonStates()` — clones each bone's linked transform node values (or local matrix for unlinked bones) into a snapshot.\r\n- `_restoreAvatarSkeletonStates(states)` — writes the snapshot back.\r\n\r\n## Verification\r\n\r\nVerified locally with the original repro playground (`#K1QFZD#9`, with both fix flags off) and the earlier variant (`#K1QFZD#8`, with `fixRootPosition: true`): in both cases the avatar now holds the clap pose after `testAnim.stop()` instead of snapping to T-pose.\r\n",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Animations/animatorAvatar.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "animations",
+                    "bones"
+                ]
+            },
+            {
+                "pr": "18447",
+                "title": "fix(GaussianSplatting): preserve plugin defines with ShadowGenerator and invoke prepareDefines events",
+                "description": "Two related fixes around MaterialPluginBase support on GaussianSplattingMaterial, both surfaced by https://forum.babylonjs.com/t/issue-updating-defines-on-material-plugin-for-gaussian-material/63369.\n\nRepro playground: https://playground.babylonjs.com/#CID4NN#393\n\n### (1) Plugin defines wiped when a ShadowGenerator is added to the scene\n\nA recent change in `GaussianSplattingMeshBase.isReady()` (PR #18345) calls `shadowGenerator.isReady(subMesh, true, false)` on the main render pass to make sure shadow casting is ready on the very first frame.\n\nBecause the GS material's shadow depth wrapper is **standalone** (it wraps a private `ShaderMaterial`), the wrapper's `isReadyForSubMesh` path eventually writes its defines string to `subMesh._drawWrappers[engine.currentRenderPassId]` — overwriting the GS material's `MaterialDefines` object on the **main** draw wrapper.\n\nNext call to `GaussianSplattingMaterial.isReadyForSubMesh` then sees no defines (the `subMesh.materialDefines` getter returns `null` when the underlying defines is a string), recreates them from scratch and loses any state previously stamped by a `MaterialPluginBase` — e.g. the user's `HUE_ENABLED` flag.\n\n**Fix:** swap `engine.currentRenderPassId` to each shadow map's render pass id around the readiness check, then restore it in a `finally`. This matches the canonical pattern used in `Mesh.isReady` (`mesh.ts:1530-1555`).\n\n### (2) `MaterialPluginBase.prepareDefines()` was never called from `GaussianSplattingMaterial`\n\nStandard/PBR materials invoke `MaterialPluginEvent.PrepareDefinesBeforeAttributes` and `PrepareDefines` from their `isReadyForSubMesh`. The GS material did not, so plugin authors were forced to use `isReadyForSubMesh` even when `prepareDefines` would have been the more idiomatic hook.\n\n**Fix:** add the two missing event invocations to `GaussianSplattingMaterial.isReadyForSubMesh`, in the same positions used by `StandardMaterial` (before/after `PrepareDefinesForAttributes`).\n\n### Verification\n\n- TypeScript diagnostics clean\n- `prettier --check` passing\n- `eslint` passing\n- Existing GS unit tests (`babylon.gaussianSplatting.serialization.test.ts`): 5/5 passing\n- Manually verified in-browser via Playwright by patching `mesh.isReady` to do exactly what the source fix now does — toggle correctly updates `HUE_ENABLED` with a `ShadowGenerator` present.\n\n### Files changed\n\n- `packages/dev/core/src/Meshes/GaussianSplatting/gaussianSplattingMeshBase.ts`\n- `packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts`",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Materials/GaussianSplatting/gaussianSplattingMaterial.ts",
+                    "packages/dev/core/src/Meshes/GaussianSplatting/gaussianSplattingMeshBase.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "Gaussian Splatting"
+                ]
+            },
+            {
+                "pr": "18445",
+                "title": "feat(flowGraph): Add keyboard event blocks (KeyDown, KeyUp, IsKeyPressed)",
+                "description": "## Summary\n\nAdd three new Flow Graph blocks for keyboard input handling:\n\n| Block | Type | Description |\n|-------|------|-------------|\n| **FlowGraphKeyDownEventBlock** | Event | Fires on `keydown`. Optional key filter, `ignoreRepeat` config, `isRepeat` output |\n| **FlowGraphKeyUpEventBlock** | Event | Fires on `keyup`. Optional key filter |\n| **FlowGraphIsKeyPressedBlock** | Data | Polls whether a key + modifier combo is currently held |\n\n## Cross-platform modifier support\n\n- **`commandOrCtrl` output** on event blocks — true for Cmd on macOS, Ctrl on Windows/Linux\n- **`withCommandOrCtrl` input** on IsKeyPressed — easy combo checks (e.g. \"is Ctrl+A held?\")\n- Platform detection uses the same pattern as `webDeviceInputSystem.ts`\n\n## Key design decisions\n\n- **Base class extraction**: `FlowGraphKeyboardEventBlock` shared by KeyDown/KeyUp to avoid duplication\n- **Pressed key tracking**: `FlowGraphSceneEventCoordinator` maintains a `Set<string>` of currently pressed keys, cleared on canvas `blur` to prevent stale state\n- **`IKeyboardEvent.repeat`**: added optional `repeat` property to support repeat filtering\n- **`_IsMacPlatform`** shared constant in `utils.ts` — single source of truth for platform detection\n\n## Editor integration\n\n- Blocks appear in the node list under Events and Keyboard categories\n- Event block colors applied\n- Tooltips added for all three blocks\n- Constructor config registry entries for `stopPropagation` and `ignoreRepeat`",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/dev/core/src/Events/deviceInputEvents.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/Data/flowGraphIsKeyPressedBlock.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/Data/index.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/Event/flowGraphKeyDownEventBlock.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/Event/flowGraphKeyUpEventBlock.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/Event/flowGraphKeyboardEventBlock.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/Event/index.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/flowGraphBlockFactory.ts",
+                    "packages/dev/core/src/FlowGraph/Blocks/flowGraphBlockNames.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraph.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraphContext.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraphEventType.ts",
+                    "packages/dev/core/src/FlowGraph/flowGraphSceneEventCoordinator.ts",
+                    "packages/dev/core/src/FlowGraph/utils.ts",
+                    "packages/dev/core/test/unit/FlowGraph/flowGraphKeyboardBlocks.test.ts",
+                    "packages/tools/flowGraphEditor/src/allBlockNames.ts",
+                    "packages/tools/flowGraphEditor/src/components/nodeList/nodeListComponent.tsx",
+                    "packages/tools/flowGraphEditor/src/components/propertyTab/propertyTabComponent.tsx",
+                    "packages/tools/flowGraphEditor/src/graphSystem/blockTypeColors.ts",
+                    "packages/tools/flowGraphEditor/src/graphSystem/properties/constructorConfigRegistry.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18429",
+                "title": "Add ES6 package smoke tests",
+                "description": "## Summary\n- Add a `test:es6-packages` script to `@tools/tests` that validates the built public ES6 packages after `build:es6`.\n- Type-check import smoke entries for the framework and editor packages using the generated `@babylonjs/*` package outputs.\n- Bundle broad public ES6 package imports with esbuild and run a runtime-safe `NullEngine` scene smoke test.\n- Validate editor release packages by checking their generated runtime and declaration entry files without running the editors.\n- Run the new ES6 package test in the ES6 CI job before the module-size report.\n\n## Why\nThe ES6 CI job previously proved that the ES6 packages could be built, but it did not prove that the generated packages were consumable by downstream applications. This adds a lightweight consumer-style test for the built ES6 package outputs, including editor package import coverage.\n\n## Validation\n- `npm run test:es6-packages -w @tools/tests`\n- `npm run build -w @tools/tests`\n- `npx prettier --check .azure-pipelines/ci-monorepo.yml packages/tools/tests/build.mjs packages/tools/tests/package.json packages/tools/tests/scripts/buildEs6SmokeTests.mjs packages/tools/tests/src/es6Smoke/runtimeSmoke.ts packages/tools/tests/src/es6Smoke/packageImportSmoke.ts packages/tools/tests/src/es6Smoke/editorImportSmoke.ts packages/tools/tests/tsconfig.es6-smoke.json`",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    ".azure-pipelines/ci-monorepo.yml",
+                    "packages/tools/tests/build.mjs",
+                    "packages/tools/tests/package.json",
+                    "packages/tools/tests/scripts/buildEs6SmokeTests.mjs",
+                    "packages/tools/tests/src/es6Smoke/editorImportSmoke.ts",
+                    "packages/tools/tests/src/es6Smoke/packageImportSmoke.ts",
+                    "packages/tools/tests/src/es6Smoke/runtimeSmoke.ts",
+                    "packages/tools/tests/tsconfig.es6-smoke.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18446",
+                "title": "Fix Lottie worker in Vite dev host",
+                "description": "## Summary\n- Rename the Lottie worker wrapper usage so it is not mistaken for the native `Worker` constructor pattern.\n- Add a focused dev-host Vite plugin that serves the Lottie worker as an esbuild-bundled classic script for `BlobWorkerWrapper` / `importScripts()`.\n- Emit the same classic worker script during dev-host production builds.\n\n## Validation\n- `npm run build -w @tools/dev-host`\n- `npm run lint:changed`\n- Vite dev host smoke test for `?exp=lottie&useprewarm=true` produced a canvas and `#lottie-ready`.",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/dev/lottiePlayer/src/player.ts",
+                    "packages/tools/devHost/vite.config.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18444",
+                "title": "Fix snapshot rendering permanently falling back to STANDARD mode when disable interrupts an in-progress recording",
+                "description": "### Forum issue\r\nhttps://forum.babylonjs.com/t/snapshot-rendering-stops-under-certain-conditions/63365\r\n\r\n### Root cause\r\n`WebGPUSnapshotRendering` temporarily sets `_mode = SNAPSHOTRENDERING_STANDARD` while a recording pass is in progress, and restores `_mode = _modeSaved` at the next `endFrame()`. If `enabled = false` is called between the start of recording and `endFrame()` (for example, from `disableSnapshotRendering` during a rapid resize storm), `_mode` is left stuck at `STANDARD`. The next `enabled = true` then runs `_modeSaved = _mode`, permanently clobbering the user-requested mode (`FAST`) with `STANDARD`. After that, `engine.snapshotRendering === true` but `engine.snapshotRenderingMode === 0`, and the engine never returns to FAST mode.\r\n\r\nThe same race had previously been fixed for `reset()` in #15633, but the protection wasn't applied to the underlying `enabled` setter.\r\n\r\n### Repro\r\nhttps://playground.babylonjs.com/#JCB9JF#0 — continuously resize the window. The cube is supposed to stay still (because snapshot rendering is on); eventually it starts animating again because snapshot rendering has silently fallen back to STANDARD mode and `disableSnapshotRendering` / `enableSnapshotRendering` no longer brings it back.\r\n\r\n### Fix\r\nMove the mode-restore guard into the `enabled` setter so that flipping `_record` off restores `_mode = _modeSaved` first. This mirrors the protection already in `reset()`. The now-duplicated guard in `reset()` is removed.\r\n\r\n### Tests\r\nNew unit tests in `packages/dev/core/test/unit/Engines/WebGPU/webgpuSnapshotRendering.test.ts`:\r\n- normal record/play cycle ends with the user-requested mode\r\n- disable mid-recording preserves the user-requested mode (regression test for this bug)\r\n- `reset()` mid-recording also preserves the user-requested mode\r\n\r\nThe mid-recording disable test fails on the unfixed code (`expected 0 to be 1` — STANDARD instead of FAST) and passes after the fix.\r\n\r\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>\r\n",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/dev/core/src/Engines/WebGPU/webgpuSnapshotRendering.ts",
+                    "packages/dev/core/test/unit/Engines/WebGPU/webgpuSnapshotRendering.test.ts"
+                ],
+                "tags": [
+                    "bug",
+                    "WebGPU"
+                ]
+            },
+            {
+                "pr": "18443",
+                "title": "Fix UMD secondary aliases for multi-entry builds",
+                "description": "> 🤖 *This PR was created by the create-pr skill.*\n\n## Summary\n\nFixes the UMD production build helper so multi-entry packages copy the secondary filename alias for each entry after that entry's output exists.\n\nPreviously, the `copyMinToMaxPlugin` was attached only to the first Rollup config for multi-entry packages, but it attempted to copy aliases for every entry. Because later entry outputs had not been written yet, only the first/main package bundle received both published names.\n\n## Motivation\n\nA forum report noted that the versioned CDN URL for the regular glTF loader alias was missing starting in 9.5.x:\n\nhttps://forum.babylonjs.com/t/cdn-for-gltffileloader-missing-changed-starting-in-v9-5-0/63314/5?u=raananw\n\nFor example, `v9.5.2/loaders/babylon.glTFFileLoader.min.js` exists, but `v9.5.2/loaders/babylon.glTFFileLoader.js` returns 404.\n\n## What was missing\n\nThe issue was broader than the glTF loader. In versioned CDN releases, the individual entry aliases were missing for multi-entry UMD packages while their `.min.js` files existed:\n\n- `loaders`: individual loader aliases such as `babylon.glTFFileLoader.js`\n- `materialsLibrary`: individual material aliases such as `babylon.gridMaterial.js`\n- `proceduralTexturesLibrary`: individual procedural texture aliases\n- `postProcessesLibrary`: individual post-process aliases\n- `serializers`: individual serializer aliases\n\nThe package-level bundles, such as `babylonjs.loaders.js` and `babylonjs.loaders.min.js`, were still present.\n\n## Fix\n\nIn multi-entry mode, attach `copyMinToMaxPlugin` to every per-entry Rollup config and scope it to the current `chunkName`. This ensures the secondary alias is copied after the corresponding output file exists.\n\nSingle-entry packages, including the main `babylonjs` package (`babylon.js` / `babylon.max.js`), continue through the unchanged single-config path.\n\n## Validation\n\nRan:\n\n```bash\nnpm run build:prod -w babylonjs-loaders\n```\n\nConfirmed the build now emits both names for every loader entry, including:\n\n```text\nbabylon.glTFFileLoader.min.js\nbabylon.glTFFileLoader.js\nbabylon.objFileLoader.min.js\nbabylon.objFileLoader.js\nbabylonjs.loaders.min.js\nbabylonjs.loaders.js\n```",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/public/rollupUMDHelper.mjs"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18442",
+                "title": "chore(deps): npm audit fix - 20260511",
+                "description": "Automated by the morning-dev-briefing skill.\n\n## Summary\n`npm audit fix` resolved the following findings:\n- Critical: 0\n- High:     2\n- Moderate: 0\n\n## Verification\n- [x] CI green\n- [x] No runtime regressions in dev host\n- [x] Lockfile diff reviewed\n\nRun locally: `npm install && npm audit`",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "package-lock.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18438",
+                "title": "fix(splat): SPLATFileLoader constructor to merge with defaults instead of entirely replacing them",
+                "description": "## Problem\r\n\r\nThe `SPLATFileLoader` constructor accepts `Partial<Readonly<SPLATLoadingOptions>>`, which implies callers only need to provide the fields they want to override — the rest should come from `_DefaultLoadingOptions`. However, the implementation assigns the argument directly:\r\n\r\n```typescript\r\nconstructor(loadingOptions: Partial<Readonly<SPLATLoadingOptions>> = SPLATFileLoader._DefaultLoadingOptions) {\r\n    this._loadingOptions = loadingOptions;\r\n}\r\n```\r\n\r\nThe default parameter (`= _DefaultLoadingOptions`) only applies when **no argument is passed**. When any partial options are provided, `_DefaultLoadingOptions` is bypassed entirely, and all unspecified fields are dropped.\r\n\r\nFor example, `createPlugin` calls `new SPLATFileLoader(options[SPLATFileLoaderMetadata.name])`. When a caller passes `pluginOptions: { splat: { flipY: true } }`, as the Babylon.js Viewer does for `.spz` files, the loader receives only `{ flipY: true }`, losing `spzLibraryUrl` and falling back to the built-in JS parser instead of the WASM path.\r\n\r\n## Fix\r\n\r\nMerge the caller's options on top of `_DefaultLoadingOptions`:\r\n\r\n```typescript\r\nconstructor(loadingOptions: Partial<Readonly<SPLATLoadingOptions>> = {}) {\r\n    this._loadingOptions = { ...SPLATFileLoader._DefaultLoadingOptions, ...loadingOptions };\r\n}\r\n```\r\n\r\nThis makes the implementation consistent with the `Partial<>` type contract: callers override only what they need, and all other defaults remain intact.\r\n\r\nIn addition, we updated the reference image for the test `Gaussian Splatting IBL Shadows`. There was a *very minor camera difference* after the extension `SafeOrbitCameraAdobe` was correctly applied to the assets when using the WASM loader.",
+                "author": {
+                    "name": "raymondyfei",
+                    "url": "https://github.com/raymondyfei"
+                },
+                "files": [
+                    "packages/dev/loaders/src/SPLAT/splatFileLoader.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/gsplat-ibl-shadows.png"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18440",
+                "title": "Fix draco3dgltf ReferenceError in local UMD builds and update playground references",
+                "description": "## Problem\n\nWhen testing locally with the Vite-based dev server (babylon-server), playgrounds that trigger Draco decoding fail with:\n\n```\nReferenceError: draco3dgltf is not defined\n```\n\nThis started after the port to Vite. Rollup externalizes the `draco3dgltf` import (an optional peer dependency not installed in the workspace), generating a UMD wrapper that reads `global.draco3dgltf` — which is `undefined` in the browser. The factory then crashes on property access.\n\n## Fix\n\nAdded a `stubOptionalPeerDepsPlugin` to the rollup UMD helper (`rollupUMDHelper.mjs`) that erases `draco3dgltf` import statements at transform time, before rollup's external resolution sees them. The consuming code already guards usage with `typeof DracoDecoderModule !== \"undefined\"` and falls back to loading the decoder from the CDN URL, so erasing the module import is safe.\n\nThe plugin erases imports entirely rather than creating `const X = undefined` stubs, because rollup would rename the bindings (e.g. `DracoDecoderModule$1`), which breaks worker functions that are stringified via `.toString()` and expect the original global name.\n\n## Playground reference updates\n\nUpdated two visualization test playground snippet IDs to ES6-friendly versions:\n- `#5E318S#5` → `#5E318S#7`\n- `#1LK70I#40` → `#1LK70I#41`\n",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    "packages/public/rollupUMDHelper.mjs",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18431",
+                "title": "Fix CPU particle support in WebGPU FAST snapshot rendering",
+                "description": "Although CPU particle systems already had a snapshot-rendering compatibility path, FAST snapshot replay could still fail because the normal scene particle evaluation path is skipped and draw-call counts are baked into the recorded render bundle. This change makes the existing support work correctly by keeping fixed CPU particle systems animated during FAST replay, rendering them with a fixed-capacity draw count, and clearing stale particle data when particles should no longer be visible.\r\n\r\n## Changes\r\n\r\n- Keeps fixed CPU particle systems simulated and uploaded during FAST snapshot replay.\r\n- Uses fixed-capacity rendering so recorded bundle draw counts remain valid as live particle counts change.\r\n- Re-records snapshot bundles if a particle system is fixed after snapshot rendering is already active.\r\n- Updates particle draw-wrapper matrices during replay so moving cameras keep working.\r\n- Clears stale fixed-capacity particle data when systems stop, emitters are disabled, or particles are gated off.\r\n- Adds unit coverage for fixed-capacity particle buffer behavior.\r\n- Adds a WebGPU visual test for before-enable fix, late fix, empty-to-nonempty emission, and disabled-emitter clearing.\r\n\r\nVideo with the reported playground working:\r\nhttps://github.com/user-attachments/assets/a7400158-03fb-438c-8cc2-15e3f89baae6\r\n\r\nForum report: https://forum.babylonjs.com/t/fixparticlesystem-not-working/63344\r\n\r\n\r\n",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/core/src/Misc/snapshotRenderingHelper.ts",
+                    "packages/dev/core/src/Particles/thinParticleSystem.ts",
+                    "packages/dev/core/test/unit/Particles/thinParticleSystemFixedCapacitySnapshot.test.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/fast-snapshot-cpu-particles.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "bug",
+                    "particles"
+                ]
+            }
+        ],
+        "9.8.0": [
+            {
+                "pr": "18441",
+                "title": "Tree-shaking - the pure barrel",
+                "description": "## Tree-Shaking for `@babylonjs/core`\n\nThis PR introduces full tree-shaking support for `@babylonjs/core`. The goal is to allow bundlers (Webpack, Rollup, Vite, esbuild) to eliminate unused code from Babylon.js applications, significantly reducing bundle sizes.\n\n### Problem\n\nEvery source file in `@babylonjs/core` was marked as having side effects (`\"sideEffects\": [\"**/*\"]`), preventing bundlers from dropping unused modules. Over 900 files contained module-level side effects — `RegisterClass()` calls, prototype augmentations, `ShaderStore` writes, `AddNodeConstructor` calls, and static property assignments — that forced the entire package into every bundle.\n\n### Approach: Pure/Side-Effect Split\n\nFiles under `packages/dev/core/src/` are split based on their side-effect profile:\n\n- **Side-effect-free files** stay as a single `foo.ts` — no split needed.\n- **Files with side effects** (RegisterClass, shader store writes, etc.) are split into two files:\n  - **`foo.pure.ts`** — All logic. Imports only from other `.pure.ts` files. No side effects. Contains a `RegisterFoo()` function that encapsulates all side effects.\n  - **`foo.ts`** — Thin wrapper that re-exports from `.pure.ts` and calls `RegisterFoo()`.\n- **Files that also augment other classes** (prototype assignments, `declare module`) get a third file:\n  - **`foo.types.ts`** — `declare module` augmentations for TypeScript.\n\nThis is a **fully backwards-compatible** change. Existing imports from `@babylonjs/core` continue to work identically. Tree-shaking users can import from `.pure` paths to get only the code they use.\n\n### Implementation Phases\n\n1. **Audit & tooling** — Side-effect inventory script, bundle smoke tests, `/*#__PURE__*/` annotations\n2. **Mechanical splits** — `RegisterClass`-only files (406 files), shader store files, prototype augmentation files\n3. **Complex splits** — Files with mixed side effects, static property assignments, factory patterns\n4. **Pure barrels** — Generated `pure.ts` barrel files alongside each `index.ts`\n5. **CI enforcement** — Manifest drift checks, pure barrel generation checks, bundle smoke tests, `sideEffects` field sync\n6. **Bulk block registration helpers** — Consolidate related registrations (e.g., all math blocks, all mesh blocks)\n7. **Native engine fix** — Re-export `Native/Extensions` barrel to ensure `createCubeTexture` is registered on `NativeEngine`\n\n### Key Stats\n\n- ~1,713 files changed\n- ~784 side-effect entries in `package.json` (down from `[\"**/*\"]`)\n- ~1,784 files confirmed pure (no side effects)\n- All 3,070 unit tests pass\n- Bundle smoke tests confirm tree-shaking works (physics-v2 scene: -38.6% vs baseline)\n\n### Scripts Added\n\n- `npm run audit:side-effects` — Scan and report all side effects\n- `npm run update:manifest` — Regenerate the side-effects manifest\n- `npm run generate:pure-barrels` — Generate pure barrel files\n- `npm run generate:side-effect-stubs` — Generate missing side-effect stubs\n- `npm run test:treeshaking` — Bundle smoke tests (Webpack + Rollup)\n- `npm run check:treeshaking` — CI checks (manifest drift, pure barrels, bundle smoke)\n",
+                "author": {
+                    "name": "RaananW",
+                    "url": "https://github.com/RaananW"
+                },
+                "files": [
+                    ".azure-pipelines/ci-monorepo.yml",
+                    ".githooks/pre-commit",
+                    ".github/copilot-instructions.md",
+                    ".github/instructions/index.md",
+                    ".github/instructions/side-effect-imports.instructions.md",
+                    ".github/instructions/tree-shaking.instructions.md",
+                    ".gitignore",
+                    "docs/tree-shaking/03-registering-side-effects.md",
+                    "docs/tree-shaking/04-troubleshooting.md",
+                    "eslint.config.mjs",
+                    "package-lock.json",
+                    "package.json",
+                    "packages/dev/buildTools/src/addJSToCompiledFiles.ts",
+                    "packages/dev/buildTools/src/buildShaders.ts",
+                    "packages/dev/core/package.json",
+                    "packages/dev/core/src/Actions/action.pure.ts",
+                    "packages/dev/core/src/Actions/action.ts",
+                    "packages/dev/core/src/Actions/actionManager.ts",
+                    "packages/dev/core/src/Actions/condition.pure.ts",
+                    "packages/dev/core/src/Actions/condition.ts",
+                    "packages/dev/core/src/Actions/directActions.pure.ts",
+                    "packages/dev/core/src/Actions/directActions.ts",
+                    "packages/dev/core/src/Actions/directAudioActions.pure.ts",
+                    "packages/dev/core/src/Actions/directAudioActions.ts",
+                    "packages/dev/core/src/Actions/interpolateValueAction.pure.ts",
+                    "packages/dev/core/src/Actions/interpolateValueAction.ts",
+                    "packages/dev/core/src/Actions/pure.ts",
+                    "packages/dev/core/src/Animations/animatable.pure.ts",
+                    "packages/dev/core/src/Animations/animatable.ts",
+                    "packages/dev/core/src/Animations/animatable.types.ts",
+                    "packages/dev/core/src/Animations/animation.pure.ts",
+                    "packages/dev/core/src/Animations/animation.ts",
+                    "packages/dev/core/src/Animations/animation.types.ts",
+                    "packages/dev/core/src/Animations/animationGroup.pure.ts",
+                    "packages/dev/core/src/Animations/animationGroup.ts",
+                    "packages/dev/core/src/Animations/animationGroup.types.ts",
+                    "packages/dev/core/src/Animations/pure.ts",
+                    "packages/dev/core/src/Audio/audioEngine.pure.ts",
+                    "packages/dev/core/src/Audio/audioEngine.ts",
+                    "packages/dev/core/src/Audio/audioSceneComponent.pure.ts",
+                    "packages/dev/core/src/Audio/audioSceneComponent.ts",
+                    "packages/dev/core/src/Audio/audioSceneComponent.types.ts",
+                    "packages/dev/core/src/Audio/pure.ts",
+                    "packages/dev/core/src/Audio/sound.pure.ts",
+                    "packages/dev/core/src/Audio/sound.ts",
+                    "packages/dev/core/src/AudioV2/abstractAudio/pure.ts",
+                    "packages/dev/core/src/AudioV2/abstractAudio/subProperties/pure.ts",
+                    "packages/dev/core/src/AudioV2/pure.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/pure.ts",
+                    "packages/dev/core/src/BakedVertexAnimation/pure.ts",
+                    "packages/dev/core/src/Behaviors/Cameras/pure.ts",
+                    "packages/dev/core/src/Behaviors/Meshes/pure.ts",
+                    "packages/dev/core/src/Behaviors/pure.ts",
+                    "packages/dev/core/src/Bones/bone.pure.ts",
+                    "packages/dev/core/src/Bones/bone.ts",
+                    "packages/dev/core/src/Bones/pure.ts",
+                    "packages/dev/core/src/Bones/skeleton.ts",
+                    "packages/dev/core/src/Buffers/buffer.align.pure.ts",
+                    "packages/dev/core/src/Buffers/buffer.align.ts",
+                    "packages/dev/core/src/Buffers/buffer.align.types.ts",
+                    "packages/dev/core/src/Buffers/buffer.nonFloatVertexBuffers.ts",
+                    "packages/dev/core/src/Buffers/buffer.pure.ts",
+                    "packages/dev/core/src/Buffers/buffer.ts",
+                    "packages/dev/core/src/Buffers/buffer.types.ts",
+                    "packages/dev/core/src/Buffers/index.ts",
+                    "packages/dev/core/src/Buffers/pure.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraVRDeviceOrientationInput.pure.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraVRDeviceOrientationInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraVRDeviceOrientationInput.types.ts",
+                    "packages/dev/core/src/Cameras/Inputs/freeCameraDeviceOrientationInput.pure.ts",
+                    "packages/dev/core/src/Cameras/Inputs/freeCameraDeviceOrientationInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/freeCameraDeviceOrientationInput.types.ts",
+                    "packages/dev/core/src/Cameras/Inputs/freeCameraVirtualJoystickInput.pure.ts",
+                    "packages/dev/core/src/Cameras/Inputs/freeCameraVirtualJoystickInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/freeCameraVirtualJoystickInput.types.ts",
+                    "packages/dev/core/src/Cameras/Inputs/pure.ts",
+                    "packages/dev/core/src/Cameras/RigModes/pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphArcRotateCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphArcRotateCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphFreeCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphFreeCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphGamepadCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphGamepadCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphUniversalCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/anaglyphUniversalCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicArcRotateCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicArcRotateCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicFreeCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicFreeCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicGamepadCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicGamepadCamera.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicUniversalCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/Stereoscopic/stereoscopicUniversalCamera.ts",
+                    "packages/dev/core/src/Cameras/VR/pure.ts",
+                    "packages/dev/core/src/Cameras/VR/vrDeviceOrientationArcRotateCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/VR/vrDeviceOrientationArcRotateCamera.ts",
+                    "packages/dev/core/src/Cameras/VR/vrDeviceOrientationFreeCamera.pure.ts",
+                    "packages/dev/core/src/Cameras/VR/vrDeviceOrientationFreeCamera.ts",
+                    "packages/dev/core/src/Cameras/VR/vrDeviceOrientationGamepadCamera.pure.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18462",
+                "title": "Add distance-only spatial mode to Audio Engine V2",
+                "description": "## Summary\r\n\r\nThis PR adds an Audio Engine V2 spatial panning toggle so spatial sounds can keep distance attenuation without being panned between the left and right channels.\r\n\r\nThe new API is available both at creation time and at runtime:\r\n\r\n- `spatialPanningEnabled: false`\r\n- `sound.spatial.panningEnabled = false`\r\n\r\nWhen panning is disabled, the WebAudio implementation bypasses `PannerNode` for directional panning and applies distance attenuation manually. This allows mono/centered spatial audio behavior while preserving distance-based volume falloff.\r\n\r\n## Details\r\n\r\n- Adds `spatialPanningEnabled` / `panningEnabled` to the Audio V2 spatial APIs.\r\n- Adds a WebAudio no-panning signal path using a gain node for manual attenuation.\r\n- Matches WebAudio distance attenuation behavior for `linear`, `inverse`, and `exponential` distance models.\r\n- Supports runtime toggling between panned and non-panned spatial output.\r\n- Keeps attenuation refreshed when source or listener position changes, including attached-source cases.\r\n- Documents that sound cone attenuation is not applied while panning is disabled, because cone handling is tied to `PannerNode`.\r\n\r\n## Playground\r\n\r\nSaved Playground snippet:\r\n\r\nhttps://playground.babylonjs.com/#ETXRJU\r\n\r\nFor PR testing, load it against the PR snapshot build once available:\r\n\r\nhttps://playground.babylonjs.com/?snapshot=refs/pull/18462/merge#ETXRJU\r\n\r\nThe demo moves a mono tone around the listener while sweeping from near to far. With spatial panning ON, the tone moves between ears and changes volume with distance. With spatial panning OFF, the tone stays centered while still changing volume with distance.\r\n\r\n## Validation\r\n\r\n- `npm run build:dev`\r\n- `npx vitest run --project=unit packages/dev/core/test/unit/Audio`",
+                "author": {
+                    "name": "VicenteCartas",
+                    "url": "https://github.com/VicenteCartas"
+                },
+                "files": [
+                    "packages/dev/core/src/AudioV2/abstractAudio/components/spatialAudioAttacherComponent.ts",
+                    "packages/dev/core/src/AudioV2/abstractAudio/subNodes/spatialAudioSubNode.ts",
+                    "packages/dev/core/src/AudioV2/abstractAudio/subProperties/abstractSpatialAudio.ts",
+                    "packages/dev/core/src/AudioV2/abstractAudio/subProperties/spatialAudio.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/subNodes/spatialWebAudioSubNode.ts",
+                    "packages/dev/core/src/AudioV2/webAudio/subNodes/webAudioBusAndSoundSubGraph.ts",
+                    "packages/dev/core/test/unit/Audio/helpers/mockedAudioObjects.ts",
+                    "packages/dev/core/test/unit/Audio/sound.test.ts"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18458",
+                "title": "Fix renderCount in visualization tests (end)",
+                "description": "Last batch of changes to remove renderCount > 1 in visualization tests.\r\n\r\nThere are still 29 visualization tests with `renderCount > 1`:\r\n* Tests that rely on frame accumulation (blur, TAA, IBL Shadows, etc.): 22\r\n* No built-in way to advance animation (fluid rendering, procedural, etc.): 6\r\n* Others: 1 (\"FAST snapshot CPU particles\" => the PG start/stop particle systems at some specific frames)\r\n\r\nNote: I removed the “Instances” test because we already have two other tests that use the same scene (“Instances + GBR + motion blur” and “Instances + motion blur”), and also because it doesn't use a PG identifier, but rather the cumbersome “scriptToRun” syntax.",
+                "author": {
+                    "name": "Popov72",
+                    "url": "https://github.com/Popov72"
+                },
+                "files": [
+                    "packages/tools/tests/test/visualization/ReferenceImages/NME-Particles-with-PositionW.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/gpu-particles-emitters-mesh.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/halo-particle-system.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particle-helper.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/particle-system-with-custom-nme-shader.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/prepass-ssao-particles.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/subemitters.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/wgsl-in-shadermaterial.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "skip changelog"
+                ]
+            },
+            {
+                "pr": "18456",
+                "title": "Upload Babylon Native visualization-test images as pipeline artifacts",
+                "description": "[Created by Copilot on behalf of @bghgary]\r\n\r\n## Context\r\n\r\nThe `NativeTests` job in `ci-monorepo.yml` downloads BabylonNative nightly test artifacts (pipeline 36), replaces their bundled `babylon*.js` with the freshly built snapshot, and runs `Playground.exe app:///Scripts/validation_native.js` plus `UnitTests.exe`.\r\n\r\nWhen pixel-diff regressions occur (e.g. the recent OpenPBR/glTF surface-tinting regression in #18430), `validation_native.js` writes the rendered PNG to `Results/<reference>.png` and a red-overlay diff to `Errors/<reference>.png` next to `Playground.exe` -- but nothing in the pipeline uploaded those directories. The failure log was the only visible signal, making it impossible to tell whether a regression is a real visual change vs. a threshold blip without re-running the test locally against a matching native binary.\r\n\r\n## Change\r\n\r\nMirror the upload pattern from BabylonNative's own win32 workflow ([`.github/workflows/build-win32.yml`](https://github.com/BabylonJS/BabylonNative/blob/master/.github/workflows/build-win32.yml), `actions/upload-artifact@v6` twice) using the ADO equivalent `PublishPipelineArtifact@1`:\r\n\r\n- **`native-rendered-pictures`** -- `Results/`, uploaded on `not(canceled())`. Matches `saveResult = true` in `validation_native.js`: every test always writes its render, so green runs upload too and give a baseline.\r\n- **`native-error-pictures`** -- `Errors/`, uploaded only on `failed()`. Matches when `validation_native.js` actually writes diff overlays.\r\n\r\n`PublishPipelineArtifact@1` has no `if-no-files-found: ignore` flag, so a one-off `New-Item -Force` step ensures both directories exist before publish (`Errors/` legitimately won't exist on a fully-green run).\r\n\r\n## Verification\r\n\r\nCan be verified end-to-end only after merge: the next native-test failure runs through this job and surfaces the diff PNGs as a downloadable artifact on the build. Until then, the green-run path is exercised by every passing build of this PR itself -- `native-rendered-pictures` should appear on the ADO run for this PR's CI.\r\n",
+                "author": {
+                    "name": "bghgary",
+                    "url": "https://github.com/bghgary"
+                },
+                "files": [
+                    ".azure-pipelines/ci-monorepo.yml"
+                ],
+                "tags": []
+            },
+            {
+                "pr": "18379",
+                "title": "Camera input mapping system with backward-compatible legacy flag support",
+                "description": "> 🤖 *This PR was created by the create-pr skill.*\n\n## Summary\nReplaces the scattered, ad-hoc input handling on `ArcRotateCamera` and `GeospatialCamera` with a declarative two-layer input mapping system, while preserving the behavior of all existing legacy boolean flags.\n\n## Motivation\nCamera input configuration today is spread across ad-hoc boolean flags (`useCtrlForPanning`, `multiTouchPanAndZoom`, `panningMouseButton`, `useAltToZoom`, …) and hardcoded button-to-action logic in each input class. Adding new configurations requires another flag, another conditional, and often cross-input snooping. This doesn't scale.\n\nThe new system replaces that with a declarative `inputMap` resolved by `resolveInteraction()` that produces typed `handlers` (orbit/zoom/pan, etc.). Per-frame deltas are accumulated and applied via `computeCurrentFrameDeltas()` for framerate-independent inertia.\n\n## Playground demos\n\n| Demo | Link |\n|------|------|\n| Legacy inertia 0.9 alpha glide | [#C7KCTE#0](https://playground.babylonjs.com/#C7KCTE#0) |\n| Legacy inertia 0.5 alpha glide | [#OPHBRC#0](https://playground.babylonjs.com/#OPHBRC#0) |\n| Legacy inertia 0 alpha snap | [#HF2DLH#0](https://playground.babylonjs.com/#HF2DLH#0) |\n| Legacy panningInertia glide | [#8S8H0S#0](https://playground.babylonjs.com/#8S8H0S#0) |\n| Legacy inertialRadiusOffset glide | [#98108I#0](https://playground.babylonjs.com/#98108I#0) |\n| Legacy beta limits clamp glide | [#FBLW1J#0](https://playground.babylonjs.com/#FBLW1J#0) |\n| Legacy radius limits clamp glide | [#QWTJH9#0](https://playground.babylonjs.com/#QWTJH9#0) |\n| Legacy combined axis glide | [#SJJRY4#0](https://playground.babylonjs.com/#SJJRY4#0) |\n| **`setInteraction()` — remap ctrl+drag** | [**#A1CDLY#0**](https://playground.babylonjs.com/#A1CDLY#0) |\n\n## What's in this PR\n\n### Core (`packages/dev/core/src/Cameras`)\n- Extends the existing `CameraMovement` base class with input-map resolution, typed handlers, and framerate-independent accumulators / inertia.\n- New `ArcRotateCameraMovement` subclass and refreshed `GeospatialCameraMovement` subclass, each with default input maps.\n- New `cameraInteractions.ts` with shared interaction descriptors and `InputMapper` class.\n- `InputMapper.setInteraction(source, conditions, interaction)` — targeted remapping of individual input entries without rebuilding the full inputMap (e.g. swap ctrl+left-drag from pan to rotate).\n- `InputMapper.getEntry(source, interaction)` — find an entry to tweak properties like sensitivity.\n- `ArcRotateCamera` and `GeospatialCamera` now always route through the movement system; `_checkInputs()` calls `computeCurrentFrameDeltas()` and applies the resulting rotation / zoom / pan deltas. The legacy `useMovementSystem` getter/setter is kept as a deprecated no-op for source compatibility.\n- `Camera.inertia` converted from a plain property to a get/set accessor so `ArcRotateCamera` can override it to sync with the movement system.\n- Legacy back-compat: `_syncLegacyFlagsToInputMap()` maps `_useCtrlForPanning`, `_panningMouseButton`, and `useAltToZoom` onto the inputMap so existing apps that toggle these flags keep behaving the same.\n- All input classes migrated to movement system: pointer, keyboard, mouse wheel, **and gamepad** (`arcRotateCameraGamepadInput.ts`) now feed `movement.rotationAccumulatedPixels` / `panAccumulatedPixels` / `zoomAccumulatedPixels` instead of legacy inertial offsets.\n- `resetInputMap()` on the base class and subclasses to restore default mappings after user customization.\n\n### Tests\n- Unit tests: `cameraMovement.test.ts`, `arcRotateCameraMovement.test.ts`, `geospatialCameraMovement.test.ts`, `arcRotateCameraFramerateIndependence.test.ts`.\n- Playwright interaction tests: `arcRotateCameraInteraction.interaction.test.ts` — 7 tests covering left-drag rotation, vertical drag, right-drag pan, ctrl+left-drag pan, mouse wheel zoom, arrow key rotation, and ctrl+arrow key panning.\n- Visualization tests with reference images covering legacy beta/radius limits and panning/radius/combined inertia and glide (8 tests).\n\n## Backward compatibility\n- Default end-user behavior is unchanged for existing apps: the same camera interactions (orbit, pan, zoom) produce equivalent motion.\n- Existing legacy boolean flags are honored via `_syncLegacyFlagsToInputMap()`, so apps that set e.g. `_useCtrlForPanning = false` or change `_panningMouseButton` still see the expected mapping changes.\n- The `useMovementSystem` property remains as a deprecated no-op getter/setter so any code referencing it still compiles.\n- Gamepad input migrated to movement system — steady-state behavior matches legacy at 60fps, with improved framerate independence at other refresh rates.\n\n## Out of scope / follow-ups\n- `FreeCamera`, `FollowCamera`, `FlyCamera`, VR / touch-joystick input sources — to be handled in subsequent PRs.",
+                "author": {
+                    "name": "georginahalpern",
+                    "url": "https://github.com/georginahalpern"
+                },
+                "files": [
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraGamepadInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraKeyboardMoveInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraMouseWheelInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/arcRotateCameraPointersInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/geospatialCameraKeyboardInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/geospatialCameraMouseWheelInput.ts",
+                    "packages/dev/core/src/Cameras/Inputs/geospatialCameraPointersInput.ts",
+                    "packages/dev/core/src/Cameras/arcRotateCamera.ts",
+                    "packages/dev/core/src/Cameras/arcRotateCameraMovement.ts",
+                    "packages/dev/core/src/Cameras/camera.ts",
+                    "packages/dev/core/src/Cameras/cameraMovement.ts",
+                    "packages/dev/core/src/Cameras/geospatialCamera.ts",
+                    "packages/dev/core/src/Cameras/geospatialCameraMovement.ts",
+                    "packages/dev/core/src/Cameras/index.ts",
+                    "packages/dev/core/src/Cameras/inputMapper.ts",
+                    "packages/dev/core/test/unit/Cameras/arcRotateCameraFramerateIndependence.test.ts",
+                    "packages/dev/core/test/unit/Cameras/arcRotateCameraMovement.test.ts",
+                    "packages/dev/core/test/unit/Cameras/cameraMovement.test.ts",
+                    "packages/dev/core/test/unit/Cameras/geospatialCameraMovement.test.ts",
+                    "packages/tools/tests/test/visualization/ReferenceImages/arc-legacy-beta-limits.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/arc-legacy-combined-glide.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/arc-legacy-inertia-comparison.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/arc-legacy-panning-inertia.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/arc-legacy-radius-glide.png",
+                    "packages/tools/tests/test/visualization/ReferenceImages/arc-legacy-radius-limits.png",
+                    "packages/tools/tests/test/visualization/config.json"
+                ],
+                "tags": [
+                    "enhancement",
+                    "new feature",
+                    "camera"
+                ]
+            },
+            {
+                "pr": "18457",
+                "title": "glTF loader: simplify material adapter finalizeAsync",
+                "description": "## Context\n\nPR #18430 added a `finalizeAsync(signal: AbortSignal)` method to `IMaterialLoadingAdapter` (alongside a deprecated `finalize?()`) and unconditionally allocated an `AbortController` on every glTF load. The signal is consumed only by `signal.aborted` polling in `OpenPBRMaterialLoadingAdapter` between awaits. It is never propagated into the texture helpers (`LerpTexturesAsync`, `MultiplyTexturesAsync`, `InvertTextureAsync`, etc.), so the underlying GPU passes always run to completion regardless.\n\nBecause JS is single-threaded, an `AbortSignal` that is not handed to a host API that respects it (`fetch`, web streams, `EventTarget.addEventListener(..., { signal })`, etc.) is functionally equivalent to a boolean flag polled at each `await` boundary. That is exactly how it is being used here — at the cost of an extra interface method, an `AbortController` allocation on every load, and a hard runtime dependency on the `AbortController` global.\n\n`IMaterialLoadingAdapter` is an internal loader detail — no need to keep both shapes for backward compatibility.\n\n## Changes\n\n- Collapse the API into a single required `finalizeAsync(loader: GLTFLoader): Promise<void>`\n- Drop `_finalizeController` (`AbortController`) from `GLTFLoader`\n- Drop the `signal: AbortSignal` parameter from `OpenPBRMaterialLoadingAdapter.finalizeAsync` and from its private `copySurfaceToCoatAsync` helper\n- Expose `GLTFLoader._disposed` as `@internal` so adapters can poll it between awaits to bail early on mid-load dispose — same semantics as the original `signal.aborted` checks, but using the loader's own state instead of an AbortSignal\n- Add a no-op `finalizeAsync` to `PBRMaterialLoadingAdapter` (it had no deferred work)\n\nNet: **4 files changed, ~40 insertions(+), ~55 deletions(-)**.\n\n## Behavior\n\nUnchanged. The OpenPBR adapter still short-circuits on each `await` if the loader is disposed mid-flight — the polling state is now `loader._disposed` instead of `signal.aborted`.\n\n## Side-benefit: unblocks Babylon Native\n\nBabylon Native does not initialize the AbortController polyfill in its JS host (the polyfill exists in `JsRuntimeHost` but is never wired into any BN app). After #18430, every glTF load on BN was throwing `ReferenceError: AbortController is not defined` inside the new `.then(...)` callback in `GLTFLoader.loadAsync`. The rejection prevented `_extensionsOnReady()` / `_setState(READY)` from running, so the loader never reached the READY state. This manifested as the `EXT_mesh_gpu_instancing` visualization test rendering the base mesh **without its instances** (205,438 px diff vs reference) in `BabylonNative` CI.\n\n| Variant | AbortController in loader | BN polyfill | Pixel diff vs reference | Result |\n|---|---|---|---|---|\n| Master HEAD (#18430) | yes (broken on BN) | none | 205,438 | ❌ failed |\n| Master + JS `AbortController` polyfill shim | yes (works) | injected via JS | 13,507 | ✅ validated |\n| This PR | **removed** | none | 13,507 | ✅ validated |\n\nReproduced locally using `BabylonNative` nightly build #53343's `Playground.exe` + freshly-built UMD bundles from each variant.\n\nWe can still separately wire up the AbortController polyfill in BN — there are latent uses in `lightingVolume.ts` and `audioEngine.ts` that will hit the same wall when those code paths are exercised — but that's a defense-in-depth issue, not a blocker for this fix.\n\n[Created by Copilot on behalf of @bghgary]",
+                "author": {
+                    "name": "bghgary",
+                    "url": "https://github.com/bghgary"
+                },
+                "files": [
+                    "packages/dev/loaders/src/glTF/2.0/glTFLoader.ts",
+                    "packages/dev/loaders/src/glTF/2.0/materialLoadingAdapter.ts",
+                    "packages/dev/loaders/src/glTF/2.0/openpbrMaterialLoadingAdapter.ts",
+                    "packages/dev/loaders/src/glTF/2.0/pbrMaterialLoadingAdapter.ts"
+                ],
+                "tags": [
+                    "skip changelog"
+                ]
+            }
+        ],
         "9.6.2": [],
         "9.6.1": [
             {

@@ -19,6 +19,7 @@ import { type BaseTexture } from "core/Materials/Textures/baseTexture";
 import { type ITextureCreationOptions, Texture } from "core/Materials/Textures/texture";
 import { TransformNode } from "core/Meshes/transformNode";
 import { Buffer, VertexBuffer } from "core/Buffers/buffer";
+import { VertexBufferForEach, VertexBufferGetTypeByteLength } from "core/Buffers/buffer.pure";
 import { Geometry } from "core/Meshes/geometry";
 import { AbstractMesh } from "core/Meshes/abstractMesh";
 import { Mesh } from "core/Meshes/mesh";
@@ -197,9 +198,6 @@ export class GLTFLoader implements IGLTFLoader {
     /** @internal */
     public readonly _completePromises = new Array<Promise<unknown>>();
 
-    /** AbortController used to cancel in-flight finalizeAsync() calls when dispose() is called. */
-    private _finalizeController: AbortController | null = null;
-
     /** @internal */
     public _assetContainer: Nullable<AssetContainer> = null;
 
@@ -217,7 +215,8 @@ export class GLTFLoader implements IGLTFLoader {
 
     private readonly _parent: GLTFFileLoader;
     private readonly _extensions = new Array<IGLTFLoaderExtension>();
-    private _disposed = false;
+    /** @internal */
+    public _disposed = false;
     private _rootUrl: Nullable<string> = null;
     private _fileName: Nullable<string> = null;
     private _uniqueRootUrl: Nullable<string> = null;
@@ -355,9 +354,6 @@ export class GLTFLoader implements IGLTFLoader {
         }
 
         this._disposed = true;
-
-        this._finalizeController?.abort();
-        this._finalizeController = null;
 
         this._completePromises.length = 0;
 
@@ -533,24 +529,10 @@ export class GLTFLoader implements IGLTFLoader {
                     }
 
                     // Finalize all material adapters. finalizeAsync() may return a Promise for async
-                    // work (e.g. GPU texture processing); push any such promises into
-                    // _completePromises so they are awaited before the COMPLETE state is reached.
-                    // Fall back to the deprecated finalize() for third-party adapters that have not
-                    // yet migrated, logging a warning so authors know to update.
-                    // An AbortController is created here and aborted in dispose() so that adapters
-                    // can detect mid-flight disposal and clean up intermediate resources early.
-                    this._finalizeController = new AbortController();
-                    const finalizeSignal = this._finalizeController.signal;
+                    // work (e.g. GPU texture processing); any returned Promise is pushed into
+                    // _completePromises so it is awaited before the COMPLETE state is reached.
                     for (const adapter of Array.from(this._materialAdapters)) {
-                        if (adapter.finalizeAsync) {
-                            const finalizePromise = adapter.finalizeAsync(finalizeSignal);
-                            if (finalizePromise) {
-                                this._completePromises.push(finalizePromise);
-                            }
-                        } else if (adapter.finalize) {
-                            Logger.Warn("GLTFLoader: IMaterialLoadingAdapter.finalize() is deprecated. Implement finalizeAsync() instead.");
-                            adapter.finalize();
-                        }
+                        this._completePromises.push(adapter.finalizeAsync(this));
                     }
 
                     this._extensionsOnReady();
@@ -2042,7 +2024,7 @@ export class GLTFLoader implements IGLTFLoader {
         }
 
         const numComponents = GLTFLoader._GetNumComponents(context, accessor.type);
-        const byteStride = numComponents * VertexBuffer.GetTypeByteLength(accessor.componentType);
+        const byteStride = numComponents * VertexBufferGetTypeByteLength(accessor.componentType);
         const length = numComponents * accessor.count;
 
         if (accessor.bufferView == undefined) {
@@ -2054,7 +2036,7 @@ export class GLTFLoader implements IGLTFLoader {
                     return GLTFLoader._GetTypedArray(context, accessor.componentType, data, accessor.byteOffset, length);
                 } else {
                     const typedArray = new constructor(length);
-                    VertexBuffer.ForEach(
+                    VertexBufferForEach(
                         data,
                         accessor.byteOffset || 0,
                         bufferView.byteStride || byteStride,
@@ -2097,7 +2079,7 @@ export class GLTFLoader implements IGLTFLoader {
                     } else {
                         const sparseData = GLTFLoader._GetTypedArray(`${context}/sparse/values`, accessor.componentType, valuesData, sparse.values.byteOffset, sparseLength);
                         values = new constructor(sparseLength);
-                        VertexBuffer.ForEach(sparseData, 0, byteStride, numComponents, accessor.componentType, values.length, accessor.normalized || false, (value, index) => {
+                        VertexBufferForEach(sparseData, 0, byteStride, numComponents, accessor.componentType, values.length, accessor.normalized || false, (value, index) => {
                             values[index] = value;
                         });
                     }
@@ -2801,7 +2783,7 @@ export class GLTFLoader implements IGLTFLoader {
 
         const constructor = GLTFLoader._GetTypedArrayConstructor(`${context}/componentType`, componentType);
 
-        const componentTypeLength = VertexBuffer.GetTypeByteLength(componentType);
+        const componentTypeLength = VertexBufferGetTypeByteLength(componentType);
         if (byteOffset % componentTypeLength !== 0) {
             // HACK: Copy the buffer if byte offset is not a multiple of component type byte length.
             Logger.Warn(`${context}: Copying buffer as byte offset (${byteOffset}) is not a multiple of component type byte length (${componentTypeLength})`);
