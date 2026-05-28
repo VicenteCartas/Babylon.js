@@ -3,6 +3,7 @@ import "./babylonSideEffects";
 import { type RawLottieAnimation } from "../parsing/rawTypes";
 import { type AnimationInfo } from "../parsing/parsedTypes";
 import { type Node } from "../nodes/node";
+import { type LottieFeatureSet } from "../features/feature";
 import {
     type AnimationConfiguration,
     type LottieFeatureConfig,
@@ -15,13 +16,19 @@ import { ThinEngine } from "core/Engines/thinEngine";
 import { Viewport } from "core/Maths/math.viewport";
 import { RenderingManager } from "./renderingManager";
 import { ThinMatrix } from "../maths/matrix";
-import { Parser } from "../parsing/parser";
 import { SpritePacker } from "../parsing/spritePacker";
+import { LoadLottieFeatures } from "../load/loadFeatures";
+import { ParseAnimation, ParseAnimationAsync } from "../load/parseAnimation";
 
 /**
  * Defines the babylon combine alpha value to prevent a large import.
  */
 const ALPHA_PREMULTIPLIED = 7;
+
+type AnimationControllerOptions = {
+    loadedFeatures?: LottieFeatureSet;
+    skipInitialParse?: boolean;
+};
 
 /**
  * Class that controls the playing of lottie animations using Babylon.js
@@ -85,6 +92,47 @@ export class AnimationController {
     }
 
     /**
+     * Creates and initializes a new animation controller using runtime feature detection and loading.
+     * @param canvas The canvas element to render the animation on.
+     * @param animationData The raw lottie animation as a JSON object.
+     * @param canvasScale The scale factor for the canvas / viewport (may be \< 1 when the animation is larger than the container).
+     * @param atlasScale The scale factor for the sprite atlas (always \>= 1 to keep sprites crisp).
+     * @param variables Map of variables to replace in the animation file.
+     * @param configuration The partial configuration for the animation player. Will be finalized after engine creation.
+     * @param mainThreadDevicePixelRatio The devicePixelRatio from the main thread (used in worker scenarios).
+     * @param onFirstRender Optional callback invoked after the first frame renders.
+     * @returns Initialized animation controller.
+     */
+    public static async CreateAsync(
+        canvas: HTMLCanvasElement | OffscreenCanvas,
+        animationData: RawLottieAnimation,
+        canvasScale: number,
+        atlasScale: number,
+        variables: Map<string, string>,
+        configuration: Partial<AnimationConfiguration>,
+        mainThreadDevicePixelRatio?: number,
+        onFirstRender?: () => void
+    ): Promise<AnimationController> {
+        const controller = new AnimationController(canvas, animationData, canvasScale, atlasScale, variables, configuration, mainThreadDevicePixelRatio, onFirstRender, {
+            skipInitialParse: true,
+        });
+
+        try {
+            const loadedFeatures = await LoadLottieFeatures(animationData, controller._featureConfiguration);
+            const animationInfo = await ParseAnimationAsync(animationData, loadedFeatures, controller._featureConfiguration, controller._rendererConfiguration, {
+                packer: controller._spritePacker,
+                renderingManager: controller._renderingManager,
+            });
+            controller._applyAnimationInfo(animationData, animationInfo);
+        } catch (error: unknown) {
+            controller.dispose();
+            throw error;
+        }
+
+        return controller;
+    }
+
+    /**
      * Creates a new instance of the Player.
      * @param canvas The canvas element to render the animation on.
      * @param animationData The raw lottie animation as a JSON object.
@@ -94,6 +142,7 @@ export class AnimationController {
      * @param configuration The partial configuration for the animation player. Will be finalized after engine creation.
      * @param mainThreadDevicePixelRatio The devicePixelRatio from the main thread (used in worker scenarios).
      * @param onFirstRender Optional callback invoked after the first frame renders.
+     * @param options Optional parser-control options used by async feature-loading paths.
      */
     public constructor(
         canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -103,7 +152,8 @@ export class AnimationController {
         variables: Map<string, string>,
         configuration: Partial<AnimationConfiguration>,
         mainThreadDevicePixelRatio?: number,
-        onFirstRender?: () => void
+        onFirstRender?: () => void,
+        options?: AnimationControllerOptions
     ) {
         this._isReady = false;
         this._canvas = canvas;
@@ -155,7 +205,7 @@ export class AnimationController {
         this._engine.stencilState.stencilTest = false;
         this._engine.setAlphaMode(ALPHA_PREMULTIPLIED);
 
-        this._spritePacker = new SpritePacker(this._engine, this._isHtmlCanvas(canvas), this._atlasScale, this._variables, this._featureConfiguration, this._rendererConfiguration);
+        this._spritePacker = new SpritePacker(this._engine, this._isHtmlCanvas(canvas), this._atlasScale, this._variables, this._rendererConfiguration);
         this._renderingManager = new RenderingManager(this._engine, this._rendererConfiguration);
 
         this._projectionMatrix = new ThinMatrix();
@@ -164,14 +214,17 @@ export class AnimationController {
 
         this._viewport = new Viewport(0, 0, 1, 1);
 
-        // Parse the animation
-        const parser = new Parser(this._spritePacker, animationData, this._featureConfiguration, this._rendererConfiguration, this._renderingManager);
-
-        if (this._featureConfiguration.debug) {
-            parser.debug();
+        if (!options?.skipInitialParse) {
+            const animationInfo = ParseAnimation(animationData, options?.loadedFeatures, this._featureConfiguration, this._rendererConfiguration, {
+                packer: this._spritePacker,
+                renderingManager: this._renderingManager,
+            });
+            this._applyAnimationInfo(animationData, animationInfo);
         }
+    }
 
-        this._animation = parser.animationInfo;
+    private _applyAnimationInfo(animationData: RawLottieAnimation, animationInfo: AnimationInfo): void {
+        this._animation = animationInfo;
         this._frameDuration = 1000 / this._animation.frameRate;
 
         this._cleanTree(this._animation.nodes);

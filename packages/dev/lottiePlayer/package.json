@@ -5,6 +5,27 @@
     "types": "dist/index",
     "main": "dist/index",
     "module": "dist/index",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./local": {
+            "types": "./dist/local.d.ts",
+            "default": "./dist/local.js"
+        },
+        "./worker": {
+            "types": "./dist/worker.d.ts",
+            "default": "./dist/worker.js"
+        },
+        "./package.json": "./package.json",
+        "./*.js": "./dist/*.js",
+        "./*.d.ts": "./dist/*.d.ts",
+        "./*": {
+            "types": "./dist/*.d.ts",
+            "default": "./dist/*.js"
+        }
+    },
     "type": "module",
     "files": [
         "dist",

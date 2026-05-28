@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { GetTextBoundingBox } from "../../src/maths/boundingBox";
-import { BuildCanvasFont, DrawLottieText, MeasureLottieText, ResolveLottieText } from "../../src/parsing/textLayout";
+import { GetTextBoundingBox } from "../../src/features/layers/textLayer";
+import { BuildCanvasFont, DrawLottieText, MeasureLottieText, ResolveLottieText } from "../../src/features/layers/textLayout";
 import { type RawFont, type RawTextData } from "../../src/parsing/rawTypes";
 
 type FakeTextMetrics = {

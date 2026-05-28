@@ -20,7 +20,30 @@
                     "referenceImage": "lottie-phase0-solid-only.png"
                 }
             ],
-            "futureForbiddenJsUrlPatterns": ["/features/text", "/features/shape"]
+            "futureForbiddenJsUrlPatterns": ["/features/text", "/features/layers/text", "/features/shape"],
+            "futureZeroByteJsUrlPatterns": ["/features/text", "/features/layers/text"]
+        },
+        {
+            "id": "solid-babylon8-compat",
+            "description": "Local fixture containing a ty:1 solid layer with Babylon 8 solid compatibility enabled.",
+            "cases": [
+                {
+                    "id": "solid-babylon8-compat-worker",
+                    "transport": "worker",
+                    "devHostQsps": "exp=lottie&file=./phase0/solidOnly.json&useWorker=true&useUrl=false&frame=0&solidlayerrendering=babylon8",
+                    "visualTestTitle": "Lottie Phase 0 - Solid Babylon 8 Compat (Web Worker)",
+                    "referenceImage": "lottie-phase0-solid-only.png"
+                },
+                {
+                    "id": "solid-babylon8-compat-local",
+                    "transport": "local",
+                    "devHostQsps": "exp=lottie&file=./phase0/solidOnly.json&useWorker=false&useUrl=false&frame=0&solidlayerrendering=babylon8",
+                    "visualTestTitle": "Lottie Phase 0 - Solid Babylon 8 Compat (Main Thread)",
+                    "referenceImage": "lottie-phase0-solid-only.png"
+                }
+            ],
+            "futureForbiddenJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text", "/features/shape"],
+            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"]
         },
         {
             "id": "shape-only",
@@ -41,7 +64,8 @@
                     "referenceImage": "lottie-phase0-shape-only.png"
                 }
             ],
-            "futureForbiddenJsUrlPatterns": ["/features/text"]
+            "futureForbiddenJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"],
+            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"]
         },
         {
             "id": "text-only",
@@ -62,7 +86,8 @@
                     "referenceImage": "lottie-phase0-text-only.png"
                 }
             ],
-            "futureForbiddenJsUrlPatterns": ["/features/shape"]
+            "futureForbiddenJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/shape"],
+            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid"]
         },
         {
             "id": "mixed",
@@ -104,7 +129,8 @@
                     "referenceImage": "lottie-phase0-no-text-realistic.png"
                 }
             ],
-            "futureForbiddenJsUrlPatterns": ["/features/text"]
+            "futureForbiddenJsUrlPatterns": ["/features/text", "/features/layers/text"],
+            "futureZeroByteJsUrlPatterns": ["/features/text", "/features/layers/text"]
         }
     ]
 }

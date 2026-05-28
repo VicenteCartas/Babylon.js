@@ -184,7 +184,7 @@ export class Player {
 
     private _getOrCreateWorker(): globalThis.Worker {
         if (!this._worker) {
-            const wrapperWorker = new BlobWorkerWrapper(new URL("./worker", import.meta.url));
+            const wrapperWorker = new BlobWorkerWrapper(new URL("./workerEntry", import.meta.url));
             this._worker = wrapperWorker.getWorker();
             this._worker.onmessage = (evt: MessageEvent) => {
                 this._handleWorkerMessage(evt);

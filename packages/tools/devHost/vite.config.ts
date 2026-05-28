@@ -5,10 +5,10 @@ import { commonDevViteConfiguration } from "../../public/viteToolsHelper.mjs";
 
 const OptionalPeerDependencies = ["draco3dgltf", "ammo.js", "cannon", "oimo", "recast", "havok", "basis_transcoder"];
 const OptionalPeerDependencyPattern = OptionalPeerDependencies.map((p) => p.replace(".", "\\.")).join("|");
-const LottieWorkerEntry = path.resolve("../../dev/lottiePlayer/src/worker.ts");
+const LottieWorkerEntry = path.resolve("../../dev/lottiePlayer/src/workerEntry.ts");
 const LottiePlayerEntry = normalizePath(path.resolve("../../dev/lottiePlayer/src/player.ts"));
 const LottieWorkerDevUrl = "/__lottie-worker.js";
-const LottieWorkerUrlExpression = /new URL\(["']\.\/worker(?:\.[jt]s)?["'],\s*import\.meta\.url\)/g;
+const LottieWorkerUrlExpression = /new URL\(["']\.\/workerEntry(?:\.[jt]s)?["'],\s*import\.meta\.url\)/g;
 
 function stubNamedOptionalPeerDependencyImport(bindings: string): string {
     return bindings
@@ -85,7 +85,7 @@ function lottieClassicWorkerPlugin(aliases: Record<string, string>): Plugin {
             sourcemap = command === "serve" ? "inline" : config.build.sourcemap === "inline" ? "inline" : Boolean(config.build.sourcemap);
         },
         async transform(code, id) {
-            if (normalizePath(id.split("?")[0]) !== LottiePlayerEntry || !code.includes("./worker")) {
+            if (normalizePath(id.split("?")[0]) !== LottiePlayerEntry || !code.includes("./workerEntry")) {
                 return null;
             }
 

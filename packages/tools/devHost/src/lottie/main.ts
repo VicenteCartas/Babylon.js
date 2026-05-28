@@ -1,8 +1,40 @@
 import { type AnimationConfiguration, type LottieCompatibilityMode, type LottieCompatibilityOptions } from "lottie-player/animationConfiguration";
 import { type RawLottieAnimation } from "lottie-player/parsing/rawTypes";
-import { Player } from "lottie-player/player";
-import { LocalPlayer } from "lottie-player/localPlayer";
+import { type LocalPlayer } from "lottie-player/local";
+import { type Player } from "lottie-player/worker";
 import { DecodeQspStringToObject } from "./utils";
+
+type LottieEntryMode = "deep" | "local" | "root" | "worker";
+
+function ParseEntryMode(value: string | null): LottieEntryMode {
+    return value === "local" || value === "root" || value === "worker" ? value : "deep";
+}
+
+async function CreateWorkerPlayer(entryMode: LottieEntryMode): Promise<Player> {
+    switch (entryMode) {
+        case "root":
+            return new (await import("lottie-player")).Player();
+        case "worker":
+            return new (await import("lottie-player/worker")).Player();
+        case "local":
+            throw new Error("The lottie local entry cannot create a worker player.");
+        case "deep":
+            return new (await import("lottie-player/player")).Player();
+    }
+}
+
+async function CreateLocalPlayer(entryMode: LottieEntryMode): Promise<LocalPlayer> {
+    switch (entryMode) {
+        case "root":
+            return new (await import("lottie-player")).LocalPlayer();
+        case "local":
+            return new (await import("lottie-player/local")).LocalPlayer();
+        case "worker":
+            throw new Error("The lottie worker entry cannot create a local player.");
+        case "deep":
+            return new (await import("lottie-player/localPlayer")).LocalPlayer();
+    }
+}
 
 function ParseCompatibilityMode(value: string | null): LottieCompatibilityMode | undefined {
     return value === "spec" || value === "babylon8" ? value : undefined;
@@ -38,6 +70,8 @@ export async function Main(searchParams: URLSearchParams): Promise<void> {
     // Whether to use a web worker for rendering or not, defaults to true
     const useWorkerParam = searchParams.get("useworker");
     const useWorker = useWorkerParam !== "false"; // Default to true if not specified
+
+    const entryMode = ParseEntryMode(searchParams.get("entry"));
 
     // Whether to use the file URL for the data or to parse the data in the devhost, defaults to true (use the file URL)
     const useUrlParam = searchParams.get("useurl");
@@ -98,7 +132,7 @@ export async function Main(searchParams: URLSearchParams): Promise<void> {
     const animationInput = { container: div, animationSource: useUrl ? fileUrl : (animationData as RawLottieAnimation), variables, configuration, onFirstRender };
 
     if (useWorker) {
-        const player = new Player();
+        const player = await CreateWorkerPlayer(entryMode);
 
         if (usePrewarm) {
             await player.preWarmPlayerAsync();
@@ -106,7 +140,7 @@ export async function Main(searchParams: URLSearchParams): Promise<void> {
 
         await player.playAnimationAsync(animationInput);
     } else {
-        const player = new LocalPlayer();
+        const player = await CreateLocalPlayer(entryMode);
         await player.playAnimationAsync(animationInput);
     }
 }

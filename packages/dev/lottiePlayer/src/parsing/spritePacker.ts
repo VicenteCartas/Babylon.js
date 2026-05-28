@@ -9,25 +9,40 @@ import {
     type RawElement,
     type RawEllipseShape,
     type RawFillShape,
-    type RawFont,
     type RawGradientFillShape,
     type RawGradientStrokeShape,
     type RawPathShape,
     type RawRectangleShape,
     type RawStrokeShape,
-    type RawTextData,
 } from "./rawTypes";
 import { GetInitialColorValue, GetInitialScalarValue, GetInitialVectorValues, GetInitialBezierData } from "./rawPropertyHelpers";
-import { ApplyLottieTextContext, DrawLottieText, MeasureLottieText, ResolveLottieText } from "./textLayout";
 
-import { type BoundingBox, GetShapesBoundingBox, GetTextBoundingBox } from "../maths/boundingBox";
+import { type BoundingBox, GetShapesBoundingBox } from "../maths/boundingBox";
 
-import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
+import { type LottieRendererConfig } from "../animationConfiguration";
 
 /**
  * Type alias for the 2D drawing context used by the sprite packer.
  */
-type DrawingContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
+export type SpritePackerDrawingContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
+
+type DrawingContext = SpritePackerDrawingContext;
+
+/**
+ * Canvas context and atlas cell placement for a sprite rasterization callback.
+ */
+export type SpritePackerRasterizationContext = {
+    /** Atlas page drawing context. */
+    context: SpritePackerDrawingContext;
+    /** X coordinate of the allocated atlas cell in pixels. */
+    x: number;
+    /** Y coordinate of the allocated atlas cell in pixels. */
+    y: number;
+    /** Width of the allocated atlas cell in pixels. */
+    cellWidth: number;
+    /** Height of the allocated atlas cell in pixels. */
+    cellHeight: number;
+};
 
 /**
  * Information about a sprite in the sprite atlas.
@@ -117,9 +132,7 @@ export class SpritePacker {
     private readonly _isHtmlCanvas: boolean;
     private _atlasScale: number;
     private readonly _variables: Map<string, string>;
-    private readonly _featureConfiguration: LottieFeatureConfig;
     private readonly _rendererConfiguration: LottieRendererConfig;
-    private _rawFonts: Map<string, RawFont> | undefined;
 
     private _pages: AtlasPage[];
 
@@ -149,11 +162,19 @@ export class SpritePacker {
     }
 
     /**
-     * Sets the fonts that will be used to render text in the sprite atlas.
-     * @param rawFonts A map of font names to RawFont objects.
+     * Gets the variables map used by feature-owned rasterizers.
+     * @returns The variables map for this animation.
      */
-    public set rawFonts(rawFonts: Map<string, RawFont>) {
-        this._rawFonts = rawFonts;
+    public get variables(): Map<string, string> {
+        return this._variables;
+    }
+
+    /**
+     * Gets a canvas context that feature-owned rasterizers can use for measurement before allocation.
+     * @returns The current atlas page drawing context.
+     */
+    public get measurementContext(): SpritePackerDrawingContext {
+        return this._pages[this._pages.length - 1].context;
     }
 
     /**
@@ -162,22 +183,13 @@ export class SpritePacker {
      * @param isHtmlCanvas Whether we should render the atlas in an HTMLCanvasElement or an OffscreenCanvas.
      * @param atlasScale The atlas scale factor to apply to the sprites (always \>= 1 to keep sprites crisp).
      * @param variables Map of variables to replace in the animation file.
-     * @param featureConfiguration Engine-free feature configuration for text compatibility behavior.
      * @param rendererConfiguration Renderer-bound configuration for atlas and raster settings.
      */
-    public constructor(
-        engine: ThinEngine,
-        isHtmlCanvas: boolean,
-        atlasScale: number,
-        variables: Map<string, string>,
-        featureConfiguration: LottieFeatureConfig,
-        rendererConfiguration: LottieRendererConfig
-    ) {
+    public constructor(engine: ThinEngine, isHtmlCanvas: boolean, atlasScale: number, variables: Map<string, string>, rendererConfiguration: LottieRendererConfig) {
         this._engine = engine;
         this._isHtmlCanvas = isHtmlCanvas;
         this._atlasScale = atlasScale;
         this._variables = variables;
-        this._featureConfiguration = featureConfiguration;
         this._rendererConfiguration = rendererConfiguration;
 
         this._pages = [this._createPage()];
@@ -205,84 +217,51 @@ export class SpritePacker {
     public addLottieShape(rawElements: RawElement[], scalingFactor: IVector2Like, debugName?: string): SpriteAtlasInfo {
         const boundingBox = GetShapesBoundingBox(rawElements);
 
+        return this.addRasterizedSprite(
+            "shape",
+            boundingBox,
+            scalingFactor,
+            (context) => {
+                this._drawVectorShape(rawElements, boundingBox, scalingFactor, context);
+            },
+            debugName
+        );
+    }
+
+    /**
+     * Adds a feature-owned rasterized sprite to the atlas.
+     * @param kind Kind of sprite being rasterized, used for diagnostics.
+     * @param boundingBox Source bounding box in lottie coordinates, before any scaling.
+     * @param scalingFactor The scaling factor to apply while drawing into the atlas. Mutated with the effective atlas scale.
+     * @param drawSprite Callback that draws into the allocated atlas cell.
+     * @param debugName Optional human-readable identifier (e.g. owning layer name) included in oversize warnings.
+     * @returns The information on how to find the sprite in the atlas.
+     */
+    public addRasterizedSprite(
+        kind: "shape" | "text" | "solid",
+        boundingBox: BoundingBox,
+        scalingFactor: IVector2Like,
+        drawSprite: (context: SpritePackerRasterizationContext) => void,
+        debugName?: string
+    ): SpriteAtlasInfo {
         const layerScaleX = scalingFactor.x;
         const layerScaleY = scalingFactor.y;
-        this._applyAtlasScaleAndFit("shape", debugName, boundingBox, scalingFactor, layerScaleX, layerScaleY);
+        this._applyAtlasScaleAndFit(kind, debugName, boundingBox, scalingFactor, layerScaleX, layerScaleY);
 
         // Calculate the size of the sprite in the atlas in pixels
-        // This takes into account the scaling factor so in the call to _drawVectorShape the canvas will be scaled when rendering
+        // This takes into account the scaling factor so in the draw callback the canvas will be scaled when rendering
         this._spriteAtlasInfo.cellWidth = this._getAtlasCellDimension(boundingBox.width * scalingFactor.x);
         this._spriteAtlasInfo.cellHeight = this._getAtlasCellDimension(boundingBox.height * scalingFactor.y);
 
         // Get (or create) the page that has room for this sprite
         const page = this._getPageWithRoom(this._spriteAtlasInfo.cellWidth, this._spriteAtlasInfo.cellHeight);
 
-        // Draw the shape in the canvas
-        this._drawVectorShape(rawElements, boundingBox, scalingFactor, page);
+        // Draw the sprite in the canvas
+        drawSprite({ context: page.context, x: page.currentX, y: page.currentY, cellWidth: this._spriteAtlasInfo.cellWidth, cellHeight: this._spriteAtlasInfo.cellHeight });
         this._extrudeSpriteEdges(page, page.currentX, page.currentY, this._spriteAtlasInfo.cellWidth, this._spriteAtlasInfo.cellHeight);
         page.isDirty = true;
 
         // Get the rest of the sprite information required to render the shape
-        this._spriteAtlasInfo.uOffset = page.currentX / this._rendererConfiguration.spriteAtlasWidth;
-        this._spriteAtlasInfo.vOffset = page.currentY / this._rendererConfiguration.spriteAtlasHeight;
-
-        this._spriteAtlasInfo.widthPx = boundingBox.width;
-        this._spriteAtlasInfo.heightPx = boundingBox.height;
-
-        this._spriteAtlasInfo.centerX = boundingBox.offsetX;
-        this._spriteAtlasInfo.centerY = boundingBox.offsetY;
-
-        this._spriteAtlasInfo.atlasIndex = this._pages.indexOf(page);
-
-        // Advance the current position for the next sprite
-        page.currentX += this._spriteAtlasInfo.cellWidth + this._rendererConfiguration.gapSize; // Add a gap between sprites to avoid bleeding
-        page.maxRowHeight = Math.max(page.maxRowHeight, this._spriteAtlasInfo.cellHeight);
-
-        return this._spriteAtlasInfo;
-    }
-
-    /**
-     * Adds a text element that comes from lottie data to the sprite atlas.
-     * @param textData The raw text data to add to the atlas.
-     * @param scalingFactor The scaling factor to apply to the text.
-     * @param debugName Optional human-readable identifier (e.g. owning layer name) included in oversize warnings.
-     * @returns The information on how to find the sprite in the atlas.
-     */
-    public addLottieText(textData: RawTextData, scalingFactor: IVector2Like, debugName?: string): SpriteAtlasInfo | undefined {
-        if (this._rawFonts === undefined) {
-            return undefined;
-        }
-
-        // If the text information is malformed and we can't get the bounding box, then just return
-        const boundingBox = GetTextBoundingBox(
-            this._pages[this._pages.length - 1].context,
-            textData,
-            this._rawFonts,
-            this._variables,
-            this._featureConfiguration.compatibility.textLayerPlacement
-        );
-        if (boundingBox === undefined) {
-            return undefined;
-        }
-
-        const layerScaleX = scalingFactor.x;
-        const layerScaleY = scalingFactor.y;
-        this._applyAtlasScaleAndFit("text", debugName, boundingBox, scalingFactor, layerScaleX, layerScaleY);
-
-        // Calculate the size of the sprite in the atlas in pixels
-        // This takes into account the scaling factor so in the call to _drawText the canvas will be scaled when rendering
-        this._spriteAtlasInfo.cellWidth = this._getAtlasCellDimension(boundingBox.width * scalingFactor.x);
-        this._spriteAtlasInfo.cellHeight = this._getAtlasCellDimension(boundingBox.height * scalingFactor.y);
-
-        // Get (or create) the page that has room for this sprite
-        const page = this._getPageWithRoom(this._spriteAtlasInfo.cellWidth, this._spriteAtlasInfo.cellHeight);
-
-        // Draw the text in the canvas
-        this._drawText(textData, scalingFactor, page);
-        this._extrudeSpriteEdges(page, page.currentX, page.currentY, this._spriteAtlasInfo.cellWidth, this._spriteAtlasInfo.cellHeight);
-        page.isDirty = true;
-
-        // Get the rest of the sprite information required to render the text
         this._spriteAtlasInfo.uOffset = page.currentX / this._rendererConfiguration.spriteAtlasWidth;
         this._spriteAtlasInfo.vOffset = page.currentY / this._rendererConfiguration.spriteAtlasHeight;
 
@@ -410,7 +389,7 @@ export class SpritePacker {
      * Mutates `scalingFactor` in place with the final effective scale to use when drawing
      * into the atlas canvas. When a downscale is applied, emits a warning that identifies the
      * offending layer and the scale factors involved so the source can be diagnosed.
-     * @param kind Whether the sprite is a vector shape or a text element.
+     * @param kind Kind of sprite being rasterized, used for diagnostics.
      * @param debugName Optional human-readable identifier (typically the owning layer name).
      * @param boundingBox Source bounding box in lottie coordinates, before any scaling.
      * @param scalingFactor Layer-side scale on input; receives the final effective scale on output.
@@ -418,7 +397,7 @@ export class SpritePacker {
      * @param layerScaleY Original layer-side Y scale (preserved for the warning message).
      */
     private _applyAtlasScaleAndFit(
-        kind: "shape" | "text",
+        kind: "shape" | "text" | "solid",
         debugName: string | undefined,
         boundingBox: BoundingBox,
         scalingFactor: IVector2Like,
@@ -540,41 +519,43 @@ export class SpritePacker {
         }
     }
 
-    private _drawVectorShape(rawElements: RawElement[], boundingBox: BoundingBox, scalingFactor: IVector2Like, page: AtlasPage): void {
-        page.context.save();
-        page.context.globalCompositeOperation = "destination-over";
+    private _drawVectorShape(rawElements: RawElement[], boundingBox: BoundingBox, scalingFactor: IVector2Like, rasterizationContext: SpritePackerRasterizationContext): void {
+        const ctx = rasterizationContext.context;
 
-        page.context.translate(page.currentX + Math.ceil(boundingBox.strokeInset / 2), page.currentY + Math.ceil(boundingBox.strokeInset / 2));
-        page.context.scale(scalingFactor.x, scalingFactor.y);
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-over";
 
-        page.context.beginPath();
-        page.context.rect(0, 0, boundingBox.width, boundingBox.height);
-        page.context.clip();
-        page.context.beginPath();
+        ctx.translate(rasterizationContext.x + Math.ceil(boundingBox.strokeInset / 2), rasterizationContext.y + Math.ceil(boundingBox.strokeInset / 2));
+        ctx.scale(scalingFactor.x, scalingFactor.y);
+
+        ctx.beginPath();
+        ctx.rect(0, 0, boundingBox.width, boundingBox.height);
+        ctx.clip();
+        ctx.beginPath();
 
         for (let i = 0; i < rawElements.length; i++) {
             const shape = rawElements[i];
             switch (shape.ty) {
                 case "rc":
-                    this._drawRectangle(shape as RawRectangleShape, boundingBox, page.context);
+                    this._drawRectangle(shape as RawRectangleShape, boundingBox, ctx);
                     break;
                 case "el":
-                    this._drawEllipse(shape as RawEllipseShape, boundingBox, page.context);
+                    this._drawEllipse(shape as RawEllipseShape, boundingBox, ctx);
                     break;
                 case "sh":
-                    this._drawPath(shape as RawPathShape, boundingBox, page.context);
+                    this._drawPath(shape as RawPathShape, boundingBox, ctx);
                     break;
                 case "fl":
-                    this._drawFill(shape as RawFillShape, page.context);
+                    this._drawFill(shape as RawFillShape, ctx);
                     break;
                 case "st":
-                    this._drawStroke(shape as RawStrokeShape, page.context);
+                    this._drawStroke(shape as RawStrokeShape, ctx);
                     break;
                 case "gf":
-                    this._drawGradientFill(shape as RawGradientFillShape, boundingBox, page.context);
+                    this._drawGradientFill(shape as RawGradientFillShape, boundingBox, ctx);
                     break;
                 case "gs":
-                    this._drawGradientStroke(shape as RawGradientStrokeShape, boundingBox, page.context);
+                    this._drawGradientStroke(shape as RawGradientStrokeShape, boundingBox, ctx);
                     break;
                 case "tr":
                     break; // Nothing needed with transforms
@@ -590,56 +571,7 @@ export class SpritePacker {
             }
         }
 
-        page.context.restore();
-    }
-
-    private _drawText(textData: RawTextData, scalingFactor: IVector2Like, page: AtlasPage): void {
-        if (this._rawFonts === undefined) {
-            return;
-        }
-
-        const resolvedText = ResolveLottieText(textData, this._rawFonts, this._variables);
-        if (!resolvedText) {
-            return;
-        }
-
-        page.context.save();
-        page.context.translate(page.currentX, page.currentY);
-        page.context.scale(scalingFactor.x, scalingFactor.y);
-
-        // Resolve fill color. fc is either an RGB array or a variable name string; the two shapes need different guards
-        // (arrays need at least 3 components; strings just need a non-undefined variable lookup).
-        if (resolvedText.textInfo.fc !== undefined) {
-            const rawFillStyle = resolvedText.textInfo.fc;
-            if (Array.isArray(rawFillStyle)) {
-                if (rawFillStyle.length >= 3) {
-                    page.context.fillStyle = this._lottieColorToCSSColor(rawFillStyle, 1);
-                }
-            } else {
-                const variableFillStyle = this._variables.get(rawFillStyle);
-                if (variableFillStyle !== undefined) {
-                    page.context.fillStyle = variableFillStyle;
-                }
-            }
-        }
-
-        if (resolvedText.hasStroke) {
-            // ResolveLottieText only sets hasStroke when sc is present and well-formed, so the non-null assertion here is safe.
-            page.context.strokeStyle = this._lottieColorToCSSColor(resolvedText.textInfo.sc!, 1);
-        }
-
-        ApplyLottieTextContext(page.context, resolvedText);
-
-        const layout = MeasureLottieText(resolvedText, (text) => page.context.measureText(text), this._featureConfiguration.compatibility.textLayerPlacement);
-
-        // Clip to cell bounds to prevent text overdraw into adjacent cells
-        page.context.beginPath();
-        page.context.rect(0, 0, layout.width, layout.height);
-        page.context.clip();
-
-        DrawLottieText(page.context, resolvedText, layout);
-
-        page.context.restore();
+        ctx.restore();
     }
 
     private _drawRectangle(shape: RawRectangleShape, boundingBox: BoundingBox, ctx: DrawingContext): void {

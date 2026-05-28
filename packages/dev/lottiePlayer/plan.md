@@ -10,6 +10,15 @@ The plan combines:
 - the explicit feature registry, sub-entry packaging, presets, and build-time plugin ideas from `findings_opus.md`, and
 - the synthesized direction from `findings_comparison.md`.
 
+Implementation progress:
+
+- Phases 0-6 are implemented.
+- Phase 3 is implemented for the current wrapper architecture: `DetectLottieFeatures`, `LoadLottieFeatures`, and `ParseAnimationAsync` exist, and `Player`/`LocalPlayer` both route through the same dynamic feature-loading path before parsing.
+- Phase 3 worker dynamic-import spike is complete: Vite/devhost worker playback fetches only the required feature chunks, and a temporary webpack 5 `target: "webworker"` spike emitted and runtime-fetched a dynamic import chunk from inside a worker.
+- Phase 4 is implemented: `./local` and `./worker` sub-entries exist in the public/dev package export maps, the internal worker script moved to `workerEntry`, and the Phase 0 fetched-byte harness exercises the local and worker sub-entries.
+- Phase 5 is implemented: text parsing, layout, bounding box, and rasterization live behind the dynamically loaded text feature; generic atlas/bounding-box code no longer imports text implementation code; non-text fetched-byte fixtures assert zero bytes from text feature chunks.
+- Phase 6 is implemented: solid CSS color parsing, atlas cell generation, center-UV sprite creation, and compatibility-gated parsing live behind the dynamically loaded solid feature; Babylon 8 solid compatibility asserts zero bytes from solid feature chunks.
+
 ## Scope
 
 In scope:
@@ -105,10 +114,7 @@ Runtime automatic loading is not classic static tree-shaking; it is runtime pay-
 Follow Babylon Lite's glTF loader pattern: cheap predicates plus dynamic imports.
 
 ```ts
-type LottieFeatureLoader = [
-    needs: (animation: RawLottieAnimation, config: ResolvedAnimationConfiguration) => boolean,
-    load: () => Promise<{ default: LottieFeature }>,
-];
+type LottieFeatureLoader = [needs: (animation: RawLottieAnimation, config: ResolvedAnimationConfiguration) => boolean, load: () => Promise<{ default: LottieFeature }>];
 
 const featureLoaders: LottieFeatureLoader[] = [
     [needsSolidLayers, () => import("./features/solidLayer")],
@@ -123,7 +129,7 @@ Compatibility participates in detection. For example, `needsSolidLayers` returns
 
 ### Configuration is split for detection
 
-Today's config is finalized inside `AnimationController` after `ThinEngine` is constructed, because `maxTextureSize` is read from engine caps. Feature detection must run *before* any renderer exists, so configuration is split into two layers:
+Today's config is finalized inside `AnimationController` after `ThinEngine` is constructed, because `maxTextureSize` is read from engine caps. Feature detection must run _before_ any renderer exists, so configuration is split into two layers:
 
 - `LottieFeatureConfig` (engine-free): compatibility flags, loop, easing steps, stop frame, anything detection needs. Resolved synchronously from user input + defaults, with zero dependency on `ThinEngine`.
 - `LottieRendererConfig` (engine-bound): atlas dimensions, device pixel ratio, anything that needs GPU caps. Resolved after engine creation.
@@ -254,11 +260,11 @@ src/
 ### Phase 0 - Baselines and fetched-byte harness
 
 - Add fixture animations:
-  - solid-only
-  - shape-only
-  - text-only
-  - mixed solid + shape + text
-  - no-text realistic fixture (pick a concrete existing fixture or pinned public CDN URL; do not leave "realistic" subjective)
+    - solid-only
+    - shape-only
+    - text-only
+    - mixed solid + shape + text
+    - no-text realistic fixture (pick a concrete existing fixture or pinned public CDN URL; do not leave "realistic" subjective)
 - Capture a visual golden per fixture (worker and local paths) from current `main`. These goldens are the regression baseline for every later phase.
 - Add a Playwright or Rollup/Vite harness that records runtime-fetched JS bytes for the root entry. Sub-entry measurements are added later when sub-entries land; the harness is designed for easy expansion.
 - Assert feature chunks are not fetched when not needed (vacuously true today; the assertion shape is what matters).
@@ -266,7 +272,7 @@ src/
 
 ### Phase 1 - Isolate rendering side effects
 
-- Create `rendering/babylonSideEffects.ts` as the single allow-listed module (see *Side-effect allow-list* above).
+- Create `rendering/babylonSideEffects.ts` as the single allow-listed module (see _Side-effect allow-list_ above).
 - Move every Babylon engine/shader side-effect import there.
 - **Exit criterion (enforced)**: no file outside `rendering/babylonSideEffects.ts` imports from `core/Engines/Extensions/*` or `core/Shaders/sprites.*`. This is verified by a script/lint rule, not by inspection.
 - Update `package.json` `sideEffects` to the precise allow-list.
@@ -274,22 +280,22 @@ src/
 
 ### Phase 2 - Split configuration
 
-- Split `AnimationConfiguration` into `LottieFeatureConfig` (engine-free) and `LottieRendererConfig` (engine-bound). See *Configuration is split for detection*.
+- Split `AnimationConfiguration` into `LottieFeatureConfig` (engine-free) and `LottieRendererConfig` (engine-bound). See _Configuration is split for detection_.
 - Resolve `LottieFeatureConfig` synchronously up front; resolve `LottieRendererConfig` after engine creation as today.
 - No detection or feature code added yet; this phase just preps the function signatures Phase 3 will consume.
 
 ### Phase 3 - Feature detection and dynamic loading infrastructure
 
-- Add `detectLottieFeatures(raw, featureConfig)`.
-- Add `loadLottieFeatures(raw, featureConfig)`.
-- Add `parseAnimationAsync(raw, features, featureConfig, rendererConfig)`.
+- Add `DetectLottieFeatures(raw, featureConfig)`.
+- Add `LoadLottieFeatures(raw, featureConfig)`.
+- Add `ParseAnimationAsync(raw, features, featureConfig, rendererConfig)`.
 - **Detection/loader modules must not import anything from `transport/`** — this keeps the same pipeline reusable from both `./local` and `./worker` sub-entries (added in Phase 4) with zero refactor.
 - **Worker dynamic-import spike** (mandatory sub-task before Phase 4): build a minimal worker that dynamic-imports one feature chunk and verify chunk emission + runtime fetch in **at least Vite and webpack 5**. If bundler chunk resolution fails inside the worker, fall back to: main thread detects → posts feature list → worker imports a generated bundle. The spike result determines whether the worker path uses the same detector or a generated entry. Do not start Phase 4 until this is decided.
 - Keep existing `Player`/`LocalPlayer` wrappers.
 
 ### Phase 4 - Sub-entry packaging for local and worker
 
-- Moved from its earlier position so it lands *after* Phase 1 (side effects quarantined) and Phase 3 (transport-agnostic loaders proven). Without those two, sub-entries shift code around without delivering bundle wins.
+- Moved from its earlier position so it lands _after_ Phase 1 (side effects quarantined) and Phase 3 (transport-agnostic loaders proven). Without those two, sub-entries shift code around without delivering bundle wins.
 - Add `./local` and `./worker` sub-entries via `package.json` `exports`. Root exports stay unchanged for back-compat.
 - Expand the Phase 0 fetched-bytes harness with one entry per sub-entry. Re-baseline.
 - Verify local consumers do not pull the worker URL/chunk unless they import the worker path.
@@ -321,7 +327,7 @@ src/
 
 - Once text/solid/shape extractions are complete, delete `parsing/parser.ts` (or what remains of it) and the `Parser` class.
 - All layer-type dispatch lives in the feature loaders by this point; the lingering monolith only invites drift.
-- Update `Player`/`LocalPlayer` wrappers to call `parseAnimationAsync` directly.
+- Update `Player`/`LocalPlayer` wrappers to call `ParseAnimationAsync` directly.
 
 ### Phase 9 - Pure-data node graph
 
@@ -403,7 +409,7 @@ If a split adds complexity without measurable runtime-byte or performance improv
 When adding any feature module after Phase 3, all of the following must be done in the same PR:
 
 1. Implement the feature module under `features/layers/` or `features/shapes/`.
-2. Add the `[needs, () => import(...)]` tuple to the central feature-loader registry consumed by `loadLottieFeatures`.
+2. Add the `[needs, () => import(...)]` tuple to the central feature-loader registry consumed by `LoadLottieFeatures`.
 3. Ensure the worker entry can reach the same feature-loader registry/chunk mapping so the worker bundle can resolve and fetch the new chunk. Easy to forget because worker chunk resolution is bundler-sensitive, even though the feature-loading capability must match local playback.
 4. Add a fixture exercising the feature if no existing fixture covers it.
 5. Add fetched-bytes assertions: feature chunks are fetched when the fixture needs them, and not otherwise.

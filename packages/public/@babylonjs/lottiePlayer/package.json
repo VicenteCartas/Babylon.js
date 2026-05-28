@@ -5,6 +5,27 @@
     "module": "index.js",
     "types": "index.d.ts",
     "esnext": "index.js",
+    "exports": {
+        ".": {
+            "types": "./index.d.ts",
+            "default": "./index.js"
+        },
+        "./local": {
+            "types": "./local.d.ts",
+            "default": "./local.js"
+        },
+        "./worker": {
+            "types": "./worker.d.ts",
+            "default": "./worker.js"
+        },
+        "./package.json": "./package.json",
+        "./*.js": "./*.js",
+        "./*.d.ts": "./*.d.ts",
+        "./*": {
+            "types": "./*.d.ts",
+            "default": "./*.js"
+        }
+    },
     "description": "Babylon.js Lottie Player",
     "keywords": [
         "animation",

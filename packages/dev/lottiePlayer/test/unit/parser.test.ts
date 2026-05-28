@@ -1,13 +1,74 @@
 import { describe, it, expect, vi } from "vitest";
+import { ThinSprite } from "core/Sprites/thinSprite";
 
 import { Parser } from "../../src/parsing/parser";
-import { type SpritePacker, type SpriteAtlasInfo } from "../../src/parsing/spritePacker";
+import { type SpritePacker, type SpriteAtlasInfo, type SpritePackerRasterizationContext } from "../../src/parsing/spritePacker";
 import { type RenderingManager } from "../../src/rendering/renderingManager";
 import { SpriteNode } from "../../src/nodes/spriteNode";
 import { ControlNode } from "../../src/nodes/controlNode";
 import { Node } from "../../src/nodes/node";
 import { type RawElement, type RawLottieAnimation, type RawShapeLayer, type RawTextJustify, type RawTextLayer, type RawTransform } from "../../src/parsing/rawTypes";
 import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../../src/animationConfiguration";
+import { type LottieFeatureSet } from "../../src/features/feature";
+import { SolidLayerFeature } from "../../src/features/layers/solidLayer";
+import { type LottieTextLayerFeature } from "../../src/features/layers/textLayer";
+
+const BaseSpriteInfo: SpriteAtlasInfo = {
+    uOffset: 0,
+    vOffset: 0,
+    cellWidth: 16,
+    cellHeight: 16,
+    widthPx: 16,
+    heightPx: 16,
+    centerX: 8,
+    centerY: 8,
+    atlasIndex: 0,
+};
+
+const MockTextLayerFeature: LottieTextLayerFeature = {
+    parseTextLayer: (context) => {
+        const spriteInfo = BaseSpriteInfo;
+        const useBabylon8TextPlacement = context.featureConfiguration.compatibility.textLayerPlacement === "babylon8";
+        const spriteParent = useBabylon8TextPlacement ? context.parent : context.parseNullLayer(context.layer, context.transform, context.parent);
+
+        const sprite = new ThinSprite();
+        sprite._xOffset = spriteInfo.uOffset;
+        sprite._yOffset = spriteInfo.vOffset;
+        sprite._xSize = spriteInfo.cellWidth;
+        sprite._ySize = spriteInfo.cellHeight;
+        sprite.width = spriteInfo.widthPx;
+        sprite.height = spriteInfo.heightPx;
+        sprite.invertV = true;
+
+        context.renderingManager.addSprite(sprite, context.currentLayerOriginalIndex, spriteInfo.atlasIndex);
+
+        const babylon8X = context.layer.t.d.k[0].s.j === 0 ? spriteInfo.widthPx / 2 : context.layer.t.d.k[0].s.j === 1 ? -spriteInfo.widthPx / 2 : 0;
+        const babylon8Y = spriteInfo.heightPx / 2;
+        const position = useBabylon8TextPlacement
+            ? {
+                  startValue: { x: context.transform.anchorPoint.startValue.x + babylon8X, y: context.transform.anchorPoint.startValue.y + babylon8Y },
+                  currentValue: { x: context.transform.anchorPoint.currentValue.x + babylon8X, y: context.transform.anchorPoint.currentValue.y + babylon8Y },
+                  currentKeyframeIndex: 0,
+              }
+            : {
+                  startValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
+                  currentValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
+                  currentKeyframeIndex: 0,
+              };
+
+        const spriteNode = new SpriteNode("Sprite", sprite, position, undefined, undefined, undefined, spriteParent);
+
+        return useBabylon8TextPlacement ? spriteNode : spriteParent;
+    },
+};
+
+const MockFeatureSet: LottieFeatureSet = {
+    ids: ["solid", "text"],
+    features: [
+        { id: "solid", layerTypes: [1], solidLayer: SolidLayerFeature },
+        { id: "text", layerTypes: [5], textLayer: MockTextLayerFeature },
+    ],
+};
 
 // Minimal valid transform with a configurable anchor point.
 function makeTransform(anchorPoint: number[] = [0, 0]): RawTransform {
@@ -42,21 +103,9 @@ function makeTextData(justification: RawTextJustify = 0): RawTextLayer["t"] {
 // Builds a SpritePacker mock that returns deterministic SpriteAtlasInfo for both
 // shape and text additions.
 function makeMockPacker(): SpritePacker {
-    const baseInfo: SpriteAtlasInfo = {
-        uOffset: 0,
-        vOffset: 0,
-        cellWidth: 16,
-        cellHeight: 16,
-        widthPx: 16,
-        heightPx: 16,
-        centerX: 8,
-        centerY: 8,
-        atlasIndex: 0,
-    };
-
     const mock = {
-        addLottieShape: () => baseInfo,
-        addLottieText: () => baseInfo,
+        addLottieShape: () => BaseSpriteInfo,
+        addLottieText: () => BaseSpriteInfo,
         updateAtlasTexture: () => {},
         releaseCanvas: () => {},
         get textures() {
@@ -88,9 +137,10 @@ function makeParser(
     packer: SpritePacker,
     animation: RawLottieAnimation,
     configuration: ResolvedAnimationConfiguration = makeConfiguration(),
-    renderingManager: RenderingManager = makeMockRenderingManager()
+    renderingManager: RenderingManager = makeMockRenderingManager(),
+    features: LottieFeatureSet | undefined = MockFeatureSet
 ): Parser {
-    return new Parser(packer, animation, configuration, configuration, renderingManager);
+    return new Parser(packer, animation, configuration, configuration, renderingManager, features);
 }
 
 // Recursively finds the first descendant node whose id starts with the given prefix.
@@ -642,8 +692,31 @@ describe("Parser layer-level shape decorators", () => {
 describe("Parser solid layer (ty:1)", () => {
     // Same recording packer pattern as the layer-level decorator suite above. Defined inline so each
     // describe block is self-contained.
-    function makeRecordingPacker(): { packer: SpritePacker; calls: RawElement[][] } {
-        const calls: RawElement[][] = [];
+    type SolidRasterCall = {
+        kind: string;
+        boundingBox: { width: number; height: number; centerX: number; centerY: number; offsetX: number; offsetY: number; strokeInset: number };
+        scalingFactor: { x: number; y: number };
+        fillStyle: unknown;
+        fillRects: Array<{ x: number; y: number; width: number; height: number }>;
+    };
+
+    function makeRasterizationContext(call: SolidRasterCall): SpritePackerRasterizationContext {
+        const context: any = {
+            fillStyle: "",
+            save: () => {},
+            restore: () => {},
+            fillRect: (x: number, y: number, width: number, height: number) => {
+                call.fillStyle = context.fillStyle;
+                call.fillRects.push({ x, y, width, height });
+            },
+        };
+
+        return { context, x: 3, y: 5, cellWidth: 16, cellHeight: 16 };
+    }
+
+    function makeRecordingPacker(): { packer: SpritePacker; shapeCalls: RawElement[][]; rasterCalls: SolidRasterCall[] } {
+        const shapeCalls: RawElement[][] = [];
+        const rasterCalls: SolidRasterCall[] = [];
         const baseInfo: SpriteAtlasInfo = {
             uOffset: 0,
             vOffset: 0,
@@ -658,7 +731,24 @@ describe("Parser solid layer (ty:1)", () => {
 
         const mock = {
             addLottieShape: (rawElements: RawElement[]) => {
-                calls.push(rawElements.slice());
+                shapeCalls.push(rawElements.slice());
+                return baseInfo;
+            },
+            addRasterizedSprite: (
+                kind: string,
+                boundingBox: SolidRasterCall["boundingBox"],
+                scalingFactor: { x: number; y: number },
+                drawSprite: (context: SpritePackerRasterizationContext) => void
+            ) => {
+                const call: SolidRasterCall = {
+                    kind,
+                    boundingBox: { ...boundingBox },
+                    scalingFactor: { x: scalingFactor.x, y: scalingFactor.y },
+                    fillStyle: undefined,
+                    fillRects: [],
+                };
+                drawSprite(makeRasterizationContext(call));
+                rasterCalls.push(call);
                 return baseInfo;
             },
             addLottieText: () => baseInfo,
@@ -673,7 +763,7 @@ describe("Parser solid layer (ty:1)", () => {
             set rawFonts(_: unknown) {},
         };
 
-        return { packer: mock as unknown as SpritePacker, calls };
+        return { packer: mock as unknown as SpritePacker, shapeCalls, rasterCalls };
     }
 
     // Recording rendering manager so tests can assert the on-screen sprite dimensions handed to the
@@ -736,32 +826,20 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, calls } = makeRecordingPacker();
+        const { packer, shapeCalls, rasterCalls } = makeRecordingPacker();
         const { rm, sprites } = makeRecordingRenderingManager();
         makeParser(packer, animation, makeConfiguration(), rm);
 
-        // Solid layer must produce exactly one rasterization call containing a rectangle and a fill
-        // (in that order, mirroring the [shape, decorator] convention used by Lottie shape layers).
-        expect(calls).toHaveLength(1);
-        const items = calls[0];
-        expect(items).toHaveLength(2);
-
-        const rect = items[0] as any;
-        const fill = items[1] as any;
-        expect(rect.ty).toBe("rc");
-        expect(fill.ty).toBe("fl");
-
-        // Atlas cell geometry: 1x1 lottie pixel centered at (0.5, 0.5). Independent of sw/sh — that
-        // sizing happens on the sprite (below), not in the atlas.
-        expect(rect.s.k).toEqual([1, 1]);
-        expect(rect.p.k).toEqual([0.5, 0.5]);
-
-        // Fill color: #f0f0f0 -> 240/255 on each channel, alpha 1.
-        const expectedChannel = 240 / 255;
-        expect(fill.c.k[0]).toBeCloseTo(expectedChannel, 6);
-        expect(fill.c.k[1]).toBeCloseTo(expectedChannel, 6);
-        expect(fill.c.k[2]).toBeCloseTo(expectedChannel, 6);
-        expect(fill.c.k[3]).toBe(1);
+        // Solid layer must produce exactly one feature-owned atlas rasterization call. It no longer
+        // smuggles a rectangle/fill pair through the generic shape path.
+        expect(shapeCalls).toHaveLength(0);
+        expect(rasterCalls).toHaveLength(1);
+        const solidCall = rasterCalls[0];
+        expect(solidCall.kind).toBe("solid");
+        expect(solidCall.boundingBox).toEqual({ width: 1, height: 1, centerX: 0.5, centerY: 0.5, offsetX: 0.5, offsetY: 0.5, strokeInset: 0 });
+        expect(solidCall.scalingFactor).toEqual({ x: 1, y: 1 });
+        expect(solidCall.fillStyle).toBe("rgba(240, 240, 240, 1)");
+        expect(solidCall.fillRects).toEqual([{ x: 3, y: 5, width: 16, height: 16 }]);
 
         // On-screen sprite size must reflect the layer's full sw/sh — that's the dimension the GPU
         // stretches the 1x1 cell to. Pages.json's "Grey" layer is the regression case: dropping
@@ -800,11 +878,12 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, calls } = makeRecordingPacker();
+        const { packer, shapeCalls, rasterCalls } = makeRecordingPacker();
         const { rm, sprites } = makeRecordingRenderingManager();
         const parser = makeParser(packer, animation, makeConfiguration({ compatibility: { solidLayerRendering: "babylon8" } }), rm);
 
-        expect(calls).toHaveLength(0);
+        expect(shapeCalls).toHaveLength(0);
+        expect(rasterCalls).toHaveLength(0);
         expect(sprites).toHaveLength(0);
         expect(parser.animationInfo.nodes).toHaveLength(0);
         expect(captureDebugMessages(parser)).toContain("UnsupportedLayerType - Layer Name: Grey - Layer Index: 1 - Layer Type: 1");
@@ -834,10 +913,10 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, calls } = makeRecordingPacker();
+        const { packer, rasterCalls } = makeRecordingPacker();
         makeParser(packer, animation, makeConfiguration({ compatibility: { textLayerPlacement: "babylon8", solidLayerRendering: "spec" } }));
 
-        expect(calls).toHaveLength(1);
+        expect(rasterCalls).toHaveLength(1);
     });
 
     it("handles short #RGB hex form for solid layer color", () => {
@@ -867,14 +946,11 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, calls } = makeRecordingPacker();
+        const { packer, rasterCalls } = makeRecordingPacker();
         makeParser(packer, animation);
 
-        expect(calls).toHaveLength(1);
-        const fill = calls[0][1] as any;
-        expect(fill.c.k[0]).toBe(1);
-        expect(fill.c.k[1]).toBe(0);
-        expect(fill.c.k[2]).toBe(0);
+        expect(rasterCalls).toHaveLength(1);
+        expect(rasterCalls[0].fillStyle).toBe("rgba(255, 0, 0, 1)");
     });
 
     it("skips rasterization but still registers the anchor node when sw/sh are zero", () => {
@@ -916,11 +992,12 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, calls } = makeRecordingPacker();
+        const { packer, shapeCalls, rasterCalls } = makeRecordingPacker();
         const parser = makeParser(packer, animation);
 
         // Only the child shape rasterizes; the malformed solid layer is skipped.
-        expect(calls).toHaveLength(1);
+        expect(shapeCalls).toHaveLength(1);
+        expect(rasterCalls).toHaveLength(0);
 
         // Solid layer's anchor was still created so the child resolves its parent and ends up as a
         // descendant of the solid layer's ControlNode (not a stray root).

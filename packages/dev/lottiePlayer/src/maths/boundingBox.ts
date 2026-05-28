@@ -1,16 +1,5 @@
-import {
-    type RawElement,
-    type RawFont,
-    type RawEllipseShape,
-    type RawGradientStrokeShape,
-    type RawPathShape,
-    type RawRectangleShape,
-    type RawStrokeShape,
-    type RawTextData,
-} from "../parsing/rawTypes";
+import { type RawElement, type RawEllipseShape, type RawGradientStrokeShape, type RawPathShape, type RawRectangleShape, type RawStrokeShape } from "../parsing/rawTypes";
 import { GetInitialScalarValue, GetInitialVectorValues, GetInitialBezierData } from "../parsing/rawPropertyHelpers";
-import { type LottieCompatibilityMode } from "../animationConfiguration";
-import { ApplyLottieTextContext, MeasureLottieText, ResolveLottieText } from "../parsing/textLayout";
 
 /**
  * Represents a bounding box for a shape in the animation.
@@ -30,10 +19,6 @@ export type BoundingBox = {
     offsetY: number;
     /** Inset for the stroke, if applicable. */
     strokeInset: number;
-    /** Optional: Distance from the top of the text texture to the first baseline. Only populated for text bounding boxes. */
-    baselineOffsetY?: number;
-    /** Optional: Descent (in pixels) of the last text line below its baseline. Only populated for text bounding boxes. */
-    descent?: number;
 };
 
 // Corners of the bounding box
@@ -103,49 +88,6 @@ export function GetShapesBoundingBox(rawElements: RawElement[]): BoundingBox {
         offsetX: offsetX,
         offsetY: offsetY,
         strokeInset: 0,
-    };
-}
-
-/**
- * Calculates the bounding box for a group of graphic elements in a Lottie animation.
- * @param spritesCanvasContext The OffscreenCanvasRenderingContext2D or CanvasRenderingContext2D to use for text measurement
- * @param textData The text to calculate the bounding box for
- * @param rawFonts A map of font names to their raw font data
- * @param variables A map of variables to be used in the animation as text can be a variable which will affect its length
- * @param textLayerPlacement Text layer compatibility mode used to calculate placement-affecting text metrics.
- * @returns The bounding box for the text
- */
-export function GetTextBoundingBox(
-    spritesCanvasContext: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
-    textData: RawTextData,
-    rawFonts: Map<string, RawFont>,
-    variables: Map<string, string>,
-    textLayerPlacement: LottieCompatibilityMode = "spec"
-): BoundingBox | undefined {
-    spritesCanvasContext.save();
-
-    const resolvedText = ResolveLottieText(textData, rawFonts, variables);
-    if (!resolvedText) {
-        spritesCanvasContext.restore();
-        return undefined;
-    }
-
-    ApplyLottieTextContext(spritesCanvasContext, resolvedText);
-
-    const layout = MeasureLottieText(resolvedText, (text) => spritesCanvasContext.measureText(text), textLayerPlacement);
-
-    spritesCanvasContext.restore();
-
-    return {
-        width: layout.width,
-        height: layout.height,
-        centerX: layout.width / 2,
-        centerY: layout.height / 2,
-        offsetX: layout.offsetX,
-        offsetY: layout.offsetY,
-        strokeInset: 0, // Text bounding box ignores stroke padding here
-        baselineOffsetY: layout.baselineOffsetY,
-        descent: layout.descent,
     };
 }
 

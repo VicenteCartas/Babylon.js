@@ -1,8 +1,7 @@
-export * from "../features/layers/textLayout";
 import { type IVector2Like } from "core/Maths/math.like";
 
-import { type LottieCompatibilityMode } from "../animationConfiguration";
-import { type RawFont, type RawTextData, type RawTextDocument, type RawTextJustify } from "./rawTypes";
+import { type LottieCompatibilityMode } from "../../animationConfiguration";
+import { type RawFont, type RawTextData, type RawTextDocument, type RawTextJustify } from "../../parsing/rawTypes";
 
 /**
  * Minimal text metrics shape used by the Lottie text layout helpers.

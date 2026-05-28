@@ -17,7 +17,7 @@ import {
 } from "./rawTypes";
 import { type AnimationInfo, type ScalarKeyframe, type ScalarProperty, type Transform, type Vector2Keyframe, type Vector2Property } from "./parsedTypes";
 
-import { type SpriteAtlasInfo, type SpritePacker } from "./spritePacker";
+import { type SpritePacker } from "./spritePacker";
 import { SpriteNode } from "../nodes/spriteNode";
 
 import { BezierCurve } from "../maths/bezier";
@@ -27,6 +27,9 @@ import { Node } from "../nodes/node";
 import { ControlNode } from "../nodes/controlNode";
 
 import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
+import { type LottieFeatureSet } from "../features/feature";
+import { type LottieSolidLayerFeature } from "../features/layers/solidLayer";
+import { type LottieTextLayerFeature } from "../features/layers/textLayer";
 
 /**
  * Type of the vector properties in the Lottie animation. It determines how the vector values are interpreted in Babylon.js.
@@ -36,6 +39,34 @@ type VectorType = "Scale" | "Position" | "AnchorPoint";
  * Type of the scalar properties in the Lottie animation. It determines how the scalar values are interpreted in Babylon.js.
  */
 type ScalarType = "Rotation" | "Opacity";
+
+function GetSolidLayerFeature(features: LottieFeatureSet | undefined): LottieSolidLayerFeature | undefined {
+    if (features === undefined) {
+        return undefined;
+    }
+
+    for (let i = 0; i < features.features.length; i++) {
+        if (features.features[i].id === "solid") {
+            return features.features[i].solidLayer;
+        }
+    }
+
+    return undefined;
+}
+
+function GetTextLayerFeature(features: LottieFeatureSet | undefined): LottieTextLayerFeature | undefined {
+    if (features === undefined) {
+        return undefined;
+    }
+
+    for (let i = 0; i < features.features.length; i++) {
+        if (features.features[i].id === "text") {
+            return features.features[i].textLayer;
+        }
+    }
+
+    return undefined;
+}
 
 /**
  * Default scale value for the scale property of a Lottie transform.
@@ -54,39 +85,6 @@ type LayerTree = {
     layer: RawLottieLayer;
     children: LayerTree[];
 };
-
-/**
- * Parses a CSS hex color string in `#RGB` or `#RRGGBB` form into normalized 0..1 RGB components.
- * Used for solid layers (`ty:1`), whose color is stored as a CSS string in `sc`. Falls back to
- * white and pushes a warning for any other form (e.g. `rgb()`, named colors) so the source is
- * traceable instead of silently producing the wrong color.
- * @param value The raw `sc` string from a solid layer.
- * @param layerName The owning layer's name (for the warning message).
- * @param unsupported Mutable list to push a warning into when the value cannot be parsed.
- * @returns A `[r, g, b]` triple of normalized components in 0..1.
- */
-function ParseCssColorString(value: string, layerName: string | undefined, unsupported: string[]): [number, number, number] {
-    if (typeof value === "string") {
-        if (value.length === 7 && value[0] === "#") {
-            const r = parseInt(value.substring(1, 3), 16);
-            const g = parseInt(value.substring(3, 5), 16);
-            const b = parseInt(value.substring(5, 7), 16);
-            if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
-                return [r / 255, g / 255, b / 255];
-            }
-        }
-        if (value.length === 4 && value[0] === "#") {
-            const r = parseInt(value[1] + value[1], 16);
-            const g = parseInt(value[2] + value[2], 16);
-            const b = parseInt(value[3] + value[3], 16);
-            if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
-                return [r / 255, g / 255, b / 255];
-            }
-        }
-    }
-    unsupported.push(`Unsupported CSS color string in solid layer ${layerName ?? "<unknown>"}: ${value}`);
-    return [1, 1, 1];
-}
 
 /**
  * Parses a lottie animation file from a URL and returns the json representation of the file.
@@ -108,6 +106,8 @@ export class Parser {
     private readonly _rendererConfiguration: LottieRendererConfig;
     private readonly _animationInfo: AnimationInfo;
     private readonly _renderingManager: RenderingManager;
+    private readonly _solidLayerFeature: LottieSolidLayerFeature | undefined;
+    private readonly _textLayerFeature: LottieTextLayerFeature | undefined;
 
     private _rawFonts: Map<string, RawFont> = new Map<string, RawFont>(); // Map of font names to raw font data
     private _unsupportedFeatures: string[];
@@ -134,18 +134,22 @@ export class Parser {
      * @param featureConfiguration Engine-free feature configuration for the animation parser.
      * @param rendererConfiguration Renderer-bound configuration for atlas dimensions needed by the current parser.
      * @param renderingManager Object that manages the rendering of the sprites in the animation.
+     * @param features Optional feature modules loaded for this animation.
      */
     public constructor(
         packer: SpritePacker,
         animationData: RawLottieAnimation,
         featureConfiguration: LottieFeatureConfig,
         rendererConfiguration: LottieRendererConfig,
-        renderingManager: RenderingManager
+        renderingManager: RenderingManager,
+        features?: LottieFeatureSet
     ) {
         this._packer = packer;
         this._featureConfiguration = featureConfiguration;
         this._rendererConfiguration = rendererConfiguration;
         this._renderingManager = renderingManager;
+        this._solidLayerFeature = GetSolidLayerFeature(features);
+        this._textLayerFeature = GetTextLayerFeature(features);
 
         this._unsupportedFeatures = [];
 
@@ -228,8 +232,6 @@ export class Parser {
             for (const font of rawData.fonts.list) {
                 this._rawFonts.set(font.fName, font);
             }
-
-            this._packer.rawFonts = this._rawFonts;
         }
     }
 
@@ -417,143 +419,43 @@ export class Parser {
     }
 
     private _parseSolidLayer(layer: RawSolidLayer, transform: Transform, parent: Node): Node {
-        const anchorNode = this._parseNullLayer(layer, transform, parent);
-
-        // Defensive: malformed solid layer with no usable rectangle. Skip rasterization but keep the
-        // anchor node so any layers parented to this one (via `ind`) still get a valid parent slot.
-        if (!(layer.sw > 0) || !(layer.sh > 0)) {
-            this._unsupportedFeatures.push(`Solid layer ${layer.nm} has invalid sw/sh and will not render`);
-            return anchorNode;
+        if (this._solidLayerFeature === undefined) {
+            this._pushUnsupportedOnce("Solid layer feature was not loaded; skipping solid layers.");
+            return this._parseNullLayer(layer, transform, parent);
         }
 
-        const [r, g, b] = ParseCssColorString(layer.sc, layer.nm, this._unsupportedFeatures);
-
-        // Solid layers are by definition a single flat color (Lottie schema only allows `sc` as a
-        // CSS color string — no gradient, no animation). Rasterize it into a 1x1 atlas cell instead
-        // of an `sw`x`sh` cell: the sprite samples one pixel and the GPU stretches it, which is
-        // pixel-equivalent for a flat fill and avoids consuming a multi-megabyte chunk of the atlas
-        // for what's typically a full-stage backplate (e.g. Pages.json's 960x540 "Grey" layer would
-        // otherwise eat ~90% of a 2048-pixel atlas page at devicePixelRatio=2).
-        const atlasShapes: RawElement[] = [
-            {
-                ty: "rc",
-                nm: "Solid Rect (atlas)",
-                d: 1,
-                p: { a: 0, k: [0.5, 0.5] },
-                s: { a: 0, k: [1, 1] },
-                r: { a: 0, k: 0 },
-            } as unknown as RawElement,
-            {
-                ty: "fl",
-                nm: "Solid Fill",
-                c: { a: 0, k: [r, g, b, 1] },
-                o: { a: 0, k: 100 },
-                r: 1,
-            } as unknown as RawElement,
-        ];
-
-        // Atlas write at unit scale: the cell is 1 lottie pixel * 1 = 1 atlas pixel (multiplied by
-        // devicePixelRatio internally). Using the layer's actual rasterization scale would defeat
-        // the optimization by reintroducing the sw*sh cell.
-        const atlasScale = { x: 1, y: 1 };
-        const spriteInfo = this._packer.addLottieShape(atlasShapes, atlasScale, layer.nm);
-
-        // Build the sprite ourselves rather than going through `_parseShapes`, so we can keep the
-        // tiny atlas cell while sizing the on-screen sprite to the layer's full sw*sh. The sprite
-        // is positioned with its center at (sw/2, -sh/2) in the layer's local space so its top-left
-        // sits at the layer origin (0, 0) — matching how After Effects positions a solid layer.
-        const sprite = new ThinSprite();
-        sprite._xOffset = spriteInfo.uOffset + spriteInfo.cellWidth / (2 * this._rendererConfiguration.spriteAtlasWidth);
-        sprite._yOffset = spriteInfo.vOffset + spriteInfo.cellHeight / (2 * this._rendererConfiguration.spriteAtlasHeight);
-        sprite._xSize = 0;
-        sprite._ySize = 0;
-        sprite.width = layer.sw;
-        sprite.height = layer.sh;
-        sprite.invertV = true;
-
-        this._renderingManager.addSprite(sprite, this._currentLayerOriginalIndex, spriteInfo.atlasIndex);
-
-        const positionProperty: Vector2Property = {
-            startValue: { x: layer.sw / 2, y: -layer.sh / 2 },
-            currentValue: { x: layer.sw / 2, y: -layer.sh / 2 },
-            currentKeyframeIndex: 0,
-        };
-
-        new SpriteNode(
-            "Sprite",
-            sprite,
-            positionProperty,
-            undefined, // Rotation is not used for sprites final transform
-            undefined, // Scale is not used for sprites final transform
-            undefined, // Opacity is not used for sprites final transform
-            anchorNode
-        );
-
-        return anchorNode;
+        return this._solidLayerFeature.parseSolidLayer({
+            layer,
+            transform,
+            parent,
+            packer: this._packer,
+            rendererConfiguration: this._rendererConfiguration,
+            renderingManager: this._renderingManager,
+            currentLayerOriginalIndex: this._currentLayerOriginalIndex,
+            parseNullLayer: (solidLayer, solidTransform, solidParent) => this._parseNullLayer(solidLayer, solidTransform, solidParent),
+            pushUnsupported: (message) => this._unsupportedFeatures.push(message),
+        });
     }
 
     private _parseTextLayer(layer: RawTextLayer, transform: Transform, parent: Node): Node | undefined {
-        // Get the rasterization scale at the frame when the layer first becomes visible
-        const rasterizationFrame = this._getRasterizationFrame(layer);
-        const currentScale = this._getRasterizationScale(parent, rasterizationFrame);
-        const spriteInfo = this._packer.addLottieText(layer.t, currentScale, layer.nm);
-
-        if (spriteInfo === undefined) {
+        if (this._textLayerFeature === undefined) {
+            this._pushUnsupportedOnce("Text layer feature was not loaded; skipping text layers.");
             return undefined;
         }
 
-        const useBabylon8TextPlacement = this._featureConfiguration.compatibility.textLayerPlacement === "babylon8";
-        const spriteParent = useBabylon8TextPlacement ? parent : this._parseNullLayer(layer, transform, parent);
-
-        // Build the ThinSprite from the texture packer information
-        const sprite = new ThinSprite();
-
-        // Set sprite UV coordinates
-        sprite._xOffset = spriteInfo.uOffset;
-        sprite._yOffset = spriteInfo.vOffset;
-        sprite._xSize = spriteInfo.cellWidth;
-        sprite._ySize = spriteInfo.cellHeight;
-
-        // Set sprite dimensions for rendering
-        sprite.width = spriteInfo.widthPx;
-        sprite.height = spriteInfo.heightPx;
-        sprite.invertV = true;
-
-        this._renderingManager.addSprite(sprite, this._currentLayerOriginalIndex, spriteInfo.atlasIndex);
-
-        const positionProperty = useBabylon8TextPlacement ? this._getBabylon8TextPosition(layer, transform, spriteInfo) : this._getTextPosition(spriteInfo);
-
-        const spriteNode = new SpriteNode(
-            "Sprite",
-            sprite,
-            positionProperty,
-            undefined, // Rotation is not used for sprites final transform
-            undefined, // Scale is not used for sprites final transform
-            undefined, // Opacity is not used for sprites final transform
-            spriteParent
-        );
-
-        return useBabylon8TextPlacement ? spriteNode : spriteParent;
-    }
-
-    private _getTextPosition(spriteInfo: SpriteAtlasInfo): Vector2Property {
-        return {
-            startValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
-            currentValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
-            currentKeyframeIndex: 0,
-        };
-    }
-
-    private _getBabylon8TextPosition(layer: RawTextLayer, transform: Transform, spriteInfo: SpriteAtlasInfo): Vector2Property {
-        const textAlignment = layer.t.d?.k?.[0]?.s?.j ?? 0;
-        const xAlignmentOffset = textAlignment === 0 ? spriteInfo.widthPx / 2 : textAlignment === 1 ? -spriteInfo.widthPx / 2 : 0;
-        const yBaselineOffset = spriteInfo.heightPx / 2;
-
-        return {
-            startValue: { x: transform.anchorPoint.startValue.x + xAlignmentOffset, y: transform.anchorPoint.startValue.y + yBaselineOffset },
-            currentValue: { x: transform.anchorPoint.currentValue.x + xAlignmentOffset, y: transform.anchorPoint.currentValue.y + yBaselineOffset },
-            currentKeyframeIndex: 0,
-        };
+        return this._textLayerFeature.parseTextLayer({
+            layer,
+            transform,
+            parent,
+            packer: this._packer,
+            rawFonts: this._rawFonts,
+            featureConfiguration: this._featureConfiguration,
+            renderingManager: this._renderingManager,
+            currentLayerOriginalIndex: this._currentLayerOriginalIndex,
+            getRasterizationFrame: (textLayer) => this._getRasterizationFrame(textLayer),
+            getRasterizationScale: (textParent, rasterizationFrame) => this._getRasterizationScale(textParent, rasterizationFrame),
+            parseNullLayer: (textLayer, textTransform, textParent) => this._parseNullLayer(textLayer, textTransform, textParent),
+        });
     }
 
     private _parseElements(elements: RawElement[] | undefined, parent: Node, rasterizationFrame: number): void {
