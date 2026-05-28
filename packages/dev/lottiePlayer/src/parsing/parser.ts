@@ -26,7 +26,7 @@ import { type RenderingManager } from "../rendering/renderingManager";
 import { Node } from "../nodes/node";
 import { ControlNode } from "../nodes/controlNode";
 
-import { type ResolvedAnimationConfiguration } from "../animationConfiguration";
+import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
 
 /**
  * Type of the vector properties in the Lottie animation. It determines how the vector values are interpreted in Babylon.js.
@@ -104,7 +104,8 @@ export async function GetRawAnimationDataAsync(urlToFile: string): Promise<RawLo
  */
 export class Parser {
     private _packer: SpritePacker;
-    private readonly _configuration: ResolvedAnimationConfiguration;
+    private readonly _featureConfiguration: LottieFeatureConfig;
+    private readonly _rendererConfiguration: LottieRendererConfig;
     private readonly _animationInfo: AnimationInfo;
     private readonly _renderingManager: RenderingManager;
 
@@ -130,12 +131,20 @@ export class Parser {
      * Creates a new instance of the Lottie animations parser.
      * @param packer Object that packs the sprites from the animation into a texture atlas.
      * @param animationData The raw lottie animation as a JSON object.
-     * @param configuration Configuration options for the animation parser.
+     * @param featureConfiguration Engine-free feature configuration for the animation parser.
+     * @param rendererConfiguration Renderer-bound configuration for atlas dimensions needed by the current parser.
      * @param renderingManager Object that manages the rendering of the sprites in the animation.
      */
-    public constructor(packer: SpritePacker, animationData: RawLottieAnimation, configuration: ResolvedAnimationConfiguration, renderingManager: RenderingManager) {
+    public constructor(
+        packer: SpritePacker,
+        animationData: RawLottieAnimation,
+        featureConfiguration: LottieFeatureConfig,
+        rendererConfiguration: LottieRendererConfig,
+        renderingManager: RenderingManager
+    ) {
         this._packer = packer;
-        this._configuration = configuration;
+        this._featureConfiguration = featureConfiguration;
+        this._rendererConfiguration = rendererConfiguration;
         this._renderingManager = renderingManager;
 
         this._unsupportedFeatures = [];
@@ -320,7 +329,10 @@ export class Parser {
         }
 
         // We only support solid, null, shape and text layers
-        if ((layer.ty === 1 && this._configuration.compatibility.solidLayerRendering === "babylon8") || (layer.ty !== 1 && layer.ty !== 3 && layer.ty !== 4 && layer.ty !== 5)) {
+        if (
+            (layer.ty === 1 && this._featureConfiguration.compatibility.solidLayerRendering === "babylon8") ||
+            (layer.ty !== 1 && layer.ty !== 3 && layer.ty !== 4 && layer.ty !== 5)
+        ) {
             this._unsupportedFeatures.push(`UnsupportedLayerType - Layer Name: ${layer.nm} - Layer Index: ${layer.ind} - Layer Type: ${layer.ty}`);
             return;
         }
@@ -451,8 +463,8 @@ export class Parser {
         // is positioned with its center at (sw/2, -sh/2) in the layer's local space so its top-left
         // sits at the layer origin (0, 0) — matching how After Effects positions a solid layer.
         const sprite = new ThinSprite();
-        sprite._xOffset = spriteInfo.uOffset + spriteInfo.cellWidth / (2 * this._configuration.spriteAtlasWidth);
-        sprite._yOffset = spriteInfo.vOffset + spriteInfo.cellHeight / (2 * this._configuration.spriteAtlasHeight);
+        sprite._xOffset = spriteInfo.uOffset + spriteInfo.cellWidth / (2 * this._rendererConfiguration.spriteAtlasWidth);
+        sprite._yOffset = spriteInfo.vOffset + spriteInfo.cellHeight / (2 * this._rendererConfiguration.spriteAtlasHeight);
         sprite._xSize = 0;
         sprite._ySize = 0;
         sprite.width = layer.sw;
@@ -490,7 +502,7 @@ export class Parser {
             return undefined;
         }
 
-        const useBabylon8TextPlacement = this._configuration.compatibility.textLayerPlacement === "babylon8";
+        const useBabylon8TextPlacement = this._featureConfiguration.compatibility.textLayerPlacement === "babylon8";
         const spriteParent = useBabylon8TextPlacement ? parent : this._parseNullLayer(layer, transform, parent);
 
         // Build the ThinSprite from the texture packer information
@@ -778,7 +790,7 @@ export class Parser {
                         (rawKeyFrames[i].o!.y as number[])[0],
                         (rawKeyFrames[i].i!.x as number[])[0],
                         (rawKeyFrames[i].i!.y as number[])[0],
-                        this._configuration.easingSteps
+                        this._featureConfiguration.easingSteps
                     );
                 } else {
                     // Value is a number
@@ -787,7 +799,7 @@ export class Parser {
                         rawKeyFrames[i].o!.y as number,
                         rawKeyFrames[i].i!.x as number,
                         rawKeyFrames[i].i!.y as number,
-                        this._configuration.easingSteps
+                        this._featureConfiguration.easingSteps
                     );
                 }
             }
@@ -883,7 +895,7 @@ export class Parser {
                         (rawKeyFrames[i].o!.y as number[])[0],
                         (rawKeyFrames[i].i!.x as number[])[0],
                         (rawKeyFrames[i].i!.y as number[])[0],
-                        this._configuration.easingSteps
+                        this._featureConfiguration.easingSteps
                     );
                 } else {
                     // Value is a number
@@ -892,7 +904,7 @@ export class Parser {
                         rawKeyFrames[i].o!.y as number,
                         rawKeyFrames[i].i!.x as number,
                         rawKeyFrames[i].i!.y as number,
-                        this._configuration.easingSteps
+                        this._featureConfiguration.easingSteps
                     );
                 }
             }
@@ -906,7 +918,7 @@ export class Parser {
                         (rawKeyFrames[i].o!.y as number[])[1],
                         (rawKeyFrames[i].i!.x as number[])[1],
                         (rawKeyFrames[i].i!.y as number[])[1],
-                        this._configuration.easingSteps
+                        this._featureConfiguration.easingSteps
                     );
                 } else {
                     // Value is a number
@@ -915,7 +927,7 @@ export class Parser {
                         rawKeyFrames[i].o!.y as number,
                         rawKeyFrames[i].i!.x as number,
                         rawKeyFrames[i].i!.y as number,
-                        this._configuration.easingSteps
+                        this._featureConfiguration.easingSteps
                     );
                 }
             }

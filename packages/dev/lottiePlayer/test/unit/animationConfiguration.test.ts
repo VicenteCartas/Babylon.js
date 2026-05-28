@@ -1,6 +1,50 @@
 import { describe, expect, it } from "vitest";
 
-import { UpdateConfiguration } from "../../src/animationConfiguration";
+import { ResolveFeatureConfiguration, ResolveRendererConfiguration, UpdateConfiguration } from "../../src/animationConfiguration";
+
+describe("ResolveFeatureConfiguration", () => {
+    it("resolves engine-free feature options without GPU caps", () => {
+        const configuration = ResolveFeatureConfiguration({
+            loopAnimation: true,
+            easingSteps: 8,
+            stopAtFrame: 12,
+            debug: true,
+            compatibility: { textLayerPlacement: "babylon8" },
+            spriteAtlasWidth: 256,
+            devicePixelRatio: 3,
+        });
+
+        expect(configuration).toEqual({
+            loopAnimation: true,
+            easingSteps: 8,
+            supportDeviceLost: true,
+            stopAtFrame: 12,
+            debug: true,
+            compatibility: {
+                textLayerPlacement: "babylon8",
+                solidLayerRendering: "spec",
+            },
+        });
+    });
+});
+
+describe("ResolveRendererConfiguration", () => {
+    it("resolves renderer-bound atlas and device pixel ratio options from GPU caps", () => {
+        const configuration = ResolveRendererConfiguration({}, 4096, 1);
+
+        expect(configuration.spriteAtlasWidth).toBe(4096);
+        expect(configuration.spriteAtlasHeight).toBe(4096);
+        expect(configuration.devicePixelRatio).toBe(2);
+    });
+
+    it("preserves explicit renderer options", () => {
+        const configuration = ResolveRendererConfiguration({ spriteAtlasWidth: 512, spriteAtlasHeight: 256, devicePixelRatio: 3 }, 4096, 1);
+
+        expect(configuration.spriteAtlasWidth).toBe(512);
+        expect(configuration.spriteAtlasHeight).toBe(256);
+        expect(configuration.devicePixelRatio).toBe(3);
+    });
+});
 
 describe("UpdateConfiguration compatibility", () => {
     it("uses spec compatibility by default", () => {

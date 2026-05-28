@@ -1,6 +1,4 @@
-import "core/Engines/Extensions/engine.dynamicBuffer";
-import "core/Shaders/sprites.vertex";
-import "core/Shaders/sprites.fragment";
+import "./babylonSideEffects";
 
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { type ThinTexture } from "core/Materials/Textures/thinTexture";
@@ -9,7 +7,7 @@ import { SpriteRenderer } from "core/Sprites/spriteRenderer";
 
 import { type ThinMatrix } from "../maths/matrix";
 
-import { type ResolvedAnimationConfiguration } from "../animationConfiguration";
+import { type LottieRendererConfig } from "../animationConfiguration";
 
 /**
  * Represents all the sprites from the animation and manages their rendering.
@@ -24,14 +22,14 @@ export class RenderingManager {
     private _spriteLayerIndices: number[];
     private _spriteAtlasIndices: number[];
     private _batches: { sprites: ThinSprite[]; pageIndex: number }[];
-    private readonly _configuration: ResolvedAnimationConfiguration;
+    private readonly _configuration: LottieRendererConfig;
 
     /**
      * Creates a new instance of the RenderingManager.
      * @param engine ThinEngine instance used for rendering.
      * @param configuration Configuration options for the rendering manager.
      */
-    public constructor(engine: ThinEngine, configuration: ResolvedAnimationConfiguration) {
+    public constructor(engine: ThinEngine, configuration: LottieRendererConfig) {
         this._engine = engine;
         this._spritesTextures = [];
         this._sprites = [];

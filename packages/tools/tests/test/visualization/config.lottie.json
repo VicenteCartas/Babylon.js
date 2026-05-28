@@ -510,6 +510,76 @@
             "devHostQsps": "exp=lottie&file=gradient_stroke.json&useWorker=true&useUrl=true&frame=0",
             "referenceImage": "lottie-gradient-stroke-frame0.png",
             "readySelector": "#lottie-ready"
+        },
+        {
+            "title": "Lottie Phase 0 - Solid Only (Main Thread)",
+            "devHostQsps": "exp=lottie&file=./phase0/solidOnly.json&useWorker=false&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-solid-only.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Solid Only (Web Worker)",
+            "devHostQsps": "exp=lottie&file=./phase0/solidOnly.json&useWorker=true&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-solid-only.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Shape Only (Main Thread)",
+            "devHostQsps": "exp=lottie&file=./phase0/shapeOnly.json&useWorker=false&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-shape-only.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Shape Only (Web Worker)",
+            "devHostQsps": "exp=lottie&file=./phase0/shapeOnly.json&useWorker=true&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-shape-only.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Text Only (Main Thread)",
+            "devHostQsps": "exp=lottie&file=./phase0/textOnly.json&useWorker=false&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-text-only.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Text Only (Web Worker)",
+            "devHostQsps": "exp=lottie&file=./phase0/textOnly.json&useWorker=true&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-text-only.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Mixed (Main Thread)",
+            "devHostQsps": "exp=lottie&file=./phase0/mixed.json&useWorker=false&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-mixed.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - Mixed (Web Worker)",
+            "devHostQsps": "exp=lottie&file=./phase0/mixed.json&useWorker=true&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-mixed.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - No Text Realistic (Main Thread)",
+            "devHostQsps": "exp=lottie&file=./phase0/noTextRealistic.json&useWorker=false&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-no-text-realistic.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
+        },
+        {
+            "title": "Lottie Phase 0 - No Text Realistic (Web Worker)",
+            "devHostQsps": "exp=lottie&file=./phase0/noTextRealistic.json&useWorker=true&useUrl=false&frame=0",
+            "referenceImage": "lottie-phase0-no-text-realistic.png",
+            "readySelector": "#lottie-ready",
+            "screenshotDelayMs": 0
         }
     ]
 }

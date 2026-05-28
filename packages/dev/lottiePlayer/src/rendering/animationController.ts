@@ -1,11 +1,15 @@
-import "core/Engines/Extensions/engine.alpha";
-import "core/Shaders/sprites.vertex";
-import "core/Shaders/sprites.fragment";
+import "./babylonSideEffects";
 
 import { type RawLottieAnimation } from "../parsing/rawTypes";
 import { type AnimationInfo } from "../parsing/parsedTypes";
 import { type Node } from "../nodes/node";
-import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../animationConfiguration";
+import {
+    type AnimationConfiguration,
+    type LottieFeatureConfig,
+    type LottieRendererConfig,
+    ResolveFeatureConfiguration,
+    ResolveRendererConfiguration,
+} from "../animationConfiguration";
 
 import { ThinEngine } from "core/Engines/thinEngine";
 import { Viewport } from "core/Maths/math.viewport";
@@ -29,7 +33,8 @@ export class AnimationController {
     private _canvasScale: number;
     private readonly _atlasScale: number;
     private readonly _variables: Map<string, string>;
-    private _configuration: ResolvedAnimationConfiguration;
+    private _featureConfiguration: LottieFeatureConfig;
+    private _rendererConfiguration: LottieRendererConfig;
     private readonly _engine: ThinEngine;
     private readonly _spritePacker: SpritePacker;
 
@@ -117,7 +122,9 @@ export class AnimationController {
         this._hasRendered = false;
         this._onFirstRender = onFirstRender;
 
-        const supportDeviceLost = configuration.supportDeviceLost ?? true;
+        this._featureConfiguration = ResolveFeatureConfiguration(configuration);
+        this._loop = this._featureConfiguration.loopAnimation;
+
         this._engine = new ThinEngine(
             this._canvas,
             false, // Antialias
@@ -130,7 +137,7 @@ export class AnimationController {
                 // Important to allow skip frame and tiled optimizations
                 preserveDrawingBuffer: false,
                 premultipliedAlpha: true, // Using premultiplied alpha to avoid issues with colors bleeding in the texture atlas
-                doNotHandleContextLost: !supportDeviceLost,
+                doNotHandleContextLost: !this._featureConfiguration.supportDeviceLost,
                 // Useful during debug to simulate WebGL1 devices (Safari)
                 // disableWebGL2Support: true,
             },
@@ -139,8 +146,7 @@ export class AnimationController {
 
         // Finalize configuration now that we can query GPU capabilities
         const maxTextureSize = this._engine.getCaps().maxTextureSize;
-        this._configuration = UpdateConfiguration(configuration, maxTextureSize, mainThreadDevicePixelRatio);
-        this._loop = this._configuration.loopAnimation;
+        this._rendererConfiguration = ResolveRendererConfiguration(configuration, maxTextureSize, mainThreadDevicePixelRatio);
 
         // Prevent parallel shader compilation to simplify the boot sequence
         // Only a couple of fast compile shaders.
@@ -149,8 +155,8 @@ export class AnimationController {
         this._engine.stencilState.stencilTest = false;
         this._engine.setAlphaMode(ALPHA_PREMULTIPLIED);
 
-        this._spritePacker = new SpritePacker(this._engine, this._isHtmlCanvas(canvas), this._atlasScale, this._variables, this._configuration);
-        this._renderingManager = new RenderingManager(this._engine, this._configuration);
+        this._spritePacker = new SpritePacker(this._engine, this._isHtmlCanvas(canvas), this._atlasScale, this._variables, this._featureConfiguration, this._rendererConfiguration);
+        this._renderingManager = new RenderingManager(this._engine, this._rendererConfiguration);
 
         this._projectionMatrix = new ThinMatrix();
         this._worldMatrix = new ThinMatrix();
@@ -159,9 +165,9 @@ export class AnimationController {
         this._viewport = new Viewport(0, 0, 1, 1);
 
         // Parse the animation
-        const parser = new Parser(this._spritePacker, animationData, this._configuration, this._renderingManager);
+        const parser = new Parser(this._spritePacker, animationData, this._featureConfiguration, this._rendererConfiguration, this._renderingManager);
 
-        if (this._configuration.debug) {
+        if (this._featureConfiguration.debug) {
             parser.debug();
         }
 
@@ -252,7 +258,7 @@ export class AnimationController {
      */
     private _setSize(width: number, height: number, canvasScale: number): void {
         const { _engine, _projectionMatrix, _worldMatrix } = this;
-        const devicePixelRatio = this._configuration.devicePixelRatio;
+        const devicePixelRatio = this._rendererConfiguration.devicePixelRatio;
 
         _engine.setSize(width * canvasScale * devicePixelRatio, height * canvasScale * devicePixelRatio);
 
@@ -348,12 +354,13 @@ export class AnimationController {
         }
 
         let stoppingAfterThisFrame = false;
-        const effectiveEndFrame = this._configuration.stopAtFrame !== undefined ? Math.min(this._configuration.stopAtFrame, this._animation.endFrame) : this._animation.endFrame;
+        const effectiveEndFrame =
+            this._featureConfiguration.stopAtFrame !== undefined ? Math.min(this._featureConfiguration.stopAtFrame, this._animation.endFrame) : this._animation.endFrame;
         // Lottie out-point (op) is exclusive — the last visible frame is op - 1
-        const lastVisibleFrame = this._configuration.stopAtFrame !== undefined ? effectiveEndFrame : effectiveEndFrame - 1;
+        const lastVisibleFrame = this._featureConfiguration.stopAtFrame !== undefined ? effectiveEndFrame : effectiveEndFrame - 1;
 
         if (this._currentFrame > lastVisibleFrame) {
-            if (this._loop && this._configuration.stopAtFrame === undefined) {
+            if (this._loop && this._featureConfiguration.stopAtFrame === undefined) {
                 this._currentFrame = (this._currentFrame % (this._animation.endFrame - this._animation.startFrame)) + this._animation.startFrame;
                 for (let i = 0; i < this._animation.nodes.length; i++) {
                     this._animation.nodes[i].reset();
@@ -378,7 +385,7 @@ export class AnimationController {
         }
 
         if (stoppingAfterThisFrame) {
-            if (this._configuration.stopAtFrame === undefined) {
+            if (this._featureConfiguration.stopAtFrame === undefined) {
                 this._isPlaying = false;
             }
             // When stopAtFrame is set, the render loop stays alive to prevent

@@ -20,7 +20,9 @@
     "license": "MIT",
     "readme": "README.md",
     "type": "module",
-    "sideEffects": true,
+    "sideEffects": [
+        "./rendering/babylonSideEffects.js"
+    ],
     "repository": {
         "type": "git",
         "url": "git+https://github.com/BabylonJS/Babylon.js.git"

@@ -84,6 +84,15 @@ function makeConfiguration(configuration: Partial<AnimationConfiguration> = {}):
     return UpdateConfiguration(configuration, 4096, 1);
 }
 
+function makeParser(
+    packer: SpritePacker,
+    animation: RawLottieAnimation,
+    configuration: ResolvedAnimationConfiguration = makeConfiguration(),
+    renderingManager: RenderingManager = makeMockRenderingManager()
+): Parser {
+    return new Parser(packer, animation, configuration, configuration, renderingManager);
+}
+
 // Recursively finds the first descendant node whose id starts with the given prefix.
 function findDescendantByIdPrefix(root: Node, prefix: string): Node | undefined {
     if (root.id.startsWith(prefix)) {
@@ -121,7 +130,7 @@ describe("Parser scene graph structure", () => {
             ],
         };
 
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const roots = parser.animationInfo.nodes;
 
         expect(roots).toHaveLength(1);
@@ -165,7 +174,7 @@ describe("Parser scene graph structure", () => {
             ],
         };
 
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration({ compatibility: { textLayerPlacement: "babylon8" } }), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation, makeConfiguration({ compatibility: { textLayerPlacement: "babylon8" } }));
         const roots = parser.animationInfo.nodes;
 
         expect(roots).toHaveLength(1);
@@ -221,7 +230,7 @@ describe("Parser scene graph structure", () => {
             ],
         };
 
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const roots = parser.animationInfo.nodes;
 
         // Only the text layer is a root; the shape layer is parented under it.
@@ -277,7 +286,7 @@ describe("Parser scene graph structure", () => {
             ],
         };
 
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const roots = parser.animationInfo.nodes;
 
         const parentAnchor = findDescendantByIdPrefix(roots[0], "Node (Anchor) - ShapeParent");
@@ -335,7 +344,7 @@ describe("Parser vector property validation (I-05)", () => {
         // still parses) but surface a warning so we don't silently regress on unexpected
         // component counts.
         const animation = makeAnimationWithLayerPosition({ a: 0, k: [10, 20, 0] });
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
 
         // Animation must still parse successfully (layer transform applied from x/y).
         expect(parser.animationInfo.nodes).toHaveLength(1);
@@ -354,21 +363,21 @@ describe("Parser vector property validation (I-05)", () => {
                 { t: 30, s: [10, 20, 0], i: ease, o: ease },
             ],
         });
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const messages = captureDebugMessages(parser);
         expect(messages.some((m) => m.includes("Vector2 missing 'l' with 3-component value"))).toBe(true);
     });
 
     it("does not log when 'l' is missing on a 2-component value", () => {
         const animation = makeAnimationWithLayerPosition({ a: 0, k: [10, 20] });
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const messages = captureDebugMessages(parser);
         expect(messages.some((m) => m.includes("Vector2 missing 'l'"))).toBe(false);
     });
 
     it("does not log when 'l' is explicitly 2", () => {
         const animation = makeAnimationWithLayerPosition({ a: 0, k: [10, 20], l: 2 });
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const messages = captureDebugMessages(parser);
         expect(messages.some((m) => m.includes("Vector2 missing 'l'"))).toBe(false);
     });
@@ -400,7 +409,7 @@ describe("Parser vector property validation (I-05)", () => {
                 } as RawShapeLayer,
             ],
         };
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
         const messages = captureDebugMessages(parser);
         // Each (layer, vectorType) pair gets its own message — but each message only once.
         const matches = messages.filter((m) => m.includes("Vector2 missing 'l' with 3-component value"));
@@ -456,7 +465,7 @@ describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
             ],
         };
 
-        const parser = new Parser(makeMockPacker(), animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(makeMockPacker(), animation);
 
         // Reach into the parsed ControlNode to inspect the Vector2Property keyframes.
         // Surface API doesn't expose them directly, so go through the private field — same
@@ -559,7 +568,7 @@ describe("Parser layer-level shape decorators", () => {
         };
 
         const { packer, calls } = makeRecordingPacker();
-        new Parser(packer, animation, makeConfiguration(), makeMockRenderingManager());
+        makeParser(packer, animation);
 
         // Both groups must produce a sprite call.
         expect(calls).toHaveLength(2);
@@ -620,7 +629,7 @@ describe("Parser layer-level shape decorators", () => {
         };
 
         const { packer, calls } = makeRecordingPacker();
-        new Parser(packer, animation, makeConfiguration(), makeMockRenderingManager());
+        makeParser(packer, animation);
 
         expect(calls).toHaveLength(1);
         const group1Items = calls[0];
@@ -729,7 +738,7 @@ describe("Parser solid layer (ty:1)", () => {
 
         const { packer, calls } = makeRecordingPacker();
         const { rm, sprites } = makeRecordingRenderingManager();
-        new Parser(packer, animation, makeConfiguration(), rm);
+        makeParser(packer, animation, makeConfiguration(), rm);
 
         // Solid layer must produce exactly one rasterization call containing a rectangle and a fill
         // (in that order, mirroring the [shape, decorator] convention used by Lottie shape layers).
@@ -793,7 +802,7 @@ describe("Parser solid layer (ty:1)", () => {
 
         const { packer, calls } = makeRecordingPacker();
         const { rm, sprites } = makeRecordingRenderingManager();
-        const parser = new Parser(packer, animation, makeConfiguration({ compatibility: { solidLayerRendering: "babylon8" } }), rm);
+        const parser = makeParser(packer, animation, makeConfiguration({ compatibility: { solidLayerRendering: "babylon8" } }), rm);
 
         expect(calls).toHaveLength(0);
         expect(sprites).toHaveLength(0);
@@ -826,7 +835,7 @@ describe("Parser solid layer (ty:1)", () => {
         };
 
         const { packer, calls } = makeRecordingPacker();
-        new Parser(packer, animation, makeConfiguration({ compatibility: { textLayerPlacement: "babylon8", solidLayerRendering: "spec" } }), makeMockRenderingManager());
+        makeParser(packer, animation, makeConfiguration({ compatibility: { textLayerPlacement: "babylon8", solidLayerRendering: "spec" } }));
 
         expect(calls).toHaveLength(1);
     });
@@ -859,7 +868,7 @@ describe("Parser solid layer (ty:1)", () => {
         };
 
         const { packer, calls } = makeRecordingPacker();
-        new Parser(packer, animation, makeConfiguration(), makeMockRenderingManager());
+        makeParser(packer, animation);
 
         expect(calls).toHaveLength(1);
         const fill = calls[0][1] as any;
@@ -908,7 +917,7 @@ describe("Parser solid layer (ty:1)", () => {
         };
 
         const { packer, calls } = makeRecordingPacker();
-        const parser = new Parser(packer, animation, makeConfiguration(), makeMockRenderingManager());
+        const parser = makeParser(packer, animation);
 
         // Only the child shape rasterizes; the malformed solid layer is skipped.
         expect(calls).toHaveLength(1);

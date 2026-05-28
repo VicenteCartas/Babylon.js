@@ -1,0 +1,110 @@
+{
+    "description": "Phase 0 fixture set for Lottie functional tree-shaking work. Each fixture has local devhost worker/local cases plus a visual baseline entry in config.lottie.json.",
+    "fixtures": [
+        {
+            "id": "solid-only",
+            "description": "Local fixture containing only a ty:1 solid layer.",
+            "cases": [
+                {
+                    "id": "solid-only-worker",
+                    "transport": "worker",
+                    "devHostQsps": "exp=lottie&file=./phase0/solidOnly.json&useWorker=true&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Solid Only (Web Worker)",
+                    "referenceImage": "lottie-phase0-solid-only.png"
+                },
+                {
+                    "id": "solid-only-local",
+                    "transport": "local",
+                    "devHostQsps": "exp=lottie&file=./phase0/solidOnly.json&useWorker=false&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Solid Only (Main Thread)",
+                    "referenceImage": "lottie-phase0-solid-only.png"
+                }
+            ],
+            "futureForbiddenJsUrlPatterns": ["/features/text", "/features/shape"]
+        },
+        {
+            "id": "shape-only",
+            "description": "Local fixture containing a shape layer with one rounded rectangle and flat fill, no text.",
+            "cases": [
+                {
+                    "id": "shape-only-worker",
+                    "transport": "worker",
+                    "devHostQsps": "exp=lottie&file=./phase0/shapeOnly.json&useWorker=true&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Shape Only (Web Worker)",
+                    "referenceImage": "lottie-phase0-shape-only.png"
+                },
+                {
+                    "id": "shape-only-local",
+                    "transport": "local",
+                    "devHostQsps": "exp=lottie&file=./phase0/shapeOnly.json&useWorker=false&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Shape Only (Main Thread)",
+                    "referenceImage": "lottie-phase0-shape-only.png"
+                }
+            ],
+            "futureForbiddenJsUrlPatterns": ["/features/text"]
+        },
+        {
+            "id": "text-only",
+            "description": "Local fixture containing only a ty:5 text layer.",
+            "cases": [
+                {
+                    "id": "text-only-worker",
+                    "transport": "worker",
+                    "devHostQsps": "exp=lottie&file=./phase0/textOnly.json&useWorker=true&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Text Only (Web Worker)",
+                    "referenceImage": "lottie-phase0-text-only.png"
+                },
+                {
+                    "id": "text-only-local",
+                    "transport": "local",
+                    "devHostQsps": "exp=lottie&file=./phase0/textOnly.json&useWorker=false&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Text Only (Main Thread)",
+                    "referenceImage": "lottie-phase0-text-only.png"
+                }
+            ],
+            "futureForbiddenJsUrlPatterns": ["/features/shape"]
+        },
+        {
+            "id": "mixed",
+            "description": "Local fixture containing a solid background, shape layer, and text layer.",
+            "cases": [
+                {
+                    "id": "mixed-worker",
+                    "transport": "worker",
+                    "devHostQsps": "exp=lottie&file=./phase0/mixed.json&useWorker=true&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Mixed (Web Worker)",
+                    "referenceImage": "lottie-phase0-mixed.png"
+                },
+                {
+                    "id": "mixed-local",
+                    "transport": "local",
+                    "devHostQsps": "exp=lottie&file=./phase0/mixed.json&useWorker=false&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - Mixed (Main Thread)",
+                    "referenceImage": "lottie-phase0-mixed.png"
+                }
+            ],
+            "futureForbiddenJsUrlPatterns": []
+        },
+        {
+            "id": "no-text-realistic",
+            "description": "Local no-text fixture with a solid background and shape-rich gradient/stroke panel.",
+            "cases": [
+                {
+                    "id": "no-text-realistic-worker",
+                    "transport": "worker",
+                    "devHostQsps": "exp=lottie&file=./phase0/noTextRealistic.json&useWorker=true&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - No Text Realistic (Web Worker)",
+                    "referenceImage": "lottie-phase0-no-text-realistic.png"
+                },
+                {
+                    "id": "no-text-realistic-local",
+                    "transport": "local",
+                    "devHostQsps": "exp=lottie&file=./phase0/noTextRealistic.json&useWorker=false&useUrl=false&frame=0",
+                    "visualTestTitle": "Lottie Phase 0 - No Text Realistic (Main Thread)",
+                    "referenceImage": "lottie-phase0-no-text-realistic.png"
+                }
+            ],
+            "futureForbiddenJsUrlPatterns": ["/features/text"]
+        }
+    ]
+}

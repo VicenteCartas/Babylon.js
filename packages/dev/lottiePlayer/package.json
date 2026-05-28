@@ -20,7 +20,9 @@
         "watch:source": "tsc -b tsconfig.build.json -w",
         "watch": "build-tools -c dev-watch --packages \"lottie-player\" -wa"
     },
-    "sideEffects": true,
+    "sideEffects": [
+        "./src/rendering/babylonSideEffects.ts"
+    ],
     "devDependencies": {
         "@dev/core": "^1.0.0",
         "@dev/build-tools": "^1.0.0"

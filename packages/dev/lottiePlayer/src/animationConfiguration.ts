@@ -113,16 +113,63 @@ export type AnimationConfiguration = {
 /**
  * Fully resolved configuration used internally by the Lottie animation player.
  */
-export type ResolvedAnimationConfiguration = Omit<AnimationConfiguration, "compatibility"> & {
+export type LottieFeatureConfig = {
+    /** Whether the animation should play on a loop or not. */
+    loopAnimation: boolean;
+    /** Number of steps to sample cubic bezier easing functions for animations. */
+    easingSteps: number;
+    /** Whether to support device lost events for WebGL contexts. */
+    supportDeviceLost: boolean;
+    /** When set, the animation will play normally but stop at this frame number. */
+    stopAtFrame?: number;
+    /** When true, the parser logs unsupported lottie features to the console after parsing. */
+    debug?: boolean;
     /** Resolved compatibility options for known behavior differences between Babylon.js Lottie player versions. */
     compatibility: ResolvedLottieCompatibilityOptions;
 };
 
 /**
- * Default configuration for lottie animations playback.
+ * Renderer-bound configuration resolved after a rendering engine is available.
  */
-export const DefaultConfiguration = {
+export type LottieRendererConfig = {
+    /** Width of the sprite atlas texture. */
+    spriteAtlasWidth: number;
+    /** Height of the sprite atlas texture. */
+    spriteAtlasHeight: number;
+    /** Gap size around sprites in the atlas. */
+    gapSize: number;
+    /** Maximum number of sprites the renderer can handle at once. */
+    spritesCapacity: number;
+    /** Background color for the animation canvas. */
+    backgroundColor: { r: number; g: number; b: number; a: number };
+    /** Minimum scale factor to prevent too small sprites. */
+    scaleMultiplier: number;
+    /** Scale factor for the rendering. */
+    devicePixelRatio: number;
+};
+
+/**
+ * Fully resolved configuration used internally by existing Lottie player code paths.
+ */
+export type ResolvedAnimationConfiguration = LottieFeatureConfig & LottieRendererConfig;
+
+/**
+ * Default engine-free feature configuration for lottie animations playback.
+ */
+export const DefaultFeatureConfiguration: LottieFeatureConfig = {
     loopAnimation: false, // By default do not loop animations
+    easingSteps: 4, // Number of steps to sample easing functions for animations - Less than 4 causes issues with some interpolations
+    supportDeviceLost: true, // Whether to support device lost events for WebGL contexts,
+    compatibility: {
+        textLayerPlacement: "spec",
+        solidLayerRendering: "spec",
+    },
+};
+
+/**
+ * Default renderer-bound configuration for lottie animations playback.
+ */
+export const DefaultRendererConfiguration: LottieRendererConfig = {
     spriteAtlasWidth: 0, // 0 = auto-detect based on GPU capabilities
     spriteAtlasHeight: 0, // 0 = auto-detect based on GPU capabilities
     gapSize: 25, // Gap around the sprites in the atlas
@@ -130,13 +177,75 @@ export const DefaultConfiguration = {
     backgroundColor: { r: 0, g: 0, b: 0, a: 1 }, // Background color for the animation canvas
     scaleMultiplier: 5, // Minimum scale factor to prevent too small sprites,
     devicePixelRatio: 0, // 0 = auto-detect based on atlas size
-    easingSteps: 4, // Number of steps to sample easing functions for animations - Less than 4 causes issues with some interpolations
-    supportDeviceLost: true, // Whether to support device lost events for WebGL contexts,
-    compatibility: {
-        textLayerPlacement: "spec",
-        solidLayerRendering: "spec",
-    },
-} as const satisfies ResolvedAnimationConfiguration;
+};
+
+/**
+ * Default configuration for lottie animations playback.
+ */
+export const DefaultConfiguration: ResolvedAnimationConfiguration = {
+    ...DefaultFeatureConfiguration,
+    ...DefaultRendererConfiguration,
+};
+
+/**
+ * Resolves engine-free feature configuration before a rendering engine exists.
+ * @param newConfig The configuration passed by the client.
+ * @returns The resolved feature configuration.
+ */
+export function ResolveFeatureConfiguration(newConfig: Partial<AnimationConfiguration>): LottieFeatureConfig {
+    const config: LottieFeatureConfig = {
+        loopAnimation: newConfig.loopAnimation ?? DefaultFeatureConfiguration.loopAnimation,
+        easingSteps: newConfig.easingSteps ?? DefaultFeatureConfiguration.easingSteps,
+        supportDeviceLost: newConfig.supportDeviceLost ?? DefaultFeatureConfiguration.supportDeviceLost,
+        compatibility: {
+            textLayerPlacement: newConfig.compatibility?.textLayerPlacement ?? DefaultFeatureConfiguration.compatibility.textLayerPlacement,
+            solidLayerRendering: newConfig.compatibility?.solidLayerRendering ?? DefaultFeatureConfiguration.compatibility.solidLayerRendering,
+        },
+    };
+
+    if (newConfig.stopAtFrame !== undefined) {
+        config.stopAtFrame = newConfig.stopAtFrame;
+    }
+    if (newConfig.debug !== undefined) {
+        config.debug = newConfig.debug;
+    }
+
+    return config;
+}
+
+/**
+ * Resolves renderer-bound configuration after GPU capabilities are available.
+ * @param newConfig The configuration passed by the client.
+ * @param maxTextureSize The maximum texture size supported by the GPU.
+ * @param mainThreadDevicePixelRatio The devicePixelRatio from the main thread (used in worker scenarios where window is not available).
+ * @returns The resolved renderer configuration.
+ */
+export function ResolveRendererConfiguration(newConfig: Partial<AnimationConfiguration>, maxTextureSize: number, mainThreadDevicePixelRatio?: number): LottieRendererConfig {
+    const optimalAtlasSize = Math.min(maxTextureSize, MAX_SPRITE_ATLAS_SIZE);
+
+    let spriteAtlasWidth = newConfig.spriteAtlasWidth ?? DefaultRendererConfiguration.spriteAtlasWidth;
+    let spriteAtlasHeight = newConfig.spriteAtlasHeight ?? DefaultRendererConfiguration.spriteAtlasHeight;
+    if (spriteAtlasHeight === 0 || spriteAtlasWidth === 0) {
+        spriteAtlasWidth = optimalAtlasSize;
+        spriteAtlasHeight = optimalAtlasSize;
+    }
+
+    let devicePixelRatio = newConfig.devicePixelRatio ?? DefaultRendererConfiguration.devicePixelRatio;
+    if (devicePixelRatio === 0) {
+        const systemDpr = mainThreadDevicePixelRatio ?? (typeof window !== "undefined" ? window.devicePixelRatio : 1);
+        devicePixelRatio = optimalAtlasSize >= MAX_SPRITE_ATLAS_SIZE ? Math.max(systemDpr, 4) : Math.max(systemDpr, 2);
+    }
+
+    return {
+        spriteAtlasWidth,
+        spriteAtlasHeight,
+        gapSize: newConfig.gapSize ?? DefaultRendererConfiguration.gapSize,
+        spritesCapacity: newConfig.spritesCapacity ?? DefaultRendererConfiguration.spritesCapacity,
+        backgroundColor: newConfig.backgroundColor ?? DefaultRendererConfiguration.backgroundColor,
+        scaleMultiplier: newConfig.scaleMultiplier ?? DefaultRendererConfiguration.scaleMultiplier,
+        devicePixelRatio,
+    };
+}
 
 /**
  * Creates the final animation configuration by merging the provided partial configuration with the default configuration.
@@ -147,29 +256,8 @@ export const DefaultConfiguration = {
  * @returns The final animation configuration.
  */
 export function UpdateConfiguration(newConfig: Partial<AnimationConfiguration>, maxTextureSize: number, mainThreadDevicePixelRatio?: number): ResolvedAnimationConfiguration {
-    const config = {
-        ...DefaultConfiguration,
-        ...newConfig,
-        compatibility: {
-            textLayerPlacement: newConfig.compatibility?.textLayerPlacement ?? DefaultConfiguration.compatibility.textLayerPlacement,
-            solidLayerRendering: newConfig.compatibility?.solidLayerRendering ?? DefaultConfiguration.compatibility.solidLayerRendering,
-        },
+    return {
+        ...ResolveFeatureConfiguration(newConfig),
+        ...ResolveRendererConfiguration(newConfig, maxTextureSize, mainThreadDevicePixelRatio),
     };
-
-    // If atlas dimensions are 0 (auto-detect), calculate optimal values based on GPU capabilities
-    const optimalAtlasSize = Math.min(maxTextureSize, MAX_SPRITE_ATLAS_SIZE);
-    if (config.spriteAtlasHeight === 0 || config.spriteAtlasWidth === 0) {
-        config.spriteAtlasWidth = optimalAtlasSize;
-        config.spriteAtlasHeight = optimalAtlasSize;
-    }
-
-    // If devicePixelRatio is 0 (auto-detect), set it based on atlas size and system DPR
-    if (config.devicePixelRatio === 0) {
-        // Get the system devicePixelRatio - prefer passed value (for workers), fallback to window
-        const systemDpr = mainThreadDevicePixelRatio ?? (typeof window !== "undefined" ? window.devicePixelRatio : 1);
-        // 8K atlas can afford higher supersampling (4x), smaller atlas uses 2x
-        config.devicePixelRatio = optimalAtlasSize >= MAX_SPRITE_ATLAS_SIZE ? Math.max(systemDpr, 4) : Math.max(systemDpr, 2);
-    }
-
-    return config;
 }

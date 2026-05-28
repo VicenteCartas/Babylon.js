@@ -1,4 +1,4 @@
-import "core/Engines/Extensions/engine.dynamicTexture";
+import "../rendering/babylonSideEffects";
 
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { type InternalTexture } from "core/Materials/Textures/internalTexture";
@@ -22,7 +22,7 @@ import { ApplyLottieTextContext, DrawLottieText, MeasureLottieText, ResolveLotti
 
 import { type BoundingBox, GetShapesBoundingBox, GetTextBoundingBox } from "../maths/boundingBox";
 
-import { type ResolvedAnimationConfiguration } from "../animationConfiguration";
+import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
 
 /**
  * Type alias for the 2D drawing context used by the sprite packer.
@@ -117,7 +117,8 @@ export class SpritePacker {
     private readonly _isHtmlCanvas: boolean;
     private _atlasScale: number;
     private readonly _variables: Map<string, string>;
-    private readonly _configuration: ResolvedAnimationConfiguration;
+    private readonly _featureConfiguration: LottieFeatureConfig;
+    private readonly _rendererConfiguration: LottieRendererConfig;
     private _rawFonts: Map<string, RawFont> | undefined;
 
     private _pages: AtlasPage[];
@@ -161,14 +162,23 @@ export class SpritePacker {
      * @param isHtmlCanvas Whether we should render the atlas in an HTMLCanvasElement or an OffscreenCanvas.
      * @param atlasScale The atlas scale factor to apply to the sprites (always \>= 1 to keep sprites crisp).
      * @param variables Map of variables to replace in the animation file.
-     * @param configuration Configuration options for the sprite packer.
+     * @param featureConfiguration Engine-free feature configuration for text compatibility behavior.
+     * @param rendererConfiguration Renderer-bound configuration for atlas and raster settings.
      */
-    public constructor(engine: ThinEngine, isHtmlCanvas: boolean, atlasScale: number, variables: Map<string, string>, configuration: ResolvedAnimationConfiguration) {
+    public constructor(
+        engine: ThinEngine,
+        isHtmlCanvas: boolean,
+        atlasScale: number,
+        variables: Map<string, string>,
+        featureConfiguration: LottieFeatureConfig,
+        rendererConfiguration: LottieRendererConfig
+    ) {
         this._engine = engine;
         this._isHtmlCanvas = isHtmlCanvas;
         this._atlasScale = atlasScale;
         this._variables = variables;
-        this._configuration = configuration;
+        this._featureConfiguration = featureConfiguration;
+        this._rendererConfiguration = rendererConfiguration;
 
         this._pages = [this._createPage()];
 
@@ -213,8 +223,8 @@ export class SpritePacker {
         page.isDirty = true;
 
         // Get the rest of the sprite information required to render the shape
-        this._spriteAtlasInfo.uOffset = page.currentX / this._configuration.spriteAtlasWidth;
-        this._spriteAtlasInfo.vOffset = page.currentY / this._configuration.spriteAtlasHeight;
+        this._spriteAtlasInfo.uOffset = page.currentX / this._rendererConfiguration.spriteAtlasWidth;
+        this._spriteAtlasInfo.vOffset = page.currentY / this._rendererConfiguration.spriteAtlasHeight;
 
         this._spriteAtlasInfo.widthPx = boundingBox.width;
         this._spriteAtlasInfo.heightPx = boundingBox.height;
@@ -225,7 +235,7 @@ export class SpritePacker {
         this._spriteAtlasInfo.atlasIndex = this._pages.indexOf(page);
 
         // Advance the current position for the next sprite
-        page.currentX += this._spriteAtlasInfo.cellWidth + this._configuration.gapSize; // Add a gap between sprites to avoid bleeding
+        page.currentX += this._spriteAtlasInfo.cellWidth + this._rendererConfiguration.gapSize; // Add a gap between sprites to avoid bleeding
         page.maxRowHeight = Math.max(page.maxRowHeight, this._spriteAtlasInfo.cellHeight);
 
         return this._spriteAtlasInfo;
@@ -249,7 +259,7 @@ export class SpritePacker {
             textData,
             this._rawFonts,
             this._variables,
-            this._configuration.compatibility.textLayerPlacement
+            this._featureConfiguration.compatibility.textLayerPlacement
         );
         if (boundingBox === undefined) {
             return undefined;
@@ -273,8 +283,8 @@ export class SpritePacker {
         page.isDirty = true;
 
         // Get the rest of the sprite information required to render the text
-        this._spriteAtlasInfo.uOffset = page.currentX / this._configuration.spriteAtlasWidth;
-        this._spriteAtlasInfo.vOffset = page.currentY / this._configuration.spriteAtlasHeight;
+        this._spriteAtlasInfo.uOffset = page.currentX / this._rendererConfiguration.spriteAtlasWidth;
+        this._spriteAtlasInfo.vOffset = page.currentY / this._rendererConfiguration.spriteAtlasHeight;
 
         this._spriteAtlasInfo.widthPx = boundingBox.width;
         this._spriteAtlasInfo.heightPx = boundingBox.height;
@@ -285,7 +295,7 @@ export class SpritePacker {
         this._spriteAtlasInfo.atlasIndex = this._pages.indexOf(page);
 
         // Advance the current position for the next sprite
-        page.currentX += this._spriteAtlasInfo.cellWidth + this._configuration.gapSize; // Add a gap between sprites to avoid bleeding
+        page.currentX += this._spriteAtlasInfo.cellWidth + this._rendererConfiguration.gapSize; // Add a gap between sprites to avoid bleeding
         page.maxRowHeight = Math.max(page.maxRowHeight, this._spriteAtlasInfo.cellHeight);
 
         return this._spriteAtlasInfo;
@@ -320,15 +330,15 @@ export class SpritePacker {
 
         if (this._isHtmlCanvas) {
             canvas = document.createElement("canvas");
-            canvas.width = this._configuration.spriteAtlasWidth;
-            canvas.height = this._configuration.spriteAtlasHeight;
+            canvas.width = this._rendererConfiguration.spriteAtlasWidth;
+            canvas.height = this._rendererConfiguration.spriteAtlasHeight;
             context = canvas.getContext("2d") as CanvasRenderingContext2D;
         } else {
-            canvas = new OffscreenCanvas(this._configuration.spriteAtlasWidth, this._configuration.spriteAtlasHeight);
+            canvas = new OffscreenCanvas(this._rendererConfiguration.spriteAtlasWidth, this._rendererConfiguration.spriteAtlasHeight);
             context = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
         }
 
-        const internalTexture = this._engine.createDynamicTexture(this._configuration.spriteAtlasWidth, this._configuration.spriteAtlasHeight, false, 2);
+        const internalTexture = this._engine.createDynamicTexture(this._rendererConfiguration.spriteAtlasWidth, this._rendererConfiguration.spriteAtlasHeight, false, 2);
         this._engine.updateDynamicTexture(internalTexture, canvas, false);
 
         const texture = new ThinTexture(internalTexture);
@@ -341,8 +351,8 @@ export class SpritePacker {
             internalTexture,
             texture,
             isDirty: false,
-            currentX: this._configuration.gapSize,
-            currentY: this._configuration.gapSize,
+            currentX: this._rendererConfiguration.gapSize,
+            currentY: this._rendererConfiguration.gapSize,
             maxRowHeight: 0,
         };
     }
@@ -360,8 +370,8 @@ export class SpritePacker {
         // Defensive clamp: _applyAtlasScaleAndFit should have already downscaled oversized cells
         // to fit on a single page. This handles the rounding edge case where ceil() pushes a cell
         // a single pixel past the limit.
-        const maxCellWidth = this._configuration.spriteAtlasWidth - 2 * this._configuration.gapSize;
-        const maxCellHeight = this._configuration.spriteAtlasHeight - 2 * this._configuration.gapSize;
+        const maxCellWidth = this._rendererConfiguration.spriteAtlasWidth - 2 * this._rendererConfiguration.gapSize;
+        const maxCellHeight = this._rendererConfiguration.spriteAtlasHeight - 2 * this._rendererConfiguration.gapSize;
         if (cellWidth > maxCellWidth || cellHeight > maxCellHeight) {
             this._spriteAtlasInfo.cellWidth = Math.min(cellWidth, maxCellWidth);
             this._spriteAtlasInfo.cellHeight = Math.min(cellHeight, maxCellHeight);
@@ -370,15 +380,15 @@ export class SpritePacker {
         }
 
         // Check if the sprite fits in the current row
-        if (page.currentX + cellWidth > this._configuration.spriteAtlasWidth) {
+        if (page.currentX + cellWidth > this._rendererConfiguration.spriteAtlasWidth) {
             // Move to the next row
-            page.currentX = this._configuration.gapSize;
-            page.currentY += page.maxRowHeight + this._configuration.gapSize;
+            page.currentX = this._rendererConfiguration.gapSize;
+            page.currentY += page.maxRowHeight + this._rendererConfiguration.gapSize;
             page.maxRowHeight = 0;
         }
 
         // Check if the sprite fits vertically on this page
-        if (page.currentY + cellHeight > this._configuration.spriteAtlasHeight) {
+        if (page.currentY + cellHeight > this._rendererConfiguration.spriteAtlasHeight) {
             // Current page is full — create a new one
             page = this._createPage();
             this._pages.push(page);
@@ -415,13 +425,13 @@ export class SpritePacker {
         layerScaleX: number,
         layerScaleY: number
     ): void {
-        const atlasW = this._configuration.spriteAtlasWidth;
-        const atlasH = this._configuration.spriteAtlasHeight;
-        const maxCellWidth = atlasW - 2 * this._configuration.gapSize;
-        const maxCellHeight = atlasH - 2 * this._configuration.gapSize;
+        const atlasW = this._rendererConfiguration.spriteAtlasWidth;
+        const atlasH = this._rendererConfiguration.spriteAtlasHeight;
+        const maxCellWidth = atlasW - 2 * this._rendererConfiguration.gapSize;
+        const maxCellHeight = atlasH - 2 * this._rendererConfiguration.gapSize;
 
-        let effectiveScaleX = scalingFactor.x * this._atlasScale * this._configuration.devicePixelRatio;
-        let effectiveScaleY = scalingFactor.y * this._atlasScale * this._configuration.devicePixelRatio;
+        let effectiveScaleX = scalingFactor.x * this._atlasScale * this._rendererConfiguration.devicePixelRatio;
+        let effectiveScaleY = scalingFactor.y * this._atlasScale * this._rendererConfiguration.devicePixelRatio;
 
         const projectedWidth = boundingBox.width * effectiveScaleX;
         const projectedHeight = boundingBox.height * effectiveScaleY;
@@ -440,7 +450,7 @@ export class SpritePacker {
             effectiveScaleX *= fitScale;
             effectiveScaleY *= fitScale;
 
-            const dpr = this._configuration.devicePixelRatio;
+            const dpr = this._rendererConfiguration.devicePixelRatio;
             const atlasScale = this._atlasScale;
             const rawW = boundingBox.width.toFixed(2);
             const rawH = boundingBox.height.toFixed(2);
@@ -449,7 +459,7 @@ export class SpritePacker {
             const name = debugName ?? "<unknown>";
             const finalW = Math.max(1, Math.ceil(boundingBox.width * effectiveScaleX));
             const finalH = Math.max(1, Math.ceil(boundingBox.height * effectiveScaleY));
-            const gap = this._configuration.gapSize;
+            const gap = this._rendererConfiguration.gapSize;
             // eslint-disable-next-line no-console
             console.warn(
                 `[SpritePacker] ${kind} sprite for layer "${name}" would produce a ${ceiledProjectedWidth}x${ceiledProjectedHeight}px cell that exceeds the usable ${maxCellWidth}x${maxCellHeight}px atlas area ` +
@@ -464,7 +474,7 @@ export class SpritePacker {
     }
 
     private _extrudeSpriteEdges(page: AtlasPage, x: number, y: number, width: number, height: number): void {
-        const padding = Math.min(2, Math.floor(this._configuration.gapSize / 2));
+        const padding = Math.min(2, Math.floor(this._rendererConfiguration.gapSize / 2));
         const pixelX = Math.floor(x);
         const pixelY = Math.floor(y);
         const pixelWidth = Math.ceil(width);
@@ -481,7 +491,7 @@ export class SpritePacker {
             }
 
             // Right edge
-            if (pixelX + pixelWidth - 1 + offset < this._configuration.spriteAtlasWidth) {
+            if (pixelX + pixelWidth - 1 + offset < this._rendererConfiguration.spriteAtlasWidth) {
                 page.context.drawImage(page.canvas, pixelX + pixelWidth - 1, pixelY, 1, pixelHeight, pixelX + pixelWidth - 1 + offset, pixelY, 1, pixelHeight);
             }
 
@@ -491,7 +501,7 @@ export class SpritePacker {
             }
 
             // Bottom edge
-            if (pixelY + pixelHeight - 1 + offset < this._configuration.spriteAtlasHeight) {
+            if (pixelY + pixelHeight - 1 + offset < this._rendererConfiguration.spriteAtlasHeight) {
                 page.context.drawImage(page.canvas, pixelX, pixelY + pixelHeight - 1, pixelWidth, 1, pixelX, pixelY + pixelHeight - 1 + offset, pixelWidth, 1);
             }
 
@@ -501,17 +511,20 @@ export class SpritePacker {
             }
 
             // Top-right corner
-            if (pixelX + pixelWidth - 1 + offset < this._configuration.spriteAtlasWidth && pixelY - offset >= 0) {
+            if (pixelX + pixelWidth - 1 + offset < this._rendererConfiguration.spriteAtlasWidth && pixelY - offset >= 0) {
                 page.context.drawImage(page.canvas, pixelX + pixelWidth - 1, pixelY, 1, 1, pixelX + pixelWidth - 1 + offset, pixelY - offset, 1, 1);
             }
 
             // Bottom-left corner
-            if (pixelX - offset >= 0 && pixelY + pixelHeight - 1 + offset < this._configuration.spriteAtlasHeight) {
+            if (pixelX - offset >= 0 && pixelY + pixelHeight - 1 + offset < this._rendererConfiguration.spriteAtlasHeight) {
                 page.context.drawImage(page.canvas, pixelX, pixelY + pixelHeight - 1, 1, 1, pixelX - offset, pixelY + pixelHeight - 1 + offset, 1, 1);
             }
 
             // Bottom-right corner
-            if (pixelX + pixelWidth - 1 + offset < this._configuration.spriteAtlasWidth && pixelY + pixelHeight - 1 + offset < this._configuration.spriteAtlasHeight) {
+            if (
+                pixelX + pixelWidth - 1 + offset < this._rendererConfiguration.spriteAtlasWidth &&
+                pixelY + pixelHeight - 1 + offset < this._rendererConfiguration.spriteAtlasHeight
+            ) {
                 page.context.drawImage(
                     page.canvas,
                     pixelX + pixelWidth - 1,
@@ -617,7 +630,7 @@ export class SpritePacker {
 
         ApplyLottieTextContext(page.context, resolvedText);
 
-        const layout = MeasureLottieText(resolvedText, (text) => page.context.measureText(text), this._configuration.compatibility.textLayerPlacement);
+        const layout = MeasureLottieText(resolvedText, (text) => page.context.measureText(text), this._featureConfiguration.compatibility.textLayerPlacement);
 
         // Clip to cell bounds to prevent text overdraw into adjacent cells
         page.context.beginPath();

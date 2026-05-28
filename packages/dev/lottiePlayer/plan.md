@@ -254,11 +254,11 @@ src/
 ### Phase 0 - Baselines and fetched-byte harness
 
 - Add fixture animations:
-    - solid-only
-    - shape-only
-    - text-only
-    - mixed solid + shape + text
-    - no-text realistic fixture (pick a concrete existing fixture or pinned public CDN URL; do not leave "realistic" subjective)
+  - solid-only
+  - shape-only
+  - text-only
+  - mixed solid + shape + text
+  - no-text realistic fixture (pick a concrete existing fixture or pinned public CDN URL; do not leave "realistic" subjective)
 - Capture a visual golden per fixture (worker and local paths) from current `main`. These goldens are the regression baseline for every later phase.
 - Add a Playwright or Rollup/Vite harness that records runtime-fetched JS bytes for the root entry. Sub-entry measurements are added later when sub-entries land; the harness is designed for easy expansion.
 - Assert feature chunks are not fetched when not needed (vacuously true today; the assertion shape is what matters).
