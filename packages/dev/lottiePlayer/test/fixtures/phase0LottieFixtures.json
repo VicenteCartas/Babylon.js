@@ -21,7 +21,7 @@
                 }
             ],
             "futureForbiddenJsUrlPatterns": ["/features/text", "/features/layers/text", "/features/shape"],
-            "futureZeroByteJsUrlPatterns": ["/features/text", "/features/layers/text"]
+            "futureZeroByteJsUrlPatterns": ["/features/text", "/features/layers/text", "/features/shape"]
         },
         {
             "id": "solid-babylon8-compat",
@@ -43,7 +43,7 @@
                 }
             ],
             "futureForbiddenJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text", "/features/shape"],
-            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"]
+            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text", "/features/shape"]
         },
         {
             "id": "shape-only",
@@ -65,7 +65,8 @@
                 }
             ],
             "futureForbiddenJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"],
-            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"]
+            "futureZeroByteJsUrlPatterns": ["/features/solid", "/features/layers/solid", "/features/text", "/features/layers/text"],
+            "futureNonTrivialJsUrlPatterns": [{ "pattern": "/features/shape", "minBytes": 1000 }]
         },
         {
             "id": "text-only",
@@ -130,7 +131,8 @@
                 }
             ],
             "futureForbiddenJsUrlPatterns": ["/features/text", "/features/layers/text"],
-            "futureZeroByteJsUrlPatterns": ["/features/text", "/features/layers/text"]
+            "futureZeroByteJsUrlPatterns": ["/features/text", "/features/layers/text"],
+            "futureNonTrivialJsUrlPatterns": [{ "pattern": "/features/shape", "minBytes": 1000 }]
         }
     ]
 }

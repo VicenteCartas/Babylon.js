@@ -54,4 +54,32 @@ describe("Lottie Babylon rendering side effects", () => {
         expect(devPackageJson.sideEffects).toEqual(["./src/rendering/babylonSideEffects.ts"]);
         expect(publicPackageJson.sideEffects).toEqual(["./rendering/babylonSideEffects.js"]);
     });
+
+    it("keeps parsing and feature modules free of the Babylon sprite renderer", () => {
+        // Phase 7 exit criterion: parsing and features emit renderer-agnostic sprite records.
+        // They must not import Babylon's ThinSprite or call RenderingManager.addSprite directly —
+        // that is the renderer adapter's responsibility, so the rendering backend stays replaceable.
+        const thinSpriteImportPattern = /(?:import\s+(?:[^"']*?\s+from\s*)?|import\s*\(\s*)["']core\/Sprites\/thinSprite["']/;
+        const addSpritePattern = /\.addSprite\s*\(/;
+
+        const violations: string[] = [];
+
+        for (const sourceFile of collectTypeScriptFiles(sourceRoot)) {
+            const relativePath = toSourceRelativePath(sourceFile);
+            const isRendererAgnosticModule = relativePath.startsWith("features/") || relativePath === "parsing/parser.ts";
+            if (!isRendererAgnosticModule) {
+                continue;
+            }
+
+            const sourceText = readFileSync(sourceFile, "utf8");
+            if (thinSpriteImportPattern.test(sourceText)) {
+                violations.push(`${relativePath} imports core/Sprites/thinSprite`);
+            }
+            if (addSpritePattern.test(sourceText)) {
+                violations.push(`${relativePath} calls RenderingManager.addSprite`);
+            }
+        }
+
+        expect(violations).toEqual([]);
+    });
 });

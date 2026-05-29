@@ -1,5 +1,4 @@
 import { type IVector2Like } from "core/Maths/math.like";
-import { ThinSprite } from "core/Sprites/thinSprite";
 
 import { type LottieFeatureConfig, type LottieCompatibilityMode } from "../../animationConfiguration";
 import { type BoundingBox } from "../../maths/boundingBox";
@@ -7,7 +6,7 @@ import { type Node } from "../../nodes/node";
 import { SpriteNode } from "../../nodes/spriteNode";
 import { type Transform, type Vector2Property } from "../../parsing/parsedTypes";
 import { type RawFont, type RawLottieLayer, type RawTextData, type RawTextLayer } from "../../parsing/rawTypes";
-import { type RenderingManager } from "../../rendering/renderingManager";
+import { type LottieSpriteRecord } from "../../parsing/spriteRecord";
 import { type SpriteAtlasInfo, type SpritePacker, type SpritePackerDrawingContext, type SpritePackerRasterizationContext } from "../../parsing/spritePacker";
 import { ApplyLottieTextContext, DrawLottieText, MeasureLottieText, ResolveLottieText } from "./textLayout";
 
@@ -37,8 +36,8 @@ export type LottieTextLayerParseContext = {
     rawFonts: Map<string, RawFont>;
     /** Feature configuration for compatibility decisions. */
     featureConfiguration: LottieFeatureConfig;
-    /** Renderer sprite registration surface. */
-    renderingManager: RenderingManager;
+    /** Emits a renderer-agnostic sprite record for later materialization. */
+    emitSpriteRecord(record: LottieSpriteRecord): void;
     /** Original Lottie layer index used for render ordering. */
     currentLayerOriginalIndex: number;
     /** Gets the frame used to choose rasterization scale for this layer. */
@@ -76,21 +75,22 @@ function ParseTextLayer(context: LottieTextLayerParseContext): Node | undefined 
     const useBabylon8TextPlacement = context.featureConfiguration.compatibility.textLayerPlacement === "babylon8";
     const spriteParent = useBabylon8TextPlacement ? context.parent : context.parseNullLayer(context.layer, context.transform, context.parent);
 
-    const sprite = new ThinSprite();
-    sprite._xOffset = spriteInfo.uOffset;
-    sprite._yOffset = spriteInfo.vOffset;
-    sprite._xSize = spriteInfo.cellWidth;
-    sprite._ySize = spriteInfo.cellHeight;
-
-    sprite.width = spriteInfo.widthPx;
-    sprite.height = spriteInfo.heightPx;
-    sprite.invertV = true;
-
-    context.renderingManager.addSprite(sprite, context.currentLayerOriginalIndex, spriteInfo.atlasIndex);
-
     const positionProperty = useBabylon8TextPlacement ? GetBabylon8TextPosition(context.layer, context.transform, spriteInfo) : GetTextPosition(spriteInfo);
 
-    const spriteNode = new SpriteNode("Sprite", sprite, positionProperty, undefined, undefined, undefined, spriteParent);
+    const spriteNode = new SpriteNode("Sprite", spriteInfo.widthPx, spriteInfo.heightPx, positionProperty, undefined, undefined, undefined, spriteParent);
+
+    context.emitSpriteRecord({
+        node: spriteNode,
+        atlasIndex: spriteInfo.atlasIndex,
+        uOffset: spriteInfo.uOffset,
+        vOffset: spriteInfo.vOffset,
+        uSize: spriteInfo.cellWidth,
+        vSize: spriteInfo.cellHeight,
+        width: spriteInfo.widthPx,
+        height: spriteInfo.heightPx,
+        invertV: true,
+        layerOrder: context.currentLayerOriginalIndex,
+    });
 
     return useBabylon8TextPlacement ? spriteNode : spriteParent;
 }

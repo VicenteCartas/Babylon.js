@@ -1,8 +1,6 @@
 import { type IVector2Like } from "core/Maths/math.like";
-import { ThinSprite } from "core/Sprites/thinSprite";
 
 import {
-    type RawElement,
     type RawFont,
     type RawLottieAnimation,
     type RawLottieLayer,
@@ -11,23 +9,22 @@ import {
     type RawSolidLayer,
     type RawTextLayer,
     type RawTransform,
-    type RawTransformShape,
     type RawVectorKeyframe,
     type RawVectorProperty,
 } from "./rawTypes";
 import { type AnimationInfo, type ScalarKeyframe, type ScalarProperty, type Transform, type Vector2Keyframe, type Vector2Property } from "./parsedTypes";
 
 import { type SpritePacker } from "./spritePacker";
-import { SpriteNode } from "../nodes/spriteNode";
+import { type LottieSpriteRecord } from "./spriteRecord";
 
 import { BezierCurve } from "../maths/bezier";
 
-import { type RenderingManager } from "../rendering/renderingManager";
 import { Node } from "../nodes/node";
 import { ControlNode } from "../nodes/controlNode";
 
 import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
 import { type LottieFeatureSet } from "../features/feature";
+import { type LottieShapeLayerFeature } from "../features/layers/shapeLayer";
 import { type LottieSolidLayerFeature } from "../features/layers/solidLayer";
 import { type LottieTextLayerFeature } from "../features/layers/textLayer";
 
@@ -62,6 +59,20 @@ function GetTextLayerFeature(features: LottieFeatureSet | undefined): LottieText
     for (let i = 0; i < features.features.length; i++) {
         if (features.features[i].id === "text") {
             return features.features[i].textLayer;
+        }
+    }
+
+    return undefined;
+}
+
+function GetShapeLayerFeature(features: LottieFeatureSet | undefined): LottieShapeLayerFeature | undefined {
+    if (features === undefined) {
+        return undefined;
+    }
+
+    for (let i = 0; i < features.features.length; i++) {
+        if (features.features[i].id === "shape") {
+            return features.features[i].shapeLayer;
         }
     }
 
@@ -105,9 +116,11 @@ export class Parser {
     private readonly _featureConfiguration: LottieFeatureConfig;
     private readonly _rendererConfiguration: LottieRendererConfig;
     private readonly _animationInfo: AnimationInfo;
-    private readonly _renderingManager: RenderingManager;
     private readonly _solidLayerFeature: LottieSolidLayerFeature | undefined;
+    private readonly _shapeLayerFeature: LottieShapeLayerFeature | undefined;
     private readonly _textLayerFeature: LottieTextLayerFeature | undefined;
+
+    private _spriteRecords: LottieSpriteRecord[] = []; // Renderer-agnostic sprite records emitted during parsing
 
     private _rawFonts: Map<string, RawFont> = new Map<string, RawFont>(); // Map of font names to raw font data
     private _unsupportedFeatures: string[];
@@ -128,12 +141,19 @@ export class Parser {
     }
 
     /**
+     * Renderer-agnostic sprite records emitted during parsing.
+     * A renderer adapter materializes these into concrete sprites after parsing completes.
+     */
+    public get spriteRecords(): readonly LottieSpriteRecord[] {
+        return this._spriteRecords;
+    }
+
+    /**
      * Creates a new instance of the Lottie animations parser.
      * @param packer Object that packs the sprites from the animation into a texture atlas.
      * @param animationData The raw lottie animation as a JSON object.
      * @param featureConfiguration Engine-free feature configuration for the animation parser.
      * @param rendererConfiguration Renderer-bound configuration for atlas dimensions needed by the current parser.
-     * @param renderingManager Object that manages the rendering of the sprites in the animation.
      * @param features Optional feature modules loaded for this animation.
      */
     public constructor(
@@ -141,14 +161,13 @@ export class Parser {
         animationData: RawLottieAnimation,
         featureConfiguration: LottieFeatureConfig,
         rendererConfiguration: LottieRendererConfig,
-        renderingManager: RenderingManager,
         features?: LottieFeatureSet
     ) {
         this._packer = packer;
         this._featureConfiguration = featureConfiguration;
         this._rendererConfiguration = rendererConfiguration;
-        this._renderingManager = renderingManager;
         this._solidLayerFeature = GetSolidLayerFeature(features);
+        this._shapeLayerFeature = GetShapeLayerFeature(features);
         this._textLayerFeature = GetTextLayerFeature(features);
 
         this._unsupportedFeatures = [];
@@ -202,9 +221,6 @@ export class Parser {
 
         // Update the atlas texture after creating all sprites from the animation
         this._packer.updateAtlasTexture();
-
-        // Reorder the sprites from back to front and set the final atlas textures
-        this._renderingManager.ready(this._packer.textures);
 
         // Drain any unsupported-feature reports from the packer before we drop the reference to it,
         // so debug() can surface them after construction.
@@ -376,6 +392,9 @@ export class Parser {
                 break;
             case 4: // Shape layer
                 anchorNode = this._parseShapeLayer(layer as RawShapeLayer, transform, trsNode);
+                if (anchorNode === undefined) {
+                    return;
+                }
                 break;
             case 5: // Text layer
                 anchorNode = this._parseTextLayer(layer as RawTextLayer, transform, trsNode);
@@ -410,12 +429,27 @@ export class Parser {
         );
     }
 
-    private _parseShapeLayer(layer: RawShapeLayer, transform: Transform, parent: Node): Node {
-        const anchorNode = this._parseNullLayer(layer, transform, parent);
-        const rasterizationFrame = this._getRasterizationFrame(layer);
-        this._parseElements(layer.shapes, anchorNode, rasterizationFrame);
+    private _parseShapeLayer(layer: RawShapeLayer, transform: Transform, parent: Node): Node | undefined {
+        if (this._shapeLayerFeature === undefined) {
+            this._pushUnsupportedOnce("Shape layer feature was not loaded; skipping shape layers.");
+            return undefined;
+        }
 
-        return anchorNode;
+        return this._shapeLayerFeature.parseShapeLayer({
+            layer,
+            transform,
+            parent,
+            packer: this._packer,
+            emitSpriteRecord: (record) => this._spriteRecords.push(record),
+            currentLayerOriginalIndex: this._currentLayerOriginalIndex,
+            currentLayerName: this._currentLayerName,
+            getRasterizationFrame: (shapeLayer) => this._getRasterizationFrame(shapeLayer),
+            getRasterizationScale: (shapeParent, rasterizationFrame) => this._getRasterizationScale(shapeParent, rasterizationFrame),
+            parseNullLayer: (shapeLayer, shapeTransform, shapeParent) => this._parseNullLayer(shapeLayer, shapeTransform, shapeParent),
+            parseTransform: (rawTransform) => this._parseTransform(rawTransform),
+            pushUnsupported: (message) => this._unsupportedFeatures.push(message),
+            pushUnsupportedOnce: (message) => this._pushUnsupportedOnce(message),
+        });
     }
 
     private _parseSolidLayer(layer: RawSolidLayer, transform: Transform, parent: Node): Node {
@@ -430,7 +464,7 @@ export class Parser {
             parent,
             packer: this._packer,
             rendererConfiguration: this._rendererConfiguration,
-            renderingManager: this._renderingManager,
+            emitSpriteRecord: (record) => this._spriteRecords.push(record),
             currentLayerOriginalIndex: this._currentLayerOriginalIndex,
             parseNullLayer: (solidLayer, solidTransform, solidParent) => this._parseNullLayer(solidLayer, solidTransform, solidParent),
             pushUnsupported: (message) => this._unsupportedFeatures.push(message),
@@ -450,137 +484,12 @@ export class Parser {
             packer: this._packer,
             rawFonts: this._rawFonts,
             featureConfiguration: this._featureConfiguration,
-            renderingManager: this._renderingManager,
+            emitSpriteRecord: (record) => this._spriteRecords.push(record),
             currentLayerOriginalIndex: this._currentLayerOriginalIndex,
             getRasterizationFrame: (textLayer) => this._getRasterizationFrame(textLayer),
             getRasterizationScale: (textParent, rasterizationFrame) => this._getRasterizationScale(textParent, rasterizationFrame),
             parseNullLayer: (textLayer, textTransform, textParent) => this._parseNullLayer(textLayer, textTransform, textParent),
         });
-    }
-
-    private _parseElements(elements: RawElement[] | undefined, parent: Node, rasterizationFrame: number): void {
-        if (elements === undefined || elements.length <= 0) {
-            return;
-        }
-
-        // Lottie/After Effects shape stack: a fill/stroke (or gradient fill/stroke) at a given level
-        // applies to every sibling shape/group above it. When a layer (or a group) mixes child groups
-        // with sibling decorators, those decorators have to flow into each child group so each group's
-        // sprite is rasterized with them. Without this, e.g. `[gr, gr, fl]` would render only the
-        // groups that already carry their own fill — the others would rasterize as empty sprites
-        let hasGroup = false;
-        let levelDecorators: RawElement[] | undefined;
-        for (let i = 0; i < elements.length; i++) {
-            const el = elements[i];
-            if (el.hd === true || el.ty === "tr") {
-                continue;
-            }
-            if (el.ty === "gr") {
-                hasGroup = true;
-            } else if (el.ty === "fl" || el.ty === "st" || el.ty === "gf" || el.ty === "gs") {
-                (levelDecorators ??= []).push(el);
-            }
-        }
-        const propagateDecorators = hasGroup && levelDecorators !== undefined && levelDecorators.length > 0;
-
-        for (let i = 0; i < elements.length; i++) {
-            if (elements[i].hd === true) {
-                continue; // Ignore hidden shapes
-            }
-
-            if (elements[i].ty === "tr") {
-                continue; // Transforms are parsed as part of other elements, so we can ignore it
-            }
-
-            if (elements[i].ty === "gr") {
-                this._parseGroup(elements[i], parent, rasterizationFrame, propagateDecorators ? levelDecorators : undefined);
-                //break;
-            } else if (elements[i].ty === "sh" || elements[i].ty === "rc" || elements[i].ty === "el") {
-                this._parseShapes(elements, parent, rasterizationFrame);
-                break; // After parsing the shapes, this array of elements is done
-            } else if (propagateDecorators && (elements[i].ty === "fl" || elements[i].ty === "st" || elements[i].ty === "gf" || elements[i].ty === "gs")) {
-                // Already absorbed into the preceding sibling groups via `_parseGroup` above.
-                continue;
-            } else {
-                this._unsupportedFeatures.push(`Only groups or shapes are supported as children of layers - Name: ${elements[i].nm} Type: ${elements[i].ty}`);
-                continue;
-            }
-        }
-    }
-
-    private _parseGroup(group: RawElement, parent: Node, rasterizationFrame: number, inheritedDecorators?: RawElement[]): void {
-        if (group.it === undefined || group.it.length === 0) {
-            this._unsupportedFeatures.push(`Unexpected empty group: ${group.nm}`);
-            return;
-        }
-
-        const transform: Transform | undefined = this._getTransform(group.it);
-        if (transform === undefined) {
-            this._unsupportedFeatures.push(`Group ${group.nm} does not have a transform which is not supported`);
-            return;
-        }
-
-        // Splice any inherited decorators (parent-level fills/strokes) just before the group's
-        // transform so the rasterizer sees them in the same relative position they had at the
-        // parent level — i.e. below the group's own contents in z-order. Lottie's terminal-`tr`
-        // contract (relied on by `_getTransform` and `_drawVectorShape`) is preserved.
-        let items = group.it;
-        if (inheritedDecorators && inheritedDecorators.length > 0) {
-            items = group.it.slice(0, -1).concat(inheritedDecorators, group.it[group.it.length - 1]);
-        }
-
-        // Create the nodes on the scenegraph for this group
-        const trsNode = new Node(`Node (TRS)- ${group.nm}`, transform.position, transform.rotation, transform.scale, transform.opacity, parent);
-
-        const anchorNode = new Node(
-            `Node (Anchor) - ${group.nm}`,
-            transform.anchorPoint,
-            undefined, // Rotation is not used for anchor point
-            undefined, // Scale is not used for anchor point
-            undefined, // Opacity is not used for anchor point
-            trsNode
-        );
-
-        // Parse the children of the group
-        this._parseElements(items, anchorNode, rasterizationFrame);
-    }
-
-    private _parseShapes(elements: RawElement[], parent: Node, rasterizationFrame: number): void {
-        // Get the rasterization scale at the frame when the layer first becomes visible
-        const currentScale = this._getRasterizationScale(parent, rasterizationFrame);
-        const spriteInfo = this._packer.addLottieShape(elements, currentScale, this._currentLayerName);
-
-        // Build the ThinSprite from the texture packer information
-        const sprite = new ThinSprite();
-
-        // Set sprite UV coordinates
-        sprite._xOffset = spriteInfo.uOffset;
-        sprite._yOffset = spriteInfo.vOffset;
-        sprite._xSize = spriteInfo.cellWidth;
-        sprite._ySize = spriteInfo.cellHeight;
-
-        // Set sprite dimensions for rendering
-        sprite.width = spriteInfo.widthPx;
-        sprite.height = spriteInfo.heightPx;
-        sprite.invertV = true;
-
-        this._renderingManager.addSprite(sprite, this._currentLayerOriginalIndex, spriteInfo.atlasIndex);
-
-        const positionProperty: Vector2Property = {
-            startValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
-            currentValue: { x: spriteInfo.centerX || 0, y: -spriteInfo.centerY || 0 },
-            currentKeyframeIndex: 0,
-        };
-
-        new SpriteNode(
-            "Sprite",
-            sprite,
-            positionProperty,
-            undefined, // Rotation is not used for sprites final transform
-            undefined, // Scale is not used for sprites final transform
-            undefined, // Opacity is not used for sprites final transform
-            parent
-        );
     }
 
     private _getRasterizationFrame(layer: RawLottieLayer): number {
@@ -627,19 +536,6 @@ export class Parser {
         parent.decomposeWorldMatrixAtFrame(rasterizationFrame, scale, tempPosition);
 
         return scale;
-    }
-
-    private _getTransform(elements: RawElement[] | undefined): Transform | undefined {
-        if (!elements || elements.length === 0) {
-            return undefined;
-        }
-
-        // Lottie format mandates the transform is the last item on a list of elements
-        if (elements[elements.length - 1].ty !== "tr") {
-            return undefined;
-        }
-
-        return this._parseTransform(elements[elements.length - 1] as RawTransformShape);
     }
 
     private _parseTransform(transform: RawTransform): Transform {

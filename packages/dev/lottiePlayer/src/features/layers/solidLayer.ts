@@ -1,12 +1,10 @@
-import { ThinSprite } from "core/Sprites/thinSprite";
-
 import { type LottieRendererConfig } from "../../animationConfiguration";
 import { type BoundingBox } from "../../maths/boundingBox";
 import { type Node } from "../../nodes/node";
 import { SpriteNode } from "../../nodes/spriteNode";
 import { type Vector2Property, type Transform } from "../../parsing/parsedTypes";
 import { type RawSolidLayer } from "../../parsing/rawTypes";
-import { type RenderingManager } from "../../rendering/renderingManager";
+import { type LottieSpriteRecord } from "../../parsing/spriteRecord";
 import { type SpriteAtlasInfo, type SpritePacker, type SpritePackerRasterizationContext } from "../../parsing/spritePacker";
 
 const SolidAtlasBoundingBox: BoundingBox = {
@@ -33,8 +31,8 @@ export type LottieSolidLayerParseContext = {
     packer: SpritePacker;
     /** Renderer-bound configuration needed for center-UV sampling. */
     rendererConfiguration: LottieRendererConfig;
-    /** Renderer sprite registration surface. */
-    renderingManager: RenderingManager;
+    /** Emits a renderer-agnostic sprite record for later materialization. */
+    emitSpriteRecord(record: LottieSpriteRecord): void;
     /** Original Lottie layer index used for render ordering. */
     currentLayerOriginalIndex: number;
     /** Parses the layer's standard null/anchor node structure. */
@@ -69,18 +67,10 @@ function ParseSolidLayer(context: LottieSolidLayerParseContext): Node {
     const color = ParseCssColorString(context.layer.sc, context.layer.nm, context.pushUnsupported);
     const spriteInfo = AddSolidToAtlas(context.packer, color, context.layer.nm);
 
-    const sprite = new ThinSprite();
     // Center-UV sampling preserves the solid-layer fix from 89da7c8994 (after #18402): sample the
     // middle of the 1x1 atlas cell so edge extrusion/gap pixels cannot bleed into stretched solids.
-    sprite._xOffset = spriteInfo.uOffset + spriteInfo.cellWidth / (2 * context.rendererConfiguration.spriteAtlasWidth);
-    sprite._yOffset = spriteInfo.vOffset + spriteInfo.cellHeight / (2 * context.rendererConfiguration.spriteAtlasHeight);
-    sprite._xSize = 0;
-    sprite._ySize = 0;
-    sprite.width = context.layer.sw;
-    sprite.height = context.layer.sh;
-    sprite.invertV = true;
-
-    context.renderingManager.addSprite(sprite, context.currentLayerOriginalIndex, spriteInfo.atlasIndex);
+    const uOffset = spriteInfo.uOffset + spriteInfo.cellWidth / (2 * context.rendererConfiguration.spriteAtlasWidth);
+    const vOffset = spriteInfo.vOffset + spriteInfo.cellHeight / (2 * context.rendererConfiguration.spriteAtlasHeight);
 
     const positionProperty: Vector2Property = {
         startValue: { x: context.layer.sw / 2, y: -context.layer.sh / 2 },
@@ -88,7 +78,20 @@ function ParseSolidLayer(context: LottieSolidLayerParseContext): Node {
         currentKeyframeIndex: 0,
     };
 
-    new SpriteNode("Sprite", sprite, positionProperty, undefined, undefined, undefined, anchorNode);
+    const spriteNode = new SpriteNode("Sprite", context.layer.sw, context.layer.sh, positionProperty, undefined, undefined, undefined, anchorNode);
+
+    context.emitSpriteRecord({
+        node: spriteNode,
+        atlasIndex: spriteInfo.atlasIndex,
+        uOffset,
+        vOffset,
+        uSize: 0,
+        vSize: 0,
+        width: context.layer.sw,
+        height: context.layer.sh,
+        invertV: true,
+        layerOrder: context.currentLayerOriginalIndex,
+    });
 
     return anchorNode;
 }

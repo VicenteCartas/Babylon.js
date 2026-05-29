@@ -1,3 +1,4 @@
+import { type LottieShapeLayerFeature } from "./layers/shapeLayer";
 import { type LottieSolidLayerFeature } from "./layers/solidLayer";
 import { type LottieTextLayerFeature } from "./layers/textLayer";
 
@@ -16,6 +17,8 @@ export type LottieFeature = {
     layerTypes: readonly number[];
     /** Solid layer behavior, present only on the solid feature. */
     solidLayer?: LottieSolidLayerFeature;
+    /** Shape layer behavior, present only on the shape feature. */
+    shapeLayer?: LottieShapeLayerFeature;
     /** Text layer behavior, present only on the text feature. */
     textLayer?: LottieTextLayerFeature;
 };

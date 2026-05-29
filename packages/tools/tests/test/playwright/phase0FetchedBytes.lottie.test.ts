@@ -17,6 +17,11 @@ type Phase0Fixture = {
     cases: Phase0FixtureCase[];
     futureForbiddenJsUrlPatterns: string[];
     futureZeroByteJsUrlPatterns?: string[];
+    // URL fragments whose fetched JavaScript bytes must exceed a floor, proving the feature chunk
+    // actually carries its implementation (not just a husk re-export). Used for the both-directions
+    // byte assertion: a feature-free fixture forbids/zeroes the chunk; a feature-using fixture
+    // requires non-trivial bytes from it.
+    futureNonTrivialJsUrlPatterns?: Array<{ pattern: string; minBytes: number }>;
 };
 
 type Phase0FixtureManifest = {
@@ -124,6 +129,21 @@ test.describe("Lottie Phase 0 fetched JavaScript baselines", () => {
 
                 for (const pattern of fixture.futureZeroByteJsUrlPatterns ?? []) {
                     expect(getFetchedBytesForPattern(result, pattern), `${pattern} should contribute zero fetched JavaScript bytes for ${fixtureCase.id}`).toBe(0);
+                }
+
+                for (const { pattern, minBytes } of fixture.futureNonTrivialJsUrlPatterns ?? []) {
+                    // The "moved bytes" guarantee can only be observed on the code-split local sub-entry.
+                    // The devhost worker is emitted as a single bundled IIFE (see lottieClassicWorkerPlugin),
+                    // so feature implementations are inlined into __lottie-worker.js and never fetched as a
+                    // distinct /features/* chunk. Skipping worker here keeps the assertion meaningful instead
+                    // of asserting against a chunk URL that intentionally does not exist in that transport.
+                    if (entry !== "local") {
+                        continue;
+                    }
+                    expect(
+                        getFetchedBytesForPattern(result, pattern),
+                        `${pattern} should contribute more than ${minBytes} fetched JavaScript bytes for ${fixtureCase.id}`
+                    ).toBeGreaterThan(minBytes);
                 }
 
                 if (entry === "local") {

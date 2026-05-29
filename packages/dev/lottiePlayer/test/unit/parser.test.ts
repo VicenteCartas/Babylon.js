@@ -1,16 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { ThinSprite } from "core/Sprites/thinSprite";
 
 import { Parser } from "../../src/parsing/parser";
 import { type SpritePacker, type SpriteAtlasInfo, type SpritePackerRasterizationContext } from "../../src/parsing/spritePacker";
-import { type RenderingManager } from "../../src/rendering/renderingManager";
 import { SpriteNode } from "../../src/nodes/spriteNode";
 import { ControlNode } from "../../src/nodes/controlNode";
 import { Node } from "../../src/nodes/node";
-import { type RawElement, type RawLottieAnimation, type RawShapeLayer, type RawTextJustify, type RawTextLayer, type RawTransform } from "../../src/parsing/rawTypes";
+import { type RawLottieAnimation, type RawShapeLayer, type RawTextJustify, type RawTextLayer, type RawTransform } from "../../src/parsing/rawTypes";
 import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../../src/animationConfiguration";
 import { type LottieFeatureSet } from "../../src/features/feature";
 import { SolidLayerFeature } from "../../src/features/layers/solidLayer";
+import { ShapeLayerFeature } from "../../src/features/layers/shapeLayer";
 import { type LottieTextLayerFeature } from "../../src/features/layers/textLayer";
 
 const BaseSpriteInfo: SpriteAtlasInfo = {
@@ -31,17 +30,6 @@ const MockTextLayerFeature: LottieTextLayerFeature = {
         const useBabylon8TextPlacement = context.featureConfiguration.compatibility.textLayerPlacement === "babylon8";
         const spriteParent = useBabylon8TextPlacement ? context.parent : context.parseNullLayer(context.layer, context.transform, context.parent);
 
-        const sprite = new ThinSprite();
-        sprite._xOffset = spriteInfo.uOffset;
-        sprite._yOffset = spriteInfo.vOffset;
-        sprite._xSize = spriteInfo.cellWidth;
-        sprite._ySize = spriteInfo.cellHeight;
-        sprite.width = spriteInfo.widthPx;
-        sprite.height = spriteInfo.heightPx;
-        sprite.invertV = true;
-
-        context.renderingManager.addSprite(sprite, context.currentLayerOriginalIndex, spriteInfo.atlasIndex);
-
         const babylon8X = context.layer.t.d.k[0].s.j === 0 ? spriteInfo.widthPx / 2 : context.layer.t.d.k[0].s.j === 1 ? -spriteInfo.widthPx / 2 : 0;
         const babylon8Y = spriteInfo.heightPx / 2;
         const position = useBabylon8TextPlacement
@@ -56,16 +44,30 @@ const MockTextLayerFeature: LottieTextLayerFeature = {
                   currentKeyframeIndex: 0,
               };
 
-        const spriteNode = new SpriteNode("Sprite", sprite, position, undefined, undefined, undefined, spriteParent);
+        const spriteNode = new SpriteNode("Sprite", spriteInfo.widthPx, spriteInfo.heightPx, position, undefined, undefined, undefined, spriteParent);
+
+        context.emitSpriteRecord({
+            node: spriteNode,
+            atlasIndex: spriteInfo.atlasIndex,
+            uOffset: spriteInfo.uOffset,
+            vOffset: spriteInfo.vOffset,
+            uSize: spriteInfo.cellWidth,
+            vSize: spriteInfo.cellHeight,
+            width: spriteInfo.widthPx,
+            height: spriteInfo.heightPx,
+            invertV: true,
+            layerOrder: context.currentLayerOriginalIndex,
+        });
 
         return useBabylon8TextPlacement ? spriteNode : spriteParent;
     },
 };
 
 const MockFeatureSet: LottieFeatureSet = {
-    ids: ["solid", "text"],
+    ids: ["solid", "shape", "text"],
     features: [
         { id: "solid", layerTypes: [1], solidLayer: SolidLayerFeature },
+        { id: "shape", layerTypes: [4], shapeLayer: ShapeLayerFeature },
         { id: "text", layerTypes: [5], textLayer: MockTextLayerFeature },
     ],
 };
@@ -73,6 +75,12 @@ const MockFeatureSet: LottieFeatureSet = {
 // Minimal valid transform with a configurable anchor point.
 function makeTransform(anchorPoint: number[] = [0, 0]): RawTransform {
     return { a: { a: 0, k: anchorPoint, l: 2 } };
+}
+
+// Minimal valid rectangle shape. The shape feature computes its own bounding box, so rectangle shapes
+// used in shape-layer fixtures must carry size/position/radius properties (not just a name/type).
+function makeRectShape(): any {
+    return { ty: "rc", nm: "rect", s: { a: 0, k: [10, 10] }, p: { a: 0, k: [0, 0] }, r: { a: 0, k: 0 } };
 }
 
 // Minimal valid text data. Content does not matter because the SpritePacker is mocked,
@@ -104,7 +112,7 @@ function makeTextData(justification: RawTextJustify = 0): RawTextLayer["t"] {
 // shape and text additions.
 function makeMockPacker(): SpritePacker {
     const mock = {
-        addLottieShape: () => BaseSpriteInfo,
+        addRasterizedSprite: () => BaseSpriteInfo,
         addLottieText: () => BaseSpriteInfo,
         updateAtlasTexture: () => {},
         releaseCanvas: () => {},
@@ -120,15 +128,6 @@ function makeMockPacker(): SpritePacker {
     return mock as unknown as SpritePacker;
 }
 
-// Builds a minimal RenderingManager mock — only the surface called by Parser is implemented.
-function makeMockRenderingManager(): RenderingManager {
-    const mock = {
-        addSprite: () => {},
-        ready: () => {},
-    };
-    return mock as unknown as RenderingManager;
-}
-
 function makeConfiguration(configuration: Partial<AnimationConfiguration> = {}): ResolvedAnimationConfiguration {
     return UpdateConfiguration(configuration, 4096, 1);
 }
@@ -137,10 +136,9 @@ function makeParser(
     packer: SpritePacker,
     animation: RawLottieAnimation,
     configuration: ResolvedAnimationConfiguration = makeConfiguration(),
-    renderingManager: RenderingManager = makeMockRenderingManager(),
     features: LottieFeatureSet | undefined = MockFeatureSet
 ): Parser {
-    return new Parser(packer, animation, configuration, configuration, renderingManager, features);
+    return new Parser(packer, animation, configuration, configuration, features);
 }
 
 // Recursively finds the first descendant node whose id starts with the given prefix.
@@ -270,12 +268,7 @@ describe("Parser scene graph structure", () => {
                     op: 60,
                     st: 0,
                     ks: makeTransform(),
-                    shapes: [
-                        {
-                            ty: "rc",
-                            nm: "rect",
-                        } as any,
-                    ],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
             ],
         };
@@ -320,7 +313,7 @@ describe("Parser scene graph structure", () => {
                     op: 60,
                     st: 0,
                     ks: makeTransform(),
-                    shapes: [{ ty: "rc", nm: "rect" } as any],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
                 {
                     ty: 4,
@@ -331,7 +324,7 @@ describe("Parser scene graph structure", () => {
                     op: 60,
                     st: 0,
                     ks: makeTransform(),
-                    shapes: [{ ty: "rc", nm: "rect" } as any],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
             ],
         };
@@ -369,7 +362,7 @@ describe("Parser vector property validation (I-05)", () => {
                     op: 60,
                     st: 0,
                     ks: { p: positionProperty } as unknown as RawTransform,
-                    shapes: [{ ty: "rc", nm: "rect" } as any],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
             ],
         };
@@ -455,7 +448,7 @@ describe("Parser vector property validation (I-05)", () => {
                         p: { a: 0, k: [10, 20, 0] },
                         s: { a: 0, k: [100, 100, 100] },
                     } as unknown as RawTransform,
-                    shapes: [{ ty: "rc", nm: "rect" } as any],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
             ],
         };
@@ -510,7 +503,7 @@ describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
                             ],
                         },
                     } as unknown as RawTransform,
-                    shapes: [{ ty: "rc", nm: "rect" } as any],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
             ],
         };
@@ -543,10 +536,53 @@ describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
 });
 
 describe("Parser layer-level shape decorators", () => {
-    // Builds a SpritePacker mock that records every addLottieShape invocation so tests can
-    // assert which raw elements were rasterized into each sprite.
-    function makeRecordingPacker(): { packer: SpritePacker; calls: RawElement[][] } {
-        const calls: RawElement[][] = [];
+    // Records the fill/stroke styles that each rasterized sprite paints into its atlas cell. The shape
+    // feature no longer hands raw elements to the packer (it rasterizes them itself), so decorator
+    // propagation is asserted behaviorally: a propagated fill/stroke shows up as an extra paint with the
+    // expected CSS color in the corresponding sprite's draw callback.
+    type ShapeRasterCall = {
+        fillStyles: unknown[];
+        strokeStyles: unknown[];
+    };
+
+    function makeShapeRasterizationContext(call: ShapeRasterCall): SpritePackerRasterizationContext {
+        const context: any = {
+            fillStyle: "",
+            strokeStyle: "",
+            lineWidth: 1,
+            lineCap: "butt",
+            lineJoin: "miter",
+            miterLimit: 10,
+            globalCompositeOperation: "source-over",
+            save: () => {},
+            restore: () => {},
+            translate: () => {},
+            scale: () => {},
+            beginPath: () => {},
+            rect: () => {},
+            roundRect: () => {},
+            clip: () => {},
+            moveTo: () => {},
+            lineTo: () => {},
+            ellipse: () => {},
+            bezierCurveTo: () => {},
+            closePath: () => {},
+            setLineDash: () => {},
+            createLinearGradient: () => ({ addColorStop: () => {} }),
+            createRadialGradient: () => ({ addColorStop: () => {} }),
+            fill: () => {
+                call.fillStyles.push(context.fillStyle);
+            },
+            stroke: () => {
+                call.strokeStyles.push(context.strokeStyle);
+            },
+        };
+
+        return { context, x: 3, y: 5, cellWidth: 16, cellHeight: 16 };
+    }
+
+    function makeRecordingPacker(): { packer: SpritePacker; calls: ShapeRasterCall[] } {
+        const calls: ShapeRasterCall[] = [];
         const baseInfo: SpriteAtlasInfo = {
             uOffset: 0,
             vOffset: 0,
@@ -560,9 +596,15 @@ describe("Parser layer-level shape decorators", () => {
         };
 
         const mock = {
-            addLottieShape: (rawElements: RawElement[]) => {
-                // Snapshot the array contents at call time; the parser may mutate sources later.
-                calls.push(rawElements.slice());
+            addRasterizedSprite: (
+                _kind: string,
+                _boundingBox: unknown,
+                _scalingFactor: { x: number; y: number },
+                drawSprite: (context: SpritePackerRasterizationContext) => void
+            ) => {
+                const call: ShapeRasterCall = { fillStyles: [], strokeStyles: [] };
+                drawSprite(makeShapeRasterizationContext(call));
+                calls.push(call);
                 return baseInfo;
             },
             addLottieText: () => baseInfo,
@@ -586,8 +628,10 @@ describe("Parser layer-level shape decorators", () => {
     // body and handle); the layer-level dark-gray Fill 1 is supposed to fill Group 2 (and would also
     // be drawn behind Group 1's white circle, where it is invisible).
     it("propagates a layer-level fill to every sibling group's rasterized shape", () => {
-        const innerCirclePath = { ind: 0, ty: "sh", nm: "Path 1", ks: { a: 0, k: { i: [], o: [], v: [], c: true } } };
-        const lensPath = { ind: 0, ty: "sh", nm: "Path 2", ks: { a: 0, k: { i: [], o: [], v: [], c: true } } };
+        // Non-empty path so `_drawPath` issues a real subpath that the following fills paint.
+        const circlePath = { i: [[0, 0]], o: [[0, 0]], v: [[0, 0]], c: true };
+        const innerCirclePath = { ind: 0, ty: "sh", nm: "Path 1", ks: { a: 0, k: circlePath } };
+        const lensPath = { ind: 0, ty: "sh", nm: "Path 2", ks: { a: 0, k: circlePath } };
         const whiteFill = { ty: "fl", nm: "Fill 1 (white)", c: { a: 0, k: [1, 1, 1, 1] }, o: { a: 0, k: 100 } };
         const grayLayerFill = { ty: "fl", nm: "Fill 1 (gray)", c: { a: 0, k: [0.25, 0.25, 0.25, 1] }, o: { a: 0, k: 100 } };
         const groupTransform = { ty: "tr", nm: "Transform" };
@@ -623,31 +667,23 @@ describe("Parser layer-level shape decorators", () => {
         // Both groups must produce a sprite call.
         expect(calls).toHaveLength(2);
 
-        // Group 1's call must include both the original white fill (so the inner circle stays
-        // white on top) AND the layer-level gray fill (drawn behind it).
-        const group1Items = calls[0];
-        const group1Fills = group1Items.filter((el) => el.ty === "fl");
-        expect(group1Fills).toHaveLength(2);
-        expect(group1Fills.map((f) => f.nm)).toContain("Fill 1 (white)");
-        expect(group1Fills.map((f) => f.nm)).toContain("Fill 1 (gray)");
-        // Transform must remain the last item; Lottie/AE require it and the parser's bounding box
-        // / fill code rely on it being terminal.
-        expect(group1Items[group1Items.length - 1].ty).toBe("tr");
+        const white = "rgba(255, 255, 255, 1)";
+        const gray = "rgba(64, 64, 64, 1)"; // 0.25 * 255 = 63.75 -> 64
 
-        // Group 2's call must inherit the layer-level gray fill (otherwise the magnifying glass
-        // outline rasterizes to nothing — the original bug from EDU_V2_07).
-        const group2Items = calls[1];
-        const group2Fills = group2Items.filter((el) => el.ty === "fl");
-        expect(group2Fills).toHaveLength(1);
-        expect(group2Fills[0].nm).toBe("Fill 1 (gray)");
-        expect(group2Items[group2Items.length - 1].ty).toBe("tr");
+        // Group 1 must paint both its own white fill (on top) AND the inherited layer-level gray fill.
+        expect(calls[0].fillStyles).toContain(white);
+        expect(calls[0].fillStyles).toContain(gray);
+
+        // Group 2 has no fill of its own; it must inherit only the layer-level gray fill (otherwise the
+        // magnifying glass outline rasterizes to nothing — the original bug from EDU_V2_07).
+        expect(calls[1].fillStyles).toEqual([gray]);
     });
 
     // A layer-level stroke (`st`) follows the same Lottie semantics as a layer-level fill: it
     // applies to all sibling shapes/groups above it. Cover it here too so a future tweak to the
     // decorator-detection list does not silently drop strokes.
     it("propagates a layer-level stroke to every sibling group's rasterized shape", () => {
-        const path = { ind: 0, ty: "sh", nm: "Path 1", ks: { a: 0, k: { i: [], o: [], v: [], c: true } } };
+        const path = { ind: 0, ty: "sh", nm: "Path 1", ks: { a: 0, k: { i: [[0, 0]], o: [[0, 0]], v: [[0, 0]], c: true } } };
         const layerStroke = {
             ty: "st",
             nm: "Stroke 1",
@@ -682,10 +718,8 @@ describe("Parser layer-level shape decorators", () => {
         makeParser(packer, animation);
 
         expect(calls).toHaveLength(1);
-        const group1Items = calls[0];
-        const group1Strokes = group1Items.filter((el) => el.ty === "st");
-        expect(group1Strokes).toHaveLength(1);
-        expect(group1Strokes[0].nm).toBe("Stroke 1");
+        // The inherited layer-level stroke must be painted with its black CSS color.
+        expect(calls[0].strokeStyles).toEqual(["rgba(0, 0, 0, 1)"]);
     });
 });
 
@@ -703,8 +737,30 @@ describe("Parser solid layer (ty:1)", () => {
     function makeRasterizationContext(call: SolidRasterCall): SpritePackerRasterizationContext {
         const context: any = {
             fillStyle: "",
+            strokeStyle: "",
+            lineWidth: 1,
+            lineCap: "butt",
+            lineJoin: "miter",
+            miterLimit: 10,
+            globalCompositeOperation: "source-over",
             save: () => {},
             restore: () => {},
+            translate: () => {},
+            scale: () => {},
+            beginPath: () => {},
+            rect: () => {},
+            roundRect: () => {},
+            clip: () => {},
+            moveTo: () => {},
+            lineTo: () => {},
+            ellipse: () => {},
+            bezierCurveTo: () => {},
+            closePath: () => {},
+            setLineDash: () => {},
+            createLinearGradient: () => ({ addColorStop: () => {} }),
+            createRadialGradient: () => ({ addColorStop: () => {} }),
+            fill: () => {},
+            stroke: () => {},
             fillRect: (x: number, y: number, width: number, height: number) => {
                 call.fillStyle = context.fillStyle;
                 call.fillRects.push({ x, y, width, height });
@@ -714,8 +770,7 @@ describe("Parser solid layer (ty:1)", () => {
         return { context, x: 3, y: 5, cellWidth: 16, cellHeight: 16 };
     }
 
-    function makeRecordingPacker(): { packer: SpritePacker; shapeCalls: RawElement[][]; rasterCalls: SolidRasterCall[] } {
-        const shapeCalls: RawElement[][] = [];
+    function makeRecordingPacker(): { packer: SpritePacker; rasterCalls: SolidRasterCall[] } {
         const rasterCalls: SolidRasterCall[] = [];
         const baseInfo: SpriteAtlasInfo = {
             uOffset: 0,
@@ -730,10 +785,6 @@ describe("Parser solid layer (ty:1)", () => {
         };
 
         const mock = {
-            addLottieShape: (rawElements: RawElement[]) => {
-                shapeCalls.push(rawElements.slice());
-                return baseInfo;
-            },
             addRasterizedSprite: (
                 kind: string,
                 boundingBox: SolidRasterCall["boundingBox"],
@@ -763,25 +814,22 @@ describe("Parser solid layer (ty:1)", () => {
             set rawFonts(_: unknown) {},
         };
 
-        return { packer: mock as unknown as SpritePacker, shapeCalls, rasterCalls };
+        return { packer: mock as unknown as SpritePacker, rasterCalls };
     }
 
-    // Recording rendering manager so tests can assert the on-screen sprite dimensions handed to the
-    // sprite renderer. Solid layers stretch a 1x1 atlas cell to full sw*sh, so the on-screen size
-    // is the meaningful surface — distinct from `widthPx` reported by the packer.
-    function makeRecordingRenderingManager(): {
-        rm: RenderingManager;
-        sprites: { width: number; height: number; xOffset: number; yOffset: number; xSize: number; ySize: number }[];
-    } {
-        const sprites: { width: number; height: number; xOffset: number; yOffset: number; xSize: number; ySize: number }[] = [];
-        const mock = {
-            addSprite: (sprite: { width: number; height: number; _xOffset: number; _yOffset: number; _xSize: number; _ySize: number }) => {
-                // Snapshot at call time — the parser may continue mutating the sprite afterwards.
-                sprites.push({ width: sprite.width, height: sprite.height, xOffset: sprite._xOffset, yOffset: sprite._yOffset, xSize: sprite._xSize, ySize: sprite._ySize });
-            },
-            ready: () => {},
-        };
-        return { rm: mock as unknown as RenderingManager, sprites };
+    // Reads the parser's renderer-agnostic sprite records so tests can assert the on-screen sprite
+    // dimensions that will be handed to the sprite renderer. Solid layers stretch a 1x1 atlas cell
+    // to full sw*sh, so the on-screen size is the meaningful surface — distinct from `widthPx`
+    // reported by the packer.
+    function readSpriteRecords(parser: Parser): { width: number; height: number; xOffset: number; yOffset: number; xSize: number; ySize: number }[] {
+        return parser.spriteRecords.map((record) => ({
+            width: record.width,
+            height: record.height,
+            xOffset: record.uOffset,
+            yOffset: record.vOffset,
+            xSize: record.uSize,
+            ySize: record.vSize,
+        }));
     }
 
     function captureDebugMessages(parser: Parser): string[] {
@@ -826,13 +874,12 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, shapeCalls, rasterCalls } = makeRecordingPacker();
-        const { rm, sprites } = makeRecordingRenderingManager();
-        makeParser(packer, animation, makeConfiguration(), rm);
+        const { packer, rasterCalls } = makeRecordingPacker();
+        const parser = makeParser(packer, animation, makeConfiguration());
+        const sprites = readSpriteRecords(parser);
 
         // Solid layer must produce exactly one feature-owned atlas rasterization call. It no longer
         // smuggles a rectangle/fill pair through the generic shape path.
-        expect(shapeCalls).toHaveLength(0);
         expect(rasterCalls).toHaveLength(1);
         const solidCall = rasterCalls[0];
         expect(solidCall.kind).toBe("solid");
@@ -878,11 +925,10 @@ describe("Parser solid layer (ty:1)", () => {
             ],
         };
 
-        const { packer, shapeCalls, rasterCalls } = makeRecordingPacker();
-        const { rm, sprites } = makeRecordingRenderingManager();
-        const parser = makeParser(packer, animation, makeConfiguration({ compatibility: { solidLayerRendering: "babylon8" } }), rm);
+        const { packer, rasterCalls } = makeRecordingPacker();
+        const parser = makeParser(packer, animation, makeConfiguration({ compatibility: { solidLayerRendering: "babylon8" } }));
+        const sprites = readSpriteRecords(parser);
 
-        expect(shapeCalls).toHaveLength(0);
         expect(rasterCalls).toHaveLength(0);
         expect(sprites).toHaveLength(0);
         expect(parser.animationInfo.nodes).toHaveLength(0);
@@ -987,17 +1033,17 @@ describe("Parser solid layer (ty:1)", () => {
                     op: 60,
                     st: 0,
                     ks: makeTransform(),
-                    shapes: [{ ty: "rc", nm: "rect" } as any],
+                    shapes: [makeRectShape()],
                 } as RawShapeLayer,
             ],
         };
 
-        const { packer, shapeCalls, rasterCalls } = makeRecordingPacker();
+        const { packer, rasterCalls } = makeRecordingPacker();
         const parser = makeParser(packer, animation);
 
         // Only the child shape rasterizes; the malformed solid layer is skipped.
-        expect(shapeCalls).toHaveLength(1);
-        expect(rasterCalls).toHaveLength(0);
+        expect(rasterCalls.filter((c) => c.kind === "solid")).toHaveLength(0);
+        expect(rasterCalls.filter((c) => c.kind === "shape")).toHaveLength(1);
 
         // Solid layer's anchor was still created so the child resolves its parent and ends up as a
         // descendant of the solid layer's ControlNode (not a stray root).

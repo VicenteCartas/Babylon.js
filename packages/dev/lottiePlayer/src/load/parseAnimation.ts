@@ -5,6 +5,7 @@ import { type RawLottieAnimation } from "../parsing/rawTypes";
 import { type RenderingManager } from "../rendering/renderingManager";
 import { Parser } from "../parsing/parser";
 import { type SpritePacker } from "../parsing/spritePacker";
+import { MaterializeSpriteRecords } from "../rendering/babylonSpriteAdapter";
 
 export type ParseAnimationContext = {
     /** Object that packs animation sprites into texture atlases. */
@@ -44,10 +45,13 @@ export function ParseAnimation(
 ): AnimationInfo {
     ValidateFeatureSet(features);
 
-    const parser = new Parser(context.packer, raw, featureConfig, rendererConfig, context.renderingManager, features);
+    const parser = new Parser(context.packer, raw, featureConfig, rendererConfig, features);
     if (featureConfig.debug) {
         parser.debug();
     }
+
+    // Materialize the renderer-agnostic sprite records into Babylon sprites and finalize the renderer.
+    MaterializeSpriteRecords(parser.spriteRecords, context.packer, context.renderingManager);
 
     return parser.animationInfo;
 }

@@ -1,4 +1,5 @@
 import { type ThinSprite } from "core/Sprites/thinSprite";
+import { type Nullable } from "core/types";
 
 import { type ScalarProperty, type Vector2Property } from "../parsing/parsedTypes";
 
@@ -11,32 +12,55 @@ const TempScale = { x: 1, y: 1 };
 
 /**
  * Represents a sprite in the scene graph.
+ *
+ * The node holds only renderer-agnostic transform state. The concrete sprite is supplied later
+ * by a renderer adapter through {@link attachSprite}, so parsing and feature modules can build
+ * the scene graph without depending on any specific rendering backend.
  */
 export class SpriteNode extends Node {
-    private _sprite: ThinSprite;
-    private _originalWidth: number;
-    private _originalHeight: number;
+    private _sprite: Nullable<ThinSprite> = null;
+    private readonly _originalWidth: number;
+    private readonly _originalHeight: number;
 
     private _firstTime = true;
 
     /**
      * Creates a new SpriteNode instance.
      * @param id Unique identifier for the sprite node.
-     * @param sprite The sprite associated with this node.
+     * @param originalWidth The unscaled sprite width in pixels.
+     * @param originalHeight The unscaled sprite height in pixels.
      * @param position The position of the sprite in the scene.
      * @param rotation The rotation of the sprite in degrees.
      * @param scale The scale of the sprite in the scene.
      * @param opacity The opacity of the sprite.
      * @param parent The parent node in the scene graph.
      */
-    public constructor(id: string, sprite: ThinSprite, position?: Vector2Property, rotation?: ScalarProperty, scale?: Vector2Property, opacity?: ScalarProperty, parent?: Node) {
+    public constructor(
+        id: string,
+        originalWidth: number,
+        originalHeight: number,
+        position?: Vector2Property,
+        rotation?: ScalarProperty,
+        scale?: Vector2Property,
+        opacity?: ScalarProperty,
+        parent?: Node
+    ) {
         super(id, position, rotation, scale, opacity, parent);
 
-        this._sprite = sprite;
-        this._originalWidth = sprite.width;
-        this._originalHeight = sprite.height;
+        this._originalWidth = originalWidth;
+        this._originalHeight = originalHeight;
 
         this._isShape = true;
+    }
+
+    /**
+     * Attaches the concrete sprite driven by this node.
+     * Called by the renderer adapter after parsing, once the rendering backend's sprite exists.
+     * @param sprite The sprite to drive from this node's transform.
+     */
+    public attachSprite(sprite: ThinSprite): void {
+        this._sprite = sprite;
+        this._firstTime = true;
     }
 
     /**
@@ -48,21 +72,27 @@ export class SpriteNode extends Node {
      */
     public override update(frame: number, isParentUpdated = false, isReset = false): boolean {
         const isDirty = super.update(frame, isParentUpdated, isReset) || this._firstTime;
+
+        const sprite = this._sprite;
+        if (sprite === null) {
+            return isDirty;
+        }
+
         this._firstTime = false;
 
         if (isDirty) {
-            const rotation = this.worldMatrix.decompose(TempScale, this._sprite.position);
+            const rotation = this.worldMatrix.decompose(TempScale, sprite.position);
 
             // Apply scaling to the original sprite dimensions
-            this._sprite.width = this._originalWidth * TempScale.x;
-            this._sprite.height = this._originalHeight * TempScale.y;
+            sprite.width = this._originalWidth * TempScale.x;
+            sprite.height = this._originalHeight * TempScale.y;
 
             // Rotation
-            this._sprite.angle = rotation;
+            sprite.angle = rotation;
         }
 
         // Opacity
-        this._sprite.color.a = this.opacity;
+        sprite.color.a = this.opacity;
 
         return isDirty;
     }
