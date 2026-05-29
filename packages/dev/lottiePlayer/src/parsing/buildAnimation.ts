@@ -1,8 +1,7 @@
 import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
 import { type LottieFeature, type LottieFeatureId, type LottieFeatureSet } from "../features/feature";
 import { GetFeatureIdForLayerType } from "../features/layerTypes";
-import { ControlNode } from "../nodes/controlNode";
-import { type Node } from "../nodes/node";
+import { CreateControlNode, type AnimationNode } from "../nodes/node";
 import { ParseDiagnostics } from "./diagnostics";
 import { ParseNullLayer } from "./nullLayer";
 import { type AnimationInfo, type Transform } from "./parsedTypes";
@@ -42,8 +41,8 @@ type BuildState = {
     diagnostics: ParseDiagnostics;
     spriteRecords: LottieSpriteRecord[];
     rawFonts: Map<string, RawFont>;
-    rootNodes: Node[]; // Array of root-level nodes in the animation, in top-down z order
-    parentNodes: Map<number, Node>; // Map of nodes to build the scenegraph from the animation layers
+    rootNodes: AnimationNode[]; // Array of root-level nodes in the animation, in top-down z order
+    parentNodes: Map<number, AnimationNode>; // Map of nodes to build the scenegraph from the animation layers
     layerOriginalIndices: Map<RawLottieLayer, number>; // Maps layers to their original array index for z-ordering
     startFrame: number;
     currentLayerOriginalIndex: number; // Original array index of the layer currently being parsed, used for sprite z-ordering
@@ -93,7 +92,7 @@ export function BuildAnimation(
         spriteRecords: [],
         rawFonts: new Map<string, RawFont>(),
         rootNodes: [],
-        parentNodes: new Map<number, Node>(),
+        parentNodes: new Map<number, AnimationNode>(),
         layerOriginalIndices: new Map<RawLottieLayer, number>(),
         startFrame: rawData.ip,
         currentLayerOriginalIndex: 0,
@@ -255,7 +254,7 @@ function ParseLayer(state: BuildState, layer: RawLottieLayer): void {
         return;
     }
 
-    let parentNode: Node | undefined = undefined;
+    let parentNode: AnimationNode | undefined = undefined;
     if (layer.parent !== undefined) {
         parentNode = state.parentNodes.get(layer.parent);
         if (parentNode === undefined) {
@@ -270,7 +269,7 @@ function ParseLayer(state: BuildState, layer: RawLottieLayer): void {
         diagnostics: state.diagnostics,
     });
 
-    const trsNode = new ControlNode(
+    const trsNode = CreateControlNode(
         `ControlNode (TRS) - ${layer.nm}`,
         layer.ip,
         layer.op,
@@ -282,7 +281,7 @@ function ParseLayer(state: BuildState, layer: RawLottieLayer): void {
         layer.ty === 3 // isNullLayer
     );
 
-    let anchorNode: Node | undefined = undefined;
+    let anchorNode: AnimationNode | undefined = undefined;
     if (layer.ty === 3) {
         // Null layers are structural and owned by no feature.
         anchorNode = ParseNullLayer(layer, transform, trsNode);
@@ -320,7 +319,7 @@ function ParseLayer(state: BuildState, layer: RawLottieLayer): void {
     }
 }
 
-function DispatchSolidLayer(state: BuildState, layer: RawSolidLayer, transform: Transform, parent: Node): Node {
+function DispatchSolidLayer(state: BuildState, layer: RawSolidLayer, transform: Transform, parent: AnimationNode): AnimationNode {
     const feature = GetFeature(state.features, "solid")?.solidLayer;
     if (feature === undefined) {
         state.diagnostics.pushOnce("Solid layer feature was not loaded; skipping solid layers.");
@@ -339,7 +338,7 @@ function DispatchSolidLayer(state: BuildState, layer: RawSolidLayer, transform: 
     });
 }
 
-function DispatchShapeLayer(state: BuildState, layer: RawShapeLayer, transform: Transform, parent: Node): Node | undefined {
+function DispatchShapeLayer(state: BuildState, layer: RawShapeLayer, transform: Transform, parent: AnimationNode): AnimationNode | undefined {
     const feature = GetFeature(state.features, "shape")?.shapeLayer;
     if (feature === undefined) {
         state.diagnostics.pushOnce("Shape layer feature was not loaded; skipping shape layers.");
@@ -360,7 +359,7 @@ function DispatchShapeLayer(state: BuildState, layer: RawShapeLayer, transform: 
     });
 }
 
-function DispatchTextLayer(state: BuildState, layer: RawTextLayer, transform: Transform, parent: Node): Node | undefined {
+function DispatchTextLayer(state: BuildState, layer: RawTextLayer, transform: Transform, parent: AnimationNode): AnimationNode | undefined {
     const feature = GetFeature(state.features, "text")?.textLayer;
     if (feature === undefined) {
         state.diagnostics.pushOnce("Text layer feature was not loaded; skipping text layers.");

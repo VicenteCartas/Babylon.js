@@ -1,8 +1,7 @@
 import { type IVector2Like } from "core/Maths/math.like";
 
 import { GetShapesBoundingBox } from "../../maths/boundingBox";
-import { Node } from "../../nodes/node";
-import { SpriteNode } from "../../nodes/spriteNode";
+import { CreateNode, CreateSpriteNode, type AnimationNode } from "../../nodes/node";
 import { type ParseDiagnostics } from "../../parsing/diagnostics";
 import { ParseNullLayer } from "../../parsing/nullLayer";
 import { type Transform, type Vector2Property } from "../../parsing/parsedTypes";
@@ -22,7 +21,7 @@ export type LottieShapeLayerParseContext = {
     /** Already parsed layer transform. */
     transform: Transform;
     /** Parent node in the animation tree. */
-    parent: Node;
+    parent: AnimationNode;
     /** Sprite atlas packer used by this animation. */
     packer: SpritePacker;
     /** Emits a renderer-agnostic sprite record for later materialization. */
@@ -44,7 +43,7 @@ export type LottieShapeLayerParseContext = {
  */
 export type LottieShapeLayerFeature = {
     /** Parses and rasterizes a Lottie shape layer. */
-    parseShapeLayer(context: LottieShapeLayerParseContext): Node;
+    parseShapeLayer(context: LottieShapeLayerParseContext): AnimationNode;
 };
 
 /**
@@ -54,7 +53,7 @@ export const ShapeLayerFeature: LottieShapeLayerFeature = {
     parseShapeLayer: ParseShapeLayer,
 };
 
-function ParseShapeLayer(context: LottieShapeLayerParseContext): Node {
+function ParseShapeLayer(context: LottieShapeLayerParseContext): AnimationNode {
     const anchorNode = ParseNullLayer(context.layer, context.transform, context.parent);
     const rasterizationFrame = GetRasterizationFrame(context.layer, context.startFrame);
     ParseElements(context, context.layer.shapes, anchorNode, rasterizationFrame);
@@ -62,7 +61,7 @@ function ParseShapeLayer(context: LottieShapeLayerParseContext): Node {
     return anchorNode;
 }
 
-function ParseElements(context: LottieShapeLayerParseContext, elements: RawElement[] | undefined, parent: Node, rasterizationFrame: number): void {
+function ParseElements(context: LottieShapeLayerParseContext, elements: RawElement[] | undefined, parent: AnimationNode, rasterizationFrame: number): void {
     if (elements === undefined || elements.length <= 0) {
         return;
     }
@@ -112,7 +111,7 @@ function ParseElements(context: LottieShapeLayerParseContext, elements: RawEleme
     }
 }
 
-function ParseGroup(context: LottieShapeLayerParseContext, group: RawElement, parent: Node, rasterizationFrame: number, inheritedDecorators?: RawElement[]): void {
+function ParseGroup(context: LottieShapeLayerParseContext, group: RawElement, parent: AnimationNode, rasterizationFrame: number, inheritedDecorators?: RawElement[]): void {
     if (group.it === undefined || group.it.length === 0) {
         context.diagnostics.push(`Unexpected empty group: ${group.nm}`);
         return;
@@ -134,9 +133,9 @@ function ParseGroup(context: LottieShapeLayerParseContext, group: RawElement, pa
     }
 
     // Create the nodes on the scenegraph for this group
-    const trsNode = new Node(`Node (TRS)- ${group.nm}`, transform.position, transform.rotation, transform.scale, transform.opacity, parent);
+    const trsNode = CreateNode(`Node (TRS)- ${group.nm}`, transform.position, transform.rotation, transform.scale, transform.opacity, parent);
 
-    const anchorNode = new Node(
+    const anchorNode = CreateNode(
         `Node (Anchor) - ${group.nm}`,
         transform.anchorPoint,
         undefined, // Rotation is not used for anchor point
@@ -149,7 +148,7 @@ function ParseGroup(context: LottieShapeLayerParseContext, group: RawElement, pa
     ParseElements(context, items, anchorNode, rasterizationFrame);
 }
 
-function ParseShapes(context: LottieShapeLayerParseContext, elements: RawElement[], parent: Node, rasterizationFrame: number): void {
+function ParseShapes(context: LottieShapeLayerParseContext, elements: RawElement[], parent: AnimationNode, rasterizationFrame: number): void {
     // Get the rasterization scale at the frame when the layer first becomes visible
     const currentScale = GetRasterizationScale(parent, rasterizationFrame);
     const spriteInfo = AddLottieShapeToAtlas(context, elements, currentScale);
@@ -160,7 +159,7 @@ function ParseShapes(context: LottieShapeLayerParseContext, elements: RawElement
         currentKeyframeIndex: 0,
     };
 
-    const spriteNode = new SpriteNode(
+    const spriteNode = CreateSpriteNode(
         "Sprite",
         spriteInfo.widthPx,
         spriteInfo.heightPx,

@@ -1,7 +1,6 @@
 import { type LottieRendererConfig } from "../../animationConfiguration";
 import { type BoundingBox } from "../../maths/boundingBox";
-import { type Node } from "../../nodes/node";
-import { SpriteNode } from "../../nodes/spriteNode";
+import { CreateSpriteNode, type AnimationNode } from "../../nodes/node";
 import { type ParseDiagnostics } from "../../parsing/diagnostics";
 import { ParseNullLayer } from "../../parsing/nullLayer";
 import { type Vector2Property, type Transform } from "../../parsing/parsedTypes";
@@ -28,7 +27,7 @@ export type LottieSolidLayerParseContext = {
     /** Already parsed layer transform. */
     transform: Transform;
     /** Parent node in the animation tree. */
-    parent: Node;
+    parent: AnimationNode;
     /** Sprite atlas packer used by this animation. */
     packer: SpritePacker;
     /** Renderer-bound configuration needed for center-UV sampling. */
@@ -46,7 +45,7 @@ export type LottieSolidLayerParseContext = {
  */
 export type LottieSolidLayerFeature = {
     /** Parses and rasterizes a Lottie solid layer. */
-    parseSolidLayer(context: LottieSolidLayerParseContext): Node;
+    parseSolidLayer(context: LottieSolidLayerParseContext): AnimationNode;
 };
 
 /**
@@ -56,7 +55,7 @@ export const SolidLayerFeature: LottieSolidLayerFeature = {
     parseSolidLayer: ParseSolidLayer,
 };
 
-function ParseSolidLayer(context: LottieSolidLayerParseContext): Node {
+function ParseSolidLayer(context: LottieSolidLayerParseContext): AnimationNode {
     const anchorNode = ParseNullLayer(context.layer, context.transform, context.parent);
 
     if (!(context.layer.sw > 0) || !(context.layer.sh > 0)) {
@@ -78,7 +77,7 @@ function ParseSolidLayer(context: LottieSolidLayerParseContext): Node {
         currentKeyframeIndex: 0,
     };
 
-    const spriteNode = new SpriteNode("Sprite", context.layer.sw, context.layer.sh, positionProperty, undefined, undefined, undefined, anchorNode);
+    const spriteNode = CreateSpriteNode("Sprite", context.layer.sw, context.layer.sh, positionProperty, undefined, undefined, undefined, anchorNode);
 
     context.emitSpriteRecord({
         node: spriteNode,

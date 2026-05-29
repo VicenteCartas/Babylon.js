@@ -1,5 +1,6 @@
 import { ThinSprite } from "core/Sprites/thinSprite";
 
+import { AttachSprite } from "../nodes/node";
 import { type LottieSpriteRecord } from "../parsing/spriteRecord";
 import { type SpritePacker } from "../parsing/spritePacker";
 import { type RenderingManager } from "./renderingManager";
@@ -27,7 +28,7 @@ export function MaterializeSpriteRecords(records: readonly LottieSpriteRecord[],
         sprite.height = record.height;
         sprite.invertV = record.invertV;
 
-        record.node.attachSprite(sprite);
+        AttachSprite(record.node, sprite);
         renderingManager.addSprite(sprite, record.layerOrder, record.atlasIndex);
     }
 

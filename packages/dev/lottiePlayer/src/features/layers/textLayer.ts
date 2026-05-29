@@ -2,8 +2,7 @@ import { type IVector2Like } from "core/Maths/math.like";
 
 import { type LottieFeatureConfig, type LottieCompatibilityMode } from "../../animationConfiguration";
 import { type BoundingBox } from "../../maths/boundingBox";
-import { type Node } from "../../nodes/node";
-import { SpriteNode } from "../../nodes/spriteNode";
+import { CreateSpriteNode, type AnimationNode } from "../../nodes/node";
 import { ParseNullLayer } from "../../parsing/nullLayer";
 import { type Transform, type Vector2Property } from "../../parsing/parsedTypes";
 import { GetRasterizationFrame, GetRasterizationScale } from "../../parsing/rasterization";
@@ -31,7 +30,7 @@ export type LottieTextLayerParseContext = {
     /** Already parsed layer transform. */
     transform: Transform;
     /** Parent node in the animation tree. */
-    parent: Node;
+    parent: AnimationNode;
     /** Sprite atlas packer used by this animation. */
     packer: SpritePacker;
     /** Font metadata parsed from the animation. */
@@ -51,7 +50,7 @@ export type LottieTextLayerParseContext = {
  */
 export type LottieTextLayerFeature = {
     /** Parses and rasterizes a Lottie text layer. */
-    parseTextLayer(context: LottieTextLayerParseContext): Node | undefined;
+    parseTextLayer(context: LottieTextLayerParseContext): AnimationNode | undefined;
 };
 
 /**
@@ -61,7 +60,7 @@ export const TextLayerFeature: LottieTextLayerFeature = {
     parseTextLayer: ParseTextLayer,
 };
 
-function ParseTextLayer(context: LottieTextLayerParseContext): Node | undefined {
+function ParseTextLayer(context: LottieTextLayerParseContext): AnimationNode | undefined {
     const rasterizationFrame = GetRasterizationFrame(context.layer, context.startFrame);
     const currentScale = GetRasterizationScale(context.parent, rasterizationFrame);
     const spriteInfo = AddLottieTextToAtlas(context.packer, context.layer.t, context.rawFonts, context.featureConfiguration, currentScale, context.layer.nm);
@@ -75,7 +74,7 @@ function ParseTextLayer(context: LottieTextLayerParseContext): Node | undefined 
 
     const positionProperty = useBabylon8TextPlacement ? GetBabylon8TextPosition(context.layer, context.transform, spriteInfo) : GetTextPosition(spriteInfo);
 
-    const spriteNode = new SpriteNode("Sprite", spriteInfo.widthPx, spriteInfo.heightPx, positionProperty, undefined, undefined, undefined, spriteParent);
+    const spriteNode = CreateSpriteNode("Sprite", spriteInfo.widthPx, spriteInfo.heightPx, positionProperty, undefined, undefined, undefined, spriteParent);
 
     context.emitSpriteRecord({
         node: spriteNode,

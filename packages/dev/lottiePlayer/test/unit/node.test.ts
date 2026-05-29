@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Node } from "../../src/nodes/node";
-import { ControlNode } from "../../src/nodes/controlNode";
+import { CreateNode, CreateControlNode, DecomposeWorldMatrixAtFrame, GetNodeOpacity, ResetNode, SetNodeVisible, UpdateNode } from "../../src/nodes/node";
 import { BezierCurve } from "../../src/maths/bezier";
 import { type Vector2Property, type ScalarProperty } from "../../src/parsing/parsedTypes";
 
@@ -44,12 +43,12 @@ describe("Node keyframe boundary", () => {
             { time: 30, x: 100, y: 200 },
         ]);
 
-        const node = new Node("test", position);
-        node.isVisible = true;
-        node.update(30);
+        const node = CreateNode("test", position);
+        SetNodeVisible(node, true);
+        UpdateNode(node, 30);
 
-        expect(node.positionCurrent.x).toBe(100);
-        expect(node.positionCurrent.y).toBe(200);
+        expect(node.position.currentValue.x).toBe(100);
+        expect(node.position.currentValue.y).toBe(200);
     });
 
     it("clamps to the final keyframe value beyond the last keyframe time", () => {
@@ -58,12 +57,12 @@ describe("Node keyframe boundary", () => {
             { time: 30, x: 100, y: 200 },
         ]);
 
-        const node = new Node("test", position);
-        node.isVisible = true;
-        node.update(31);
+        const node = CreateNode("test", position);
+        SetNodeVisible(node, true);
+        UpdateNode(node, 31);
 
-        expect(node.positionCurrent.x).toBe(100);
-        expect(node.positionCurrent.y).toBe(200);
+        expect(node.position.currentValue.x).toBe(100);
+        expect(node.position.currentValue.y).toBe(200);
     });
 
     it("interpolates correctly at mid-frame", () => {
@@ -72,12 +71,12 @@ describe("Node keyframe boundary", () => {
             { time: 30, x: 100, y: 200 },
         ]);
 
-        const node = new Node("test", position);
-        node.isVisible = true;
-        node.update(15);
+        const node = CreateNode("test", position);
+        SetNodeVisible(node, true);
+        UpdateNode(node, 15);
 
-        expect(node.positionCurrent.x).toBeCloseTo(50, 0);
-        expect(node.positionCurrent.y).toBeCloseTo(100, 0);
+        expect(node.position.currentValue.x).toBeCloseTo(50, 0);
+        expect(node.position.currentValue.y).toBeCloseTo(100, 0);
     });
 
     it("returns the final scale value at exactly the last keyframe time", () => {
@@ -86,12 +85,12 @@ describe("Node keyframe boundary", () => {
             { time: 20, x: 2, y: 3 },
         ]);
 
-        const node = new Node("test", undefined, undefined, scale);
-        node.isVisible = true;
-        node.update(20);
+        const node = CreateNode("test", undefined, undefined, scale);
+        SetNodeVisible(node, true);
+        UpdateNode(node, 20);
 
-        expect(node.scaleCurrent.x).toBe(2);
-        expect(node.scaleCurrent.y).toBe(3);
+        expect(node.scale.currentValue.x).toBe(2);
+        expect(node.scale.currentValue.y).toBe(3);
     });
 
     it("returns the final opacity value at exactly the last keyframe time", () => {
@@ -100,11 +99,11 @@ describe("Node keyframe boundary", () => {
             { time: 10, value: 1 },
         ]);
 
-        const node = new Node("test", undefined, undefined, undefined, opacity);
-        node.isVisible = true;
-        node.update(10);
+        const node = CreateNode("test", undefined, undefined, undefined, opacity);
+        SetNodeVisible(node, true);
+        UpdateNode(node, 10);
 
-        expect(node.opacity).toBe(1);
+        expect(GetNodeOpacity(node)).toBe(1);
     });
 
     it("applies correct sign for rotation at exactly the last keyframe time", () => {
@@ -113,101 +112,101 @@ describe("Node keyframe boundary", () => {
             { time: 30, value: Math.PI / 2 },
         ]);
 
-        const node = new Node("test", undefined, rotation);
-        node.isVisible = true;
+        const node = CreateNode("test", undefined, rotation);
+        SetNodeVisible(node, true);
 
         // At mid-frame, interpolation applies negation
-        node.update(15);
-        const midValue = node.rotationCurrent;
+        UpdateNode(node, 15);
+        const midValue = node.rotation.currentValue;
         expect(midValue).toBeLessThan(0);
 
         // At exact last keyframe, clamp should also apply negation
-        node.update(30);
-        expect(node.rotationCurrent).toBe(-Math.PI / 2);
+        UpdateNode(node, 30);
+        expect(node.rotation.currentValue).toBe(-Math.PI / 2);
     });
 });
 
 describe("Null layer opacity isolation", () => {
     it("child of null layer with opacity 0 returns its own opacity when no grandparent", () => {
         const parentOpacity = makeScalarProperty(0, []);
-        const nullParent = new ControlNode("null-parent", 0, 100, undefined, undefined, undefined, parentOpacity, undefined, true);
-        nullParent.update(0);
+        const nullParent = CreateControlNode("null-parent", 0, 100, undefined, undefined, undefined, parentOpacity, undefined, true);
+        UpdateNode(nullParent, 0);
 
         const childOpacity: ScalarProperty = { startValue: 1, currentValue: 1, currentKeyframeIndex: 0 };
-        const child = new Node("child", undefined, undefined, undefined, childOpacity, nullParent);
-        child.isVisible = true;
-        nullParent.isVisible = true;
+        const child = CreateNode("child", undefined, undefined, undefined, childOpacity, nullParent);
+        SetNodeVisible(child, true);
+        SetNodeVisible(nullParent, true);
 
         // Force update to propagate visibility
-        nullParent.update(0);
+        UpdateNode(nullParent, 0);
 
-        expect(child.opacity).toBe(1);
+        expect(GetNodeOpacity(child)).toBe(1);
     });
 
     it("child of null layer still inherits grandparent opacity", () => {
         const grandparentOpacity: ScalarProperty = { startValue: 0.5, currentValue: 0.5, currentKeyframeIndex: 0 };
-        const grandparent = new ControlNode("grandparent", 0, 100, undefined, undefined, undefined, grandparentOpacity);
+        const grandparent = CreateControlNode("grandparent", 0, 100, undefined, undefined, undefined, grandparentOpacity);
 
         const nullOpacity = makeScalarProperty(0, []);
-        const nullParent = new ControlNode("null-parent", 0, 100, undefined, undefined, undefined, nullOpacity, grandparent, true);
+        const nullParent = CreateControlNode("null-parent", 0, 100, undefined, undefined, undefined, nullOpacity, grandparent, true);
 
         const childOpacity: ScalarProperty = { startValue: 0.8, currentValue: 0.8, currentKeyframeIndex: 0 };
-        const child = new Node("child", undefined, undefined, undefined, childOpacity, nullParent);
+        const child = CreateNode("child", undefined, undefined, undefined, childOpacity, nullParent);
 
-        grandparent.isVisible = true;
-        grandparent.update(0);
+        SetNodeVisible(grandparent, true);
+        UpdateNode(grandparent, 0);
 
         // Child should skip null layer's opacity (0) but still multiply by grandparent's opacity (0.5)
-        expect(child.opacity).toBeCloseTo(0.4, 5);
+        expect(GetNodeOpacity(child)).toBeCloseTo(0.4, 5);
     });
 
     it("child of nested null layers still inherits ancestor opacity", () => {
-        // Mirror the real scene graph: ControlNode → anchor Node → ControlNode → anchor Node → ...
+        // Mirror the real scene graph: control → anchor node → control → anchor node → ...
         const ancestorOpacity: ScalarProperty = { startValue: 0.5, currentValue: 0.5, currentKeyframeIndex: 0 };
-        const ancestor = new ControlNode("ancestor", 0, 100, undefined, undefined, undefined, ancestorOpacity);
-        const ancestorAnchor = new Node("ancestor-anchor", undefined, undefined, undefined, undefined, ancestor);
+        const ancestor = CreateControlNode("ancestor", 0, 100, undefined, undefined, undefined, ancestorOpacity);
+        const ancestorAnchor = CreateNode("ancestor-anchor", undefined, undefined, undefined, undefined, ancestor);
 
         const null1Opacity = makeScalarProperty(0, []);
-        const null1 = new ControlNode("null1", 0, 100, undefined, undefined, undefined, null1Opacity, ancestorAnchor, true);
-        const null1Anchor = new Node("null1-anchor", undefined, undefined, undefined, undefined, null1);
+        const null1 = CreateControlNode("null1", 0, 100, undefined, undefined, undefined, null1Opacity, ancestorAnchor, true);
+        const null1Anchor = CreateNode("null1-anchor", undefined, undefined, undefined, undefined, null1);
 
         const null2Opacity = makeScalarProperty(0, []);
-        const null2 = new ControlNode("null2", 0, 100, undefined, undefined, undefined, null2Opacity, null1Anchor, true);
-        const null2Anchor = new Node("null2-anchor", undefined, undefined, undefined, undefined, null2);
+        const null2 = CreateControlNode("null2", 0, 100, undefined, undefined, undefined, null2Opacity, null1Anchor, true);
+        const null2Anchor = CreateNode("null2-anchor", undefined, undefined, undefined, undefined, null2);
 
         const childOpacity: ScalarProperty = { startValue: 1, currentValue: 1, currentKeyframeIndex: 0 };
-        const child = new Node("child", undefined, undefined, undefined, childOpacity, null2Anchor);
+        const child = CreateNode("child", undefined, undefined, undefined, childOpacity, null2Anchor);
 
-        ancestor.isVisible = true;
-        ancestor.update(0);
+        SetNodeVisible(ancestor, true);
+        UpdateNode(ancestor, 0);
 
         // Both null layers' opacities (0) should be skipped, but ancestor's 0.5 should be preserved
-        expect(child.opacity).toBeCloseTo(0.5, 5);
+        expect(GetNodeOpacity(child)).toBeCloseTo(0.5, 5);
     });
 
     it("child of regular layer still multiplies by parent opacity", () => {
         const parentOpacity: ScalarProperty = { startValue: 0.5, currentValue: 0.5, currentKeyframeIndex: 0 };
-        const regularParent = new ControlNode("regular-parent", 0, 100, undefined, undefined, undefined, parentOpacity, undefined, false);
+        const regularParent = CreateControlNode("regular-parent", 0, 100, undefined, undefined, undefined, parentOpacity, undefined, false);
 
         const childOpacity: ScalarProperty = { startValue: 0.8, currentValue: 0.8, currentKeyframeIndex: 0 };
-        const child = new Node("child", undefined, undefined, undefined, childOpacity, regularParent);
-        child.isVisible = true;
-        regularParent.isVisible = true;
+        const child = CreateNode("child", undefined, undefined, undefined, childOpacity, regularParent);
+        SetNodeVisible(child, true);
+        SetNodeVisible(regularParent, true);
 
-        regularParent.update(0);
+        UpdateNode(regularParent, 0);
 
-        expect(child.opacity).toBeCloseTo(0.4, 5);
+        expect(GetNodeOpacity(child)).toBeCloseTo(0.4, 5);
     });
 
     it("transforms from null layer parent still apply to children", () => {
         const parentPosition = makePositionProperty(10, 20, []);
-        const nullParent = new ControlNode("null-parent", 0, 100, parentPosition, undefined, undefined, undefined, undefined, true);
+        const nullParent = CreateControlNode("null-parent", 0, 100, parentPosition, undefined, undefined, undefined, undefined, true);
 
-        const child = new Node("child", undefined, undefined, undefined, undefined, nullParent);
-        child.isVisible = true;
-        nullParent.isVisible = true;
+        const child = CreateNode("child", undefined, undefined, undefined, undefined, nullParent);
+        SetNodeVisible(child, true);
+        SetNodeVisible(nullParent, true);
 
-        nullParent.update(0);
+        UpdateNode(nullParent, 0);
 
         // The child's world matrix should reflect the parent's position
         const scale = { x: 0, y: 0 };
@@ -221,31 +220,31 @@ describe("Null layer opacity isolation", () => {
 
 describe("ControlNode out-frame exclusivity", () => {
     it("is visible at outFrame - 1", () => {
-        const control = new ControlNode("test", 0, 30);
-        control.update(29);
+        const control = CreateControlNode("test", 0, 30);
+        UpdateNode(control, 29);
 
-        expect(control.opacity).toBeGreaterThan(0);
+        expect(GetNodeOpacity(control)).toBeGreaterThan(0);
     });
 
     it("is invisible at exactly outFrame", () => {
-        const control = new ControlNode("test", 0, 30);
-        control.update(30);
+        const control = CreateControlNode("test", 0, 30);
+        UpdateNode(control, 30);
 
-        expect(control.opacity).toBe(0);
+        expect(GetNodeOpacity(control)).toBe(0);
     });
 
     it("is visible at inFrame", () => {
-        const control = new ControlNode("test", 5, 30);
-        control.update(5);
+        const control = CreateControlNode("test", 5, 30);
+        UpdateNode(control, 5);
 
-        expect(control.opacity).toBeGreaterThan(0);
+        expect(GetNodeOpacity(control)).toBeGreaterThan(0);
     });
 
     it("is invisible before inFrame", () => {
-        const control = new ControlNode("test", 5, 30);
-        control.update(4);
+        const control = CreateControlNode("test", 5, 30);
+        UpdateNode(control, 4);
 
-        expect(control.opacity).toBe(0);
+        expect(GetNodeOpacity(control)).toBe(0);
     });
 });
 
@@ -256,20 +255,20 @@ describe("decomposeWorldMatrixAtFrame", () => {
             { time: 30, x: 2, y: 2 },
         ]);
 
-        const node = new Node("test", undefined, undefined, scale);
+        const node = CreateNode("test", undefined, undefined, scale);
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
-        node.decomposeWorldMatrixAtFrame(15, outScale, outTranslation);
+        DecomposeWorldMatrixAtFrame(node, 15, outScale, outTranslation);
 
         expect(outScale.x).toBeCloseTo(1.5, 1);
         expect(outScale.y).toBeCloseTo(1.5, 1);
     });
 
     it("returns start values when no keyframes", () => {
-        const node = new Node("test");
+        const node = CreateNode("test");
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
-        node.decomposeWorldMatrixAtFrame(10, outScale, outTranslation);
+        DecomposeWorldMatrixAtFrame(node, 10, outScale, outTranslation);
 
         expect(outScale.x).toBeCloseTo(1, 5);
         expect(outScale.y).toBeCloseTo(1, 5);
@@ -283,10 +282,10 @@ describe("decomposeWorldMatrixAtFrame", () => {
             { time: 30, x: 3, y: 3 },
         ]);
 
-        const node = new Node("test", undefined, undefined, scale);
+        const node = CreateNode("test", undefined, undefined, scale);
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
-        node.decomposeWorldMatrixAtFrame(50, outScale, outTranslation);
+        DecomposeWorldMatrixAtFrame(node, 50, outScale, outTranslation);
 
         expect(outScale.x).toBeCloseTo(3, 1);
         expect(outScale.y).toBeCloseTo(3, 1);
@@ -298,12 +297,12 @@ describe("decomposeWorldMatrixAtFrame", () => {
             { time: 30, x: 4, y: 4 },
         ]);
 
-        const parent = new Node("parent", undefined, undefined, parentScale);
-        const child = new Node("child", undefined, undefined, undefined, undefined, parent);
+        const parent = CreateNode("parent", undefined, undefined, parentScale);
+        const child = CreateNode("child", undefined, undefined, undefined, undefined, parent);
 
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
-        child.decomposeWorldMatrixAtFrame(15, outScale, outTranslation);
+        DecomposeWorldMatrixAtFrame(child, 15, outScale, outTranslation);
 
         // Parent scale at frame 15 = interpolated 3,3 → child inherits parent scale
         expect(outScale.x).toBeCloseTo(3, 1);
@@ -313,17 +312,17 @@ describe("decomposeWorldMatrixAtFrame", () => {
     it("matches worldMatrix.decompose for static non-zero rotation (no keyframes)", () => {
         const rotation: ScalarProperty = { startValue: -Math.PI / 4, currentValue: -Math.PI / 4, currentKeyframeIndex: 0 };
 
-        const node = new Node("test", undefined, rotation);
+        const node = CreateNode("test", undefined, rotation);
 
         // Get expected rotation from worldMatrix.decompose (the constructor path)
         const wmScale = { x: 0, y: 0 };
         const wmTranslation = { x: 0, y: 0 };
         const wmRotation = node.worldMatrix.decompose(wmScale, wmTranslation);
 
-        // decomposeWorldMatrixAtFrame should produce the same rotation
+        // DecomposeWorldMatrixAtFrame should produce the same rotation
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
-        const outRotation = node.decomposeWorldMatrixAtFrame(10, outScale, outTranslation);
+        const outRotation = DecomposeWorldMatrixAtFrame(node, 10, outScale, outTranslation);
 
         expect(outRotation).toBeCloseTo(wmRotation, 5);
     });
@@ -334,15 +333,15 @@ describe("decomposeWorldMatrixAtFrame", () => {
             { time: 30, x: 100, y: 200 },
         ]);
 
-        const node = new Node("test", position);
+        const node = CreateNode("test", position);
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
 
-        // Call decomposeWorldMatrixAtFrame — should NOT change currentValue
-        node.decomposeWorldMatrixAtFrame(15, outScale, outTranslation);
+        // Call DecomposeWorldMatrixAtFrame — should NOT change currentValue
+        DecomposeWorldMatrixAtFrame(node, 15, outScale, outTranslation);
 
-        expect(node.positionCurrent.x).toBe(0);
-        expect(node.positionCurrent.y).toBe(0);
+        expect(node.position.currentValue.x).toBe(0);
+        expect(node.position.currentValue.y).toBe(0);
     });
 
     it("applies negation consistently for animated rotation keyframes", () => {
@@ -354,23 +353,23 @@ describe("decomposeWorldMatrixAtFrame", () => {
             { time: 30, value: Math.PI / 2 },
         ]);
 
-        const node = new Node("test", undefined, rotation);
+        const node = CreateNode("test", undefined, rotation);
 
-        // Drive the legacy update path to get the "ground truth" rotation at frame 15.
-        node.isVisible = true;
-        node.update(15);
+        // Drive the runtime update path to get the "ground truth" rotation at frame 15.
+        SetNodeVisible(node, true);
+        UpdateNode(node, 15);
         const expectedScale = { x: 0, y: 0 };
         const expectedTranslation = { x: 0, y: 0 };
         const expectedRotation = node.worldMatrix.decompose(expectedScale, expectedTranslation);
 
         // Reset and verify the at-frame path produces the same rotation without mutating state.
-        node.reset();
+        ResetNode(node);
         const outScale = { x: 0, y: 0 };
         const outTranslation = { x: 0, y: 0 };
-        const outRotation = node.decomposeWorldMatrixAtFrame(15, outScale, outTranslation);
+        const outRotation = DecomposeWorldMatrixAtFrame(node, 15, outScale, outTranslation);
 
         expect(outRotation).toBeCloseTo(expectedRotation, 5);
-        expect(node.rotationCurrent).toBeCloseTo(0, 5); // reset restored startValue; decomposeWorldMatrixAtFrame did not mutate
+        expect(node.rotation.currentValue).toBeCloseTo(0, 5); // reset restored startValue; DecomposeWorldMatrixAtFrame did not mutate
     });
 });
 
@@ -378,7 +377,7 @@ describe("Node loop reset of nested animated nodes", () => {
     // Regression: when looping back to a frame that is BEFORE the first keyframe of an animated
     // child node, the controller's reset()+update(currentFrame) sequence used to leave the child's
     // localMatrix at the END-of-previous-loop interpolated value, even though `currentValue` had
-    // been correctly reset to `startValue`. The cause was that `Node.update` only honored
+    // been correctly reset to `startValue`. The cause was that `UpdateNode` only honored
     // `isReset` on the node it was first called on (the root) and did not propagate it to
     // children, so animated descendants whose animation functions return false at the new frame
     // (idx < 0 — frame before first keyframe) never recomposed their localMatrix.
@@ -397,8 +396,8 @@ describe("Node loop reset of nested animated nodes", () => {
                 { time: 60, value: { x: 5, y: 5 }, easeFunction1: linearEase(), easeFunction2: linearEase() },
             ],
         };
-        const parent = new Node("parent", undefined, undefined, parentScale);
-        parent.isVisible = true;
+        const parent = CreateNode("parent", undefined, undefined, parentScale);
+        SetNodeVisible(parent, true);
 
         // Child: own animated position with first keyframe at t=10. Its localMatrix gets recomposed
         // every time its animation function fires (frames 10..40), then stays at the final
@@ -407,28 +406,28 @@ describe("Node loop reset of nested animated nodes", () => {
             { time: 10, x: 0, y: 0 },
             { time: 40, x: 100, y: 200 },
         ]);
-        const child = new Node("child", childPosition, undefined, undefined, undefined, parent);
-        child.isVisible = true;
+        const child = CreateNode("child", childPosition, undefined, undefined, undefined, parent);
+        SetNodeVisible(child, true);
 
         // Drive the animation to its end so both parent.localMatrix and child.localMatrix sit at
         // their last-keyframe interpolated values.
-        parent.update(90);
+        UpdateNode(parent, 90);
 
         // Sanity: child's local position is at the last keyframe value before the loop reset.
-        expect(child.positionCurrent.x).toBeCloseTo(100, 5);
-        expect(child.positionCurrent.y).toBeCloseTo(200, 5);
+        expect(child.position.currentValue.x).toBeCloseTo(100, 5);
+        expect(child.position.currentValue.y).toBeCloseTo(200, 5);
 
         // Loop back: reset all properties and replay from frame 0 (before the child's first
         // keyframe at t=10). This mirrors what AnimationController does on loop wrap.
-        parent.reset();
-        parent.update(0);
+        ResetNode(parent);
+        UpdateNode(parent, 0);
 
         // After reset+update at frame 0:
         //  - child.currentValue must be back to startValue (0, 0) — reset's responsibility.
         //  - child.worldMatrix translation must reflect (0, 0) too — i.e. its localMatrix must
         //    have been recomposed from the reset currentValue, not left at the end-of-loop state.
-        expect(child.positionCurrent.x).toBeCloseTo(0, 5);
-        expect(child.positionCurrent.y).toBeCloseTo(0, 5);
+        expect(child.position.currentValue.x).toBeCloseTo(0, 5);
+        expect(child.position.currentValue.y).toBeCloseTo(0, 5);
 
         const worldScale = { x: 0, y: 0 };
         const worldTranslation = { x: 0, y: 0 };

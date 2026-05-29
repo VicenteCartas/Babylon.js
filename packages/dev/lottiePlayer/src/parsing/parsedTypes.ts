@@ -2,7 +2,7 @@ import { type IVector2Like } from "core/Maths/math.like";
 
 import { type BezierCurve } from "../maths/bezier";
 
-import { type Node } from "../nodes/node";
+import { type AnimationNode } from "../nodes/node";
 
 /**
  * Represents a Babylon.js thin version of a Lottie animation.
@@ -31,7 +31,7 @@ export type AnimationInfo = {
     /**
      * Nodes representing the animation
      */
-    nodes: Node[];
+    nodes: AnimationNode[];
 };
 
 /**

@@ -1,4 +1,4 @@
-import { type SpriteNode } from "../nodes/spriteNode";
+import { type AnimationNode } from "../nodes/node";
 
 /**
  * Renderer-agnostic description of a sprite produced while parsing a Lottie animation.
@@ -12,7 +12,7 @@ export type LottieSpriteRecord = {
      * Scene-graph node that drives this sprite's per-frame transform and opacity.
      * The renderer adapter attaches the concrete sprite to this node.
      */
-    node: SpriteNode;
+    node: AnimationNode;
     /** Index of the atlas page this sprite belongs to. */
     atlasIndex: number;
     /** Normalized horizontal offset of the sprite in the atlas page, left to right. */

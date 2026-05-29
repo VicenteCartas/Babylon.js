@@ -1,4 +1,4 @@
-import { Node } from "../nodes/node";
+import { CreateNode, type AnimationNode } from "../nodes/node";
 import { type Transform } from "./parsedTypes";
 import { type RawLottieLayer } from "./rawTypes";
 
@@ -11,8 +11,8 @@ import { type RawLottieLayer } from "./rawTypes";
  * @param parent The parent node in the animation tree.
  * @returns The anchor node positioned at the layer's anchor point.
  */
-export function ParseNullLayer(layer: RawLottieLayer, transform: Transform, parent: Node): Node {
-    return new Node(
+export function ParseNullLayer(layer: RawLottieLayer, transform: Transform, parent: AnimationNode): AnimationNode {
+    return CreateNode(
         `Node (Anchor) - ${layer.nm}`,
         transform.anchorPoint,
         undefined, // Rotation is not used for anchor point

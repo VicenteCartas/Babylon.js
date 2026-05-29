@@ -2,7 +2,7 @@ import "./babylonSideEffects";
 
 import { type RawLottieAnimation } from "../parsing/rawTypes";
 import { type AnimationInfo } from "../parsing/parsedTypes";
-import { type Node } from "../nodes/node";
+import { ResetNode, UpdateNode, type AnimationNode } from "../nodes/node";
 import { type LottieFeatureSet } from "../features/feature";
 import {
     type AnimationConfiguration,
@@ -343,7 +343,7 @@ export class AnimationController {
         return typeof HTMLCanvasElement !== "undefined" && canvas instanceof HTMLCanvasElement;
     }
 
-    private _cleanTree(nodes: Node[]): void {
+    private _cleanTree(nodes: AnimationNode[]): void {
         // Remove non shape nodes
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
@@ -416,7 +416,7 @@ export class AnimationController {
             if (this._loop && this._featureConfiguration.stopAtFrame === undefined) {
                 this._currentFrame = (this._currentFrame % (this._animation.endFrame - this._animation.startFrame)) + this._animation.startFrame;
                 for (let i = 0; i < this._animation.nodes.length; i++) {
-                    this._animation.nodes[i].reset();
+                    ResetNode(this._animation.nodes[i]);
                 }
             } else {
                 // When not looping, clamp to the last visible frame
@@ -426,7 +426,7 @@ export class AnimationController {
         }
 
         for (let i = 0; i < this._animation.nodes.length; i++) {
-            this._animation.nodes[i].update(this._currentFrame);
+            UpdateNode(this._animation.nodes[i], this._currentFrame);
         }
 
         // Render all layers of the animation

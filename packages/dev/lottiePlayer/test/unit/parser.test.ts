@@ -2,9 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { BuildAnimation, type BuildAnimationResult } from "../../src/parsing/buildAnimation";
 import { type SpritePacker, type SpriteAtlasInfo, type SpritePackerRasterizationContext } from "../../src/parsing/spritePacker";
-import { SpriteNode } from "../../src/nodes/spriteNode";
-import { ControlNode } from "../../src/nodes/controlNode";
-import { Node } from "../../src/nodes/node";
+import { CreateSpriteNode, type AnimationNode } from "../../src/nodes/node";
 import { ParseNullLayer } from "../../src/parsing/nullLayer";
 import { type RawLottieAnimation, type RawShapeLayer, type RawTextJustify, type RawTextLayer, type RawTransform } from "../../src/parsing/rawTypes";
 import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../../src/animationConfiguration";
@@ -55,7 +53,7 @@ const MockTextLayerFeature: LottieTextLayerFeature = {
                   currentKeyframeIndex: 0,
               };
 
-        const spriteNode = new SpriteNode("Sprite", spriteInfo.widthPx, spriteInfo.heightPx, position, undefined, undefined, undefined, spriteParent);
+        const spriteNode = CreateSpriteNode("Sprite", spriteInfo.widthPx, spriteInfo.heightPx, position, undefined, undefined, undefined, spriteParent);
 
         context.emitSpriteRecord({
             node: spriteNode,
@@ -163,7 +161,7 @@ function makeParser(
 }
 
 // Recursively finds the first descendant node whose id starts with the given prefix.
-function findDescendantByIdPrefix(root: Node, prefix: string): Node | undefined {
+function findDescendantByIdPrefix(root: AnimationNode, prefix: string): AnimationNode | undefined {
     if (root.id.startsWith(prefix)) {
         return root;
     }
@@ -204,21 +202,19 @@ describe("Parser scene graph structure", () => {
 
         expect(roots).toHaveLength(1);
         const trs = roots[0];
-        expect(trs).toBeInstanceOf(ControlNode);
+        expect(trs._kind).toBe("control");
         expect(trs.id).toBe("ControlNode (TRS) - Text");
 
         expect(trs.children).toHaveLength(1);
         const anchor = trs.children[0];
-        // The anchor node is a plain Node, not a ControlNode and not a SpriteNode.
-        expect(anchor).toBeInstanceOf(Node);
-        expect(anchor).not.toBeInstanceOf(ControlNode);
-        expect(anchor).not.toBeInstanceOf(SpriteNode);
+        // The anchor node is a plain node, not a control node and not a sprite node.
+        expect(anchor._kind).toBe("node");
         expect(anchor.id).toBe("Node (Anchor) - Text");
 
         expect(anchor.children).toHaveLength(1);
         const sprite = anchor.children[0];
-        expect(sprite).toBeInstanceOf(SpriteNode);
-        expect(sprite.positionStart).toEqual({ x: 8, y: -8 });
+        expect(sprite._kind).toBe("sprite");
+        expect(sprite.position.startValue).toEqual({ x: 8, y: -8 });
     });
 
     it("can parse text layers with Babylon 8 text placement compatibility", () => {
@@ -248,12 +244,12 @@ describe("Parser scene graph structure", () => {
 
         expect(roots).toHaveLength(1);
         const trs = roots[0];
-        expect(trs).toBeInstanceOf(ControlNode);
+        expect(trs._kind).toBe("control");
         expect(trs.children).toHaveLength(1);
 
         const sprite = trs.children[0];
-        expect(sprite).toBeInstanceOf(SpriteNode);
-        expect(sprite.positionStart).toEqual({ x: -11, y: 13 });
+        expect(sprite._kind).toBe("sprite");
+        expect(sprite.position.startValue).toEqual({ x: -11, y: 13 });
     });
 
     it("parents a child shape layer under the text layer's anchor Node, not its SpriteNode", () => {
@@ -311,7 +307,7 @@ describe("Parser scene graph structure", () => {
         // The child shape's ControlNode must be parented to the text layer's anchor Node,
         // NOT to the SpriteNode that renders the text glyphs.
         expect(shapeTrs!.parent).toBe(textAnchor);
-        expect(shapeTrs!.parent).not.toBeInstanceOf(SpriteNode);
+        expect(shapeTrs!.parent!._kind).not.toBe("sprite");
     });
 
     it("parents a child shape layer under a parent shape layer's anchor Node (parity baseline)", () => {
@@ -531,11 +527,9 @@ describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
 
         const parser = makeParser(makeMockPacker(), animation);
 
-        // Reach into the parsed ControlNode to inspect the Vector2Property keyframes.
-        // Surface API doesn't expose them directly, so go through the private field — same
-        // approach used elsewhere in this file when validating parser internals.
-        const controlNode = parser.animationInfo.nodes[0] as unknown as { _position: { keyframes?: Array<{ easeFunction1: any; easeFunction2: any }> } };
-        const keyframes = controlNode._position.keyframes;
+        // Reach into the parsed control node to inspect the Vector2Property keyframes.
+        const controlNode = parser.animationInfo.nodes[0];
+        const keyframes = controlNode.position.keyframes as Array<{ easeFunction1: any; easeFunction2: any }> | undefined;
         expect(keyframes).toBeDefined();
         expect(keyframes!.length).toBeGreaterThan(0);
 

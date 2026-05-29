@@ -1,6 +1,6 @@
 import { type IVector2Like } from "core/Maths/math.like";
 
-import { type Node } from "../nodes/node";
+import { DecomposeWorldMatrixAtFrame, type AnimationNode } from "../nodes/node";
 import { type RawLottieLayer, type RawVectorKeyframe } from "./rawTypes";
 
 /**
@@ -50,15 +50,15 @@ export function GetRasterizationFrame(layer: RawLottieLayer, startFrame: number)
  * @param rasterizationFrame The frame to evaluate the world matrix at.
  * @returns The world-space scale at the given frame.
  */
-export function GetRasterizationScale(parent: Node, rasterizationFrame: number): IVector2Like {
+export function GetRasterizationScale(parent: AnimationNode, rasterizationFrame: number): IVector2Like {
     const scale = { x: 1, y: 1 };
     const tempPosition = { x: 0, y: 0 };
 
-    // Always evaluate via decomposeWorldMatrixAtFrame. The cached parent.worldMatrix reflects each
+    // Always evaluate via DecomposeWorldMatrixAtFrame. The cached parent.worldMatrix reflects each
     // ancestor's transform at its own first keyframe time, which is not guaranteed to equal
     // rasterizationFrame (or even startFrame) — composition ip and per-layer keyframe start times
-    // can all differ. decomposeWorldMatrixAtFrame handles frames before/at/after keyframes uniformly.
-    parent.decomposeWorldMatrixAtFrame(rasterizationFrame, scale, tempPosition);
+    // can all differ. DecomposeWorldMatrixAtFrame handles frames before/at/after keyframes uniformly.
+    DecomposeWorldMatrixAtFrame(parent, rasterizationFrame, scale, tempPosition);
 
     return scale;
 }
