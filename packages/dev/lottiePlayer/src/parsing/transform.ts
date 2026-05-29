@@ -1,9 +1,40 @@
 import { type IVector2Like } from "core/Maths/math.like";
 
-import { BezierCurve } from "../maths/bezier";
-import { type ScalarKeyframe, type ScalarProperty, type Transform, type Vector2Keyframe, type Vector2Property } from "./parsedTypes";
+import { type ScalarProperty, type Transform, type Vector2Property } from "./parsedTypes";
 import { type RawScalarProperty, type RawTransform, type RawVectorKeyframe, type RawVectorProperty } from "./rawTypes";
 import { type ParseDiagnostics } from "./diagnostics";
+import { BuildScalarTrack, BuildVector2Track, type EaseHandle, type ScalarKeyframeInput, type Vector2KeyframeInput } from "./tracks";
+
+/**
+ * Reads the cubic-bezier easing handle for a given axis from a raw keyframe.
+ * Returns `undefined` when the keyframe has no easing handles (a hold/step segment).
+ * @param keyframe The raw keyframe.
+ * @param axis The axis index to read for array-valued handles (0 = X, 1 = Y).
+ * @returns The easing handle control points, or `undefined`.
+ */
+function ReadEaseHandle(keyframe: RawVectorKeyframe, axis: number): EaseHandle {
+    const o = keyframe.o;
+    const i = keyframe.i;
+    if (o === undefined || i === undefined) {
+        return undefined;
+    }
+
+    if (Array.isArray(o.x)) {
+        return {
+            x1: (o.x as number[])[axis],
+            y1: (o.y as number[])[axis],
+            x2: (i.x as number[])[axis],
+            y2: (i.y as number[])[axis],
+        };
+    }
+
+    return {
+        x1: o.x as number,
+        y1: o.y as number,
+        x2: i.x as number,
+        y2: i.y as number,
+    };
+}
 
 /**
  * Type of the vector properties in the Lottie animation. It determines how the vector values are interpreted in Babylon.js.
@@ -81,33 +112,10 @@ function FromLottieScalarToBabylonScalar(property: RawScalarProperty | undefined
         };
     }
 
-    const keyframes: ScalarKeyframe[] = [];
+    const keyframes: ScalarKeyframeInput[] = [];
     const rawKeyFrames = property.k as RawVectorKeyframe[];
     let i: number;
     for (i = 0; i < rawKeyFrames.length; i++) {
-        let easeFunction: BezierCurve | undefined = undefined;
-        if (rawKeyFrames[i].o !== undefined && rawKeyFrames[i].i !== undefined) {
-            if (Array.isArray(rawKeyFrames[i].o!.x)) {
-                // Value is an array
-                easeFunction = new BezierCurve(
-                    (rawKeyFrames[i].o!.x as number[])[0],
-                    (rawKeyFrames[i].o!.y as number[])[0],
-                    (rawKeyFrames[i].i!.x as number[])[0],
-                    (rawKeyFrames[i].i!.y as number[])[0],
-                    context.easingSteps
-                );
-            } else {
-                // Value is a number
-                easeFunction = new BezierCurve(
-                    rawKeyFrames[i].o!.x as number,
-                    rawKeyFrames[i].o!.y as number,
-                    rawKeyFrames[i].i!.x as number,
-                    rawKeyFrames[i].i!.y as number,
-                    context.easingSteps
-                );
-            }
-        }
-
         let value = rawKeyFrames[i].s[0];
 
         if (scalarType === "Opacity") {
@@ -121,7 +129,7 @@ function FromLottieScalarToBabylonScalar(property: RawScalarProperty | undefined
         keyframes.push({
             value: value,
             time: rawKeyFrames[i].t,
-            easeFunction: easeFunction!, // We assume that the ease function is always defined if we have keyframes
+            ease: ReadEaseHandle(rawKeyFrames[i], 0),
         });
     }
 
@@ -138,7 +146,7 @@ function FromLottieScalarToBabylonScalar(property: RawScalarProperty | undefined
     return {
         startValue: startValue,
         currentValue: startValue,
-        keyframes: keyframes,
+        track: BuildScalarTrack(keyframes, context.easingSteps),
         currentKeyframeIndex: 0,
     };
 }
@@ -191,61 +199,17 @@ function FromLottieVector2ToBabylonVector2(
         };
     }
 
-    const keyframes: Vector2Keyframe[] = [];
+    const keyframes: Vector2KeyframeInput[] = [];
     const rawKeyFrames = property.k as RawVectorKeyframe[];
     let i: number;
     for (i = 0; i < rawKeyFrames.length; i++) {
-        let easeFunction1: BezierCurve | undefined = undefined;
-        if (rawKeyFrames[i].o !== undefined && rawKeyFrames[i].i !== undefined) {
-            if (Array.isArray(rawKeyFrames[i].o!.x)) {
-                // Value is an array
-                easeFunction1 = new BezierCurve(
-                    (rawKeyFrames[i].o!.x as number[])[0],
-                    (rawKeyFrames[i].o!.y as number[])[0],
-                    (rawKeyFrames[i].i!.x as number[])[0],
-                    (rawKeyFrames[i].i!.y as number[])[0],
-                    context.easingSteps
-                );
-            } else {
-                // Value is a number
-                easeFunction1 = new BezierCurve(
-                    rawKeyFrames[i].o!.x as number,
-                    rawKeyFrames[i].o!.y as number,
-                    rawKeyFrames[i].i!.x as number,
-                    rawKeyFrames[i].i!.y as number,
-                    context.easingSteps
-                );
-            }
-        }
-
-        let easeFunction2: BezierCurve | undefined = undefined;
-        if (rawKeyFrames[i].o !== undefined && rawKeyFrames[i].i !== undefined) {
-            if (Array.isArray(rawKeyFrames[i].o!.x)) {
-                // Value is an array
-                easeFunction2 = new BezierCurve(
-                    (rawKeyFrames[i].o!.x as number[])[1],
-                    (rawKeyFrames[i].o!.y as number[])[1],
-                    (rawKeyFrames[i].i!.x as number[])[1],
-                    (rawKeyFrames[i].i!.y as number[])[1],
-                    context.easingSteps
-                );
-            } else {
-                // Value is a number
-                easeFunction2 = new BezierCurve(
-                    rawKeyFrames[i].o!.x as number,
-                    rawKeyFrames[i].o!.y as number,
-                    rawKeyFrames[i].i!.x as number,
-                    rawKeyFrames[i].i!.y as number,
-                    context.easingSteps
-                );
-            }
-        }
-
+        const value = CalculateFinalVector(rawKeyFrames[i].s[0], rawKeyFrames[i].s[1], vectorType);
         keyframes.push({
-            value: CalculateFinalVector(rawKeyFrames[i].s[0], rawKeyFrames[i].s[1], vectorType),
             time: rawKeyFrames[i].t,
-            easeFunction1: easeFunction1!, // We assume that the ease function is always defined if we have keyframes
-            easeFunction2: easeFunction2!, // We assume that the ease function is always defined if we have keyframes
+            x: value.x,
+            y: value.y,
+            ease1: ReadEaseHandle(rawKeyFrames[i], 0),
+            ease2: ReadEaseHandle(rawKeyFrames[i], 1),
         });
     }
 
@@ -253,7 +217,7 @@ function FromLottieVector2ToBabylonVector2(
     return {
         startValue: startValue,
         currentValue: { x: startValue.x, y: startValue.y }, // All vectors are passed by reference, so we need to create a copy to avoid modifying the start value
-        keyframes: keyframes,
+        track: BuildVector2Track(keyframes, context.easingSteps),
         currentKeyframeIndex: 0,
     };
 }

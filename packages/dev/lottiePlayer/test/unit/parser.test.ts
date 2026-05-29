@@ -481,11 +481,11 @@ describe("Parser vector property validation (I-05)", () => {
 describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
     // When a vector keyframe carries per-axis tangent arrays (`o.x`/`o.y`/`i.x`/`i.y` are
     // arrays), index `[0]` belongs to the X axis and `[1]` to the Y axis. The runtime
-    // (`Node._interpolateVector2Property`) applies `easeFunction1` to X and `easeFunction2`
-    // to Y, so the parser must split the array entries the same way. This test pins down
-    // the X/Y component split with an asymmetric fixture (different curve per axis) so a
-    // future swap of `[0]`/`[1]` would be caught immediately.
-    it("splits asymmetric per-axis tangent arrays so easeFunction1=X (index 0) and easeFunction2=Y (index 1)", () => {
+    // interpolation applies the X-axis easing (stored in `track.bezierX`) to X and the
+    // Y-axis easing (stored in `track.bezierY`) to Y, so the parser must split the array
+    // entries the same way. This test pins down the X/Y component split with an asymmetric
+    // fixture (different curve per axis) so a future swap of `[0]`/`[1]` would be caught immediately.
+    it("splits asymmetric per-axis tangent arrays so bezierX=X (index 0) and bezierY=Y (index 1)", () => {
         const animation: RawLottieAnimation = {
             v: "5.0.0",
             fr: 30,
@@ -527,26 +527,25 @@ describe("Parser per-axis easing on Vector2 keyframes (I-06)", () => {
 
         const parser = makeParser(makeMockPacker(), animation);
 
-        // Reach into the parsed control node to inspect the Vector2Property keyframes.
+        // Reach into the parsed control node to inspect the Vector2Property track.
         const controlNode = parser.animationInfo.nodes[0];
-        const keyframes = controlNode.position.keyframes as Array<{ easeFunction1: any; easeFunction2: any }> | undefined;
-        expect(keyframes).toBeDefined();
-        expect(keyframes!.length).toBeGreaterThan(0);
+        const track = controlNode.position.track;
+        expect(track).toBeDefined();
+        expect(track!.count).toBeGreaterThan(0);
 
-        const ease1 = keyframes![0].easeFunction1;
-        const ease2 = keyframes![0].easeFunction2;
-
+        // The easing of the segment starting at keyframe 0 is stored at bezier[0..3] for each axis.
         // X-axis curve must be built from index [0] of every per-axis array.
-        expect(ease1.x1).toBe(0.1);
-        expect(ease1.y1).toBe(0.2);
-        expect(ease1.x2).toBe(0.3);
-        expect(ease1.y2).toBe(0.4);
+        // Values are stored in Float32Array, so compare with single-precision tolerance.
+        expect(track!.bezierX[0]).toBeCloseTo(0.1, 6);
+        expect(track!.bezierX[1]).toBeCloseTo(0.2, 6);
+        expect(track!.bezierX[2]).toBeCloseTo(0.3, 6);
+        expect(track!.bezierX[3]).toBeCloseTo(0.4, 6);
 
         // Y-axis curve must be built from index [1] of every per-axis array.
-        expect(ease2.x1).toBe(0.5);
-        expect(ease2.y1).toBe(0.6);
-        expect(ease2.x2).toBe(0.7);
-        expect(ease2.y2).toBe(0.8);
+        expect(track!.bezierY[0]).toBeCloseTo(0.5, 6);
+        expect(track!.bezierY[1]).toBeCloseTo(0.6, 6);
+        expect(track!.bezierY[2]).toBeCloseTo(0.7, 6);
+        expect(track!.bezierY[3]).toBeCloseTo(0.8, 6);
     });
 });
 

@@ -2,6 +2,7 @@ import { type IVector2Like } from "core/Maths/math.like";
 import { type ThinSprite } from "core/Sprites/thinSprite";
 import { type Nullable } from "core/types";
 
+import { InterpolateBezierEase } from "../maths/bezier";
 import { ThinMatrix } from "../maths/matrix";
 import { type ScalarProperty, type Vector2Property } from "../parsing/parsedTypes";
 
@@ -49,8 +50,13 @@ export type AnimationNode = {
     isVisible: boolean;
     /** Whether the node has any animated track. */
     isAnimated: boolean;
-    /** Per-track update closures evaluated each frame when {@link isAnimated} is true. */
-    animationFunctions: ((frame: number) => boolean)[];
+    /**
+     * Bitmask of which transform tracks are animated, built once at creation time.
+     * Combination of {@link TrackPosition}, {@link TrackRotation} and {@link TrackScale}.
+     * Replaces the previous per-track update closures so the per-frame update path can dispatch
+     * directly to the evaluators without allocating or calling through a closure array.
+     */
+    animatedTracks: number;
 
     // Control-kind fields (defaults for other kinds).
     /** Frame at which a control node becomes active. */
@@ -81,6 +87,13 @@ const ComposeScratchB: ThinMatrix = new ThinMatrix();
 const ComposeScratchScale: IVector2Like = { x: 0, y: 0 };
 const ComposeScratchPos: IVector2Like = { x: 0, y: 0 };
 
+/** Bit flag in {@link AnimationNode.animatedTracks} marking the position track as animated. */
+const TrackPosition = 1;
+/** Bit flag in {@link AnimationNode.animatedTracks} marking the rotation track as animated. */
+const TrackRotation = 2;
+/** Bit flag in {@link AnimationNode.animatedTracks} marking the scale track as animated. */
+const TrackScale = 4;
+
 /** Temporary scale vector used during sprite updates for matrix decomposition. */
 const TempScale = { x: 1, y: 1 };
 
@@ -108,7 +121,7 @@ function CreateBaseNode(
         children: [],
         isVisible: false,
         isAnimated: false,
-        animationFunctions: [],
+        animatedTracks: 0,
         inFrame: 0,
         outFrame: 0,
         isNullLayer: false,
@@ -122,27 +135,23 @@ function CreateBaseNode(
     // Store the matrix at least once.
     node.localMatrix.compose(node.scale.currentValue, node.rotation.currentValue, node.position.currentValue);
 
-    // Animated ?
-    if (node.position.keyframes !== undefined && node.position.keyframes.length > 0) {
-        node.isAnimated = true;
-        node.animationFunctions.push((frame) => {
-            return UpdatePosition(node, frame);
-        });
+    // Animated ? Record which tracks are animated in a numeric bitmask so the per-frame update
+    // path can dispatch directly to the evaluators without a closure array.
+    let animatedTracks = 0;
+    if (node.position.track !== undefined && node.position.track.count > 0) {
+        animatedTracks |= TrackPosition;
     }
 
-    if (node.rotation.keyframes !== undefined && node.rotation.keyframes.length > 0) {
-        node.isAnimated = true;
-        node.animationFunctions.push((frame) => {
-            return UpdateRotation(node, frame);
-        });
+    if (node.rotation.track !== undefined && node.rotation.track.count > 0) {
+        animatedTracks |= TrackRotation;
     }
 
-    if (node.scale.keyframes !== undefined && node.scale.keyframes.length > 0) {
-        node.isAnimated = true;
-        node.animationFunctions.push((frame) => {
-            return UpdateScale(node, frame);
-        });
+    if (node.scale.track !== undefined && node.scale.track.count > 0) {
+        animatedTracks |= TrackScale;
     }
+
+    node.animatedTracks = animatedTracks;
+    node.isAnimated = animatedTracks !== 0;
 
     // Parenting
     if (parent) {
@@ -301,22 +310,22 @@ export function SetNodeVisible(node: AnimationNode, value: boolean): void {
 export function ResetNode(node: AnimationNode): void {
     // Vectors need to be copied to avoid modifying the original start values
     node.position.currentValue = { x: node.position.startValue.x, y: node.position.startValue.y };
-    if (node.position.keyframes) {
+    if (node.position.track) {
         node.position.currentKeyframeIndex = 0;
     }
 
     node.rotation.currentValue = node.rotation.startValue;
-    if (node.rotation.keyframes) {
+    if (node.rotation.track) {
         node.rotation.currentKeyframeIndex = 0;
     }
 
     node.scale.currentValue = { x: node.scale.startValue.x, y: node.scale.startValue.y };
-    if (node.scale.keyframes) {
+    if (node.scale.track) {
         node.scale.currentKeyframeIndex = 0;
     }
 
     node.opacity.currentValue = node.opacity.startValue;
-    if (node.opacity.keyframes) {
+    if (node.opacity.track) {
         node.opacity.currentKeyframeIndex = 0;
     }
 
@@ -350,8 +359,17 @@ export function UpdateNode(node: AnimationNode, frame: number, isParentUpdated =
     let isUpdated = isReset;
 
     if (node.isAnimated) {
-        for (let i = 0; i < node.animationFunctions.length; i++) {
-            isUpdated = node.animationFunctions[i](frame) || isUpdated;
+        // Direct dispatch by track bitmask; each evaluator runs every frame (matching the prior
+        // closure loop) so sequential-keyframe state advances even when the value is unchanged.
+        const tracks = node.animatedTracks;
+        if (tracks & TrackPosition) {
+            isUpdated = UpdatePosition(node, frame) || isUpdated;
+        }
+        if (tracks & TrackRotation) {
+            isUpdated = UpdateRotation(node, frame) || isUpdated;
+        }
+        if (tracks & TrackScale) {
+            isUpdated = UpdateScale(node, frame) || isUpdated;
         }
 
         if (isUpdated) {
@@ -464,26 +482,26 @@ function ComposeLocalAtFrame(node: AnimationNode, frame: number, output: ThinMat
  * `output` is left unchanged).
  */
 function InterpolateVector2AtFrame(property: Vector2Property, frame: number, startIndex: number, output: IVector2Like): number {
-    const keyframes = property.keyframes;
-    if (!keyframes || keyframes.length === 0) {
+    const track = property.track;
+    if (track === undefined || track.count === 0) {
         return -1;
     }
 
-    if (frame < keyframes[0].time) {
+    const times = track.times;
+    if (frame < times[0]) {
         return -1;
     }
 
-    const lastIdx = keyframes.length - 1;
-    if (frame >= keyframes[lastIdx].time) {
-        const last = keyframes[lastIdx].value;
-        output.x = last.x;
-        output.y = last.y;
+    const lastIdx = track.count - 1;
+    if (frame >= times[lastIdx]) {
+        output.x = track.valuesX[lastIdx];
+        output.y = track.valuesY[lastIdx];
         return lastIdx;
     }
 
     let segmentIndex = -1;
     for (let i = startIndex; i < lastIdx; i++) {
-        if (frame >= keyframes[i].time && frame < keyframes[i + 1].time) {
+        if (frame >= times[i] && frame < times[i + 1]) {
             segmentIndex = i;
             break;
         }
@@ -493,15 +511,16 @@ function InterpolateVector2AtFrame(property: Vector2Property, frame: number, sta
         return -1;
     }
 
-    const currentKeyframe = keyframes[segmentIndex];
-    const nextKeyframe = keyframes[segmentIndex + 1];
-    const gradient = (frame - currentKeyframe.time) / (nextKeyframe.time - currentKeyframe.time);
+    const gradient = (frame - times[segmentIndex]) / (times[segmentIndex + 1] - times[segmentIndex]);
 
-    const easeFactor1 = currentKeyframe.easeFunction1.interpolate(gradient);
-    const easeFactor2 = currentKeyframe.easeFunction2.interpolate(gradient);
+    const b = segmentIndex * 4;
+    const easeFactor1 = InterpolateBezierEase(track.bezierX[b], track.bezierX[b + 1], track.bezierX[b + 2], track.bezierX[b + 3], track.easingSteps, gradient);
+    const easeFactor2 = InterpolateBezierEase(track.bezierY[b], track.bezierY[b + 1], track.bezierY[b + 2], track.bezierY[b + 3], track.easingSteps, gradient);
 
-    output.x = currentKeyframe.value.x + easeFactor1 * (nextKeyframe.value.x - currentKeyframe.value.x);
-    output.y = currentKeyframe.value.y + easeFactor2 * (nextKeyframe.value.y - currentKeyframe.value.y);
+    const currentX = track.valuesX[segmentIndex];
+    const currentY = track.valuesY[segmentIndex];
+    output.x = currentX + easeFactor1 * (track.valuesX[segmentIndex + 1] - currentX);
+    output.y = currentY + easeFactor2 * (track.valuesY[segmentIndex + 1] - currentY);
     return segmentIndex;
 }
 
@@ -516,24 +535,25 @@ function InterpolateVector2AtFrame(property: Vector2Property, frame: number, sta
  * `output.value` is left unchanged).
  */
 function InterpolateScalarAtFrame(property: ScalarProperty, frame: number, startIndex: number, output: { value: number }): number {
-    const keyframes = property.keyframes;
-    if (!keyframes || keyframes.length === 0) {
+    const track = property.track;
+    if (track === undefined || track.count === 0) {
         return -1;
     }
 
-    if (frame < keyframes[0].time) {
+    const times = track.times;
+    if (frame < times[0]) {
         return -1;
     }
 
-    const lastIdx = keyframes.length - 1;
-    if (frame >= keyframes[lastIdx].time) {
-        output.value = keyframes[lastIdx].value;
+    const lastIdx = track.count - 1;
+    if (frame >= times[lastIdx]) {
+        output.value = track.values[lastIdx];
         return lastIdx;
     }
 
     let segmentIndex = -1;
     for (let i = startIndex; i < lastIdx; i++) {
-        if (frame >= keyframes[i].time && frame < keyframes[i + 1].time) {
+        if (frame >= times[i] && frame < times[i + 1]) {
             segmentIndex = i;
             break;
         }
@@ -543,12 +563,12 @@ function InterpolateScalarAtFrame(property: ScalarProperty, frame: number, start
         return -1;
     }
 
-    const currentKeyframe = keyframes[segmentIndex];
-    const nextKeyframe = keyframes[segmentIndex + 1];
-    const gradient = (frame - currentKeyframe.time) / (nextKeyframe.time - currentKeyframe.time);
+    const gradient = (frame - times[segmentIndex]) / (times[segmentIndex + 1] - times[segmentIndex]);
 
-    const easeFactor = currentKeyframe.easeFunction?.interpolate(gradient) ?? 0;
-    output.value = currentKeyframe.value + easeFactor * (nextKeyframe.value - currentKeyframe.value);
+    const b = segmentIndex * 4;
+    const easeFactor = InterpolateBezierEase(track.bezier[b], track.bezier[b + 1], track.bezier[b + 2], track.bezier[b + 3], track.easingSteps, gradient);
+    const currentValue = track.values[segmentIndex];
+    output.value = currentValue + easeFactor * (track.values[segmentIndex + 1] - currentValue);
     return segmentIndex;
 }
 
@@ -558,8 +578,8 @@ function UpdatePosition(node: AnimationNode, frame: number): boolean {
         return false;
     }
     // Only advance when we resolved a real segment; leave the index alone when clamped to the last keyframe
-    // to match prior behavior (the original update loop only ran up to keyframes.length - 1, exclusive).
-    if (idx < node.position.keyframes!.length - 1) {
+    // to match prior behavior (the original update loop only ran up to count - 1, exclusive).
+    if (idx < node.position.track!.count - 1) {
         node.position.currentKeyframeIndex = idx;
     }
     return true;
@@ -570,7 +590,7 @@ function UpdateRotation(node: AnimationNode, frame: number): boolean {
     if (idx < 0) {
         return false;
     }
-    if (idx < node.rotation.keyframes!.length - 1) {
+    if (idx < node.rotation.track!.count - 1) {
         node.rotation.currentKeyframeIndex = idx;
     }
     node.rotation.currentValue = -ScalarScratch.value;
@@ -582,14 +602,14 @@ function UpdateScale(node: AnimationNode, frame: number): boolean {
     if (idx < 0) {
         return false;
     }
-    if (idx < node.scale.keyframes!.length - 1) {
+    if (idx < node.scale.track!.count - 1) {
         node.scale.currentKeyframeIndex = idx;
     }
     return true;
 }
 
 function UpdateOpacity(node: AnimationNode, frame: number): boolean {
-    if (node.opacity.keyframes === undefined || node.opacity.keyframes.length === 0) {
+    if (node.opacity.track === undefined || node.opacity.track.count === 0) {
         return false;
     }
 
@@ -597,7 +617,7 @@ function UpdateOpacity(node: AnimationNode, frame: number): boolean {
     if (idx < 0) {
         return false;
     }
-    if (idx < node.opacity.keyframes.length - 1) {
+    if (idx < node.opacity.track.count - 1) {
         node.opacity.currentKeyframeIndex = idx;
     }
     node.opacity.currentValue = ScalarScratch.value;

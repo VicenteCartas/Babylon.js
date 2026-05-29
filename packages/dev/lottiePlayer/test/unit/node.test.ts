@@ -1,38 +1,45 @@
 import { describe, it, expect } from "vitest";
 import { CreateNode, CreateControlNode, DecomposeWorldMatrixAtFrame, GetNodeOpacity, ResetNode, SetNodeVisible, UpdateNode } from "../../src/nodes/node";
-import { BezierCurve } from "../../src/maths/bezier";
 import { type Vector2Property, type ScalarProperty } from "../../src/parsing/parsedTypes";
+import { BuildScalarTrack, BuildVector2Track, type EaseHandle } from "../../src/parsing/tracks";
 
-function linearEase(): BezierCurve {
-    return new BezierCurve(0, 0, 1, 1, 4);
+const EasingSteps = 4;
+
+function linearEase(): EaseHandle {
+    return { x1: 0, y1: 0, x2: 1, y2: 1 };
 }
 
 function makePositionProperty(startX: number, startY: number, keyframes: { time: number; x: number; y: number }[]): Vector2Property {
-    const ease = linearEase();
     return {
         startValue: { x: startX, y: startY },
         currentValue: { x: startX, y: startY },
         currentKeyframeIndex: 0,
-        keyframes: keyframes.map((kf) => ({
-            time: kf.time,
-            value: { x: kf.x, y: kf.y },
-            easeFunction1: ease,
-            easeFunction2: ease,
-        })),
+        track: BuildVector2Track(
+            keyframes.map((kf) => ({
+                time: kf.time,
+                x: kf.x,
+                y: kf.y,
+                ease1: linearEase(),
+                ease2: linearEase(),
+            })),
+            EasingSteps
+        ),
     };
 }
 
 function makeScalarProperty(startValue: number, keyframes: { time: number; value: number }[]): ScalarProperty {
-    const ease = linearEase();
     return {
         startValue,
         currentValue: startValue,
         currentKeyframeIndex: 0,
-        keyframes: keyframes.map((kf) => ({
-            time: kf.time,
-            value: kf.value,
-            easeFunction: ease,
-        })),
+        track: BuildScalarTrack(
+            keyframes.map((kf) => ({
+                time: kf.time,
+                value: kf.value,
+                ease: linearEase(),
+            })),
+            EasingSteps
+        ),
     };
 }
 
@@ -122,7 +129,7 @@ describe("Node keyframe boundary", () => {
 
         // At exact last keyframe, clamp should also apply negation
         UpdateNode(node, 30);
-        expect(node.rotation.currentValue).toBe(-Math.PI / 2);
+        expect(node.rotation.currentValue).toBeCloseTo(-Math.PI / 2, 5);
     });
 });
 
@@ -391,10 +398,13 @@ describe("Node loop reset of nested animated nodes", () => {
             startValue: { x: 1, y: 1 },
             currentValue: { x: 1, y: 1 },
             currentKeyframeIndex: 0,
-            keyframes: [
-                { time: 30, value: { x: 1, y: 1 }, easeFunction1: linearEase(), easeFunction2: linearEase() },
-                { time: 60, value: { x: 5, y: 5 }, easeFunction1: linearEase(), easeFunction2: linearEase() },
-            ],
+            track: BuildVector2Track(
+                [
+                    { time: 30, x: 1, y: 1, ease1: linearEase(), ease2: linearEase() },
+                    { time: 60, x: 5, y: 5, ease1: linearEase(), ease2: linearEase() },
+                ],
+                EasingSteps
+            ),
         };
         const parent = CreateNode("parent", undefined, undefined, parentScale);
         SetNodeVisible(parent, true);

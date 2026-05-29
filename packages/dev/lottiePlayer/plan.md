@@ -12,7 +12,7 @@ The plan combines:
 
 Implementation progress:
 
-- Phases 0-10 are implemented.
+- Phases 0-11 are implemented.
 - Phase 3 is implemented for the current wrapper architecture: `DetectLottieFeatures`, `LoadLottieFeatures`, and `ParseAnimationAsync` exist, and `Player`/`LocalPlayer` both route through the same dynamic feature-loading path before parsing.
 - Phase 3 worker dynamic-import spike is complete: Vite/devhost worker playback fetches only the required feature chunks, and a temporary webpack 5 `target: "webworker"` spike emitted and runtime-fetched a dynamic import chunk from inside a worker.
 - Phase 4 is implemented: `./local` and `./worker` sub-entries exist in the public/dev package export maps, the internal worker script moved to `workerEntry`, and the Phase 0 fetched-byte harness exercises the local and worker sub-entries.
@@ -366,12 +366,17 @@ Pulled forward because every feature extracted after this point should emit plai
 - Mechanical, shape-only refactor. No storage-format change yet — `_animationsFunctions` closures are kept as-is.
 - Gate: focused fixture visual goldens unchanged, unit tests pass.
 
-### Phase 11 - Typed-array tracks (perf-gated)
+### Phase 11 - Typed-array tracks (perf-gated) (implemented)
 
 - Replace `_animationsFunctions` closures with numeric track metadata and direct evaluators.
 - Store keyframes/tracks in typed arrays for zero-allocation per-frame updates.
 - **Perf gate**: measure per-frame allocations (Chrome DevTools allocation timeline or equivalent) before and after. If allocations do not drop materially on the mixed fixture, pause and reassess.
 - This is structurally larger than the text/solid/shape extractions; keeping it separate from Phase 10 means a regression here does not block earlier wins.
+
+Phase 11 is implemented in two parts:
+
+- **Part 1 - closures to numeric dispatch:** the per-node `animationFunctions` closure array is replaced by a numeric `animatedTracks` bitmask (`TrackPosition | TrackRotation | TrackScale`); `UpdateNode` dispatches directly to `UpdatePosition`/`UpdateRotation`/`UpdateScale` evaluators instead of invoking closures. This already makes the steady-state per-frame update path allocation-free.
+- **Part 2 - typed-array track storage:** the keyframe-object arrays (`ScalarKeyframe[]`/`Vector2Keyframe[]`) and the `BezierCurve` class are removed. Animated properties now hold a `ScalarTrack`/`Vector2Track` of parallel `Float32Array`s (`times`, `values`/`valuesX`/`valuesY`, packed per-keyframe bezier control points, plus `easingSteps`). `parsing/tracks.ts` builds the tracks (used by both `parsing/transform.ts` and the unit tests); `maths/bezier.ts` exposes a standalone `InterpolateBezierEase(x1,y1,x2,y2,easingSteps,t)` (NaN `x1` sentinel = hold/step segment). `startValue`/`currentValue` stay as plain numbers/`IVector2Like` objects so the matrix `compose` API path is unchanged. Since steady-state was already allocation-free after Part 1, the typed-array win is footprint, cache locality, and reduced parse-time GC rather than per-frame allocations; track values are stored at single (Float32) precision.
 
 ### Phase 12 - Functional API alongside classes
 

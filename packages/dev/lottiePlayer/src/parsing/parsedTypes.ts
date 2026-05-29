@@ -1,7 +1,5 @@
 import { type IVector2Like } from "core/Maths/math.like";
 
-import { type BezierCurve } from "../maths/bezier";
-
 import { type AnimationNode } from "../nodes/node";
 
 /**
@@ -62,6 +60,48 @@ export type Transform = {
 };
 
 /**
+ * Animated scalar keyframe data packed into parallel typed arrays for a compact, allocation-free,
+ * cache-friendly per-frame evaluation path. There is one entry per keyframe; the easing of the
+ * segment that starts at keyframe `i` is stored at `bezier[i * 4 ... i * 4 + 3]` as the cubic
+ * bezier control points `[x1, y1, x2, y2]`. A `NaN` in the `x1` slot marks a keyframe with no
+ * easing handle (a hold/step segment).
+ */
+export type ScalarTrack = {
+    /** Number of keyframes in the track. */
+    count: number;
+    /** Keyframe times in frames, length `count`. */
+    times: Float32Array;
+    /** Keyframe values, length `count`. */
+    values: Float32Array;
+    /** Per-keyframe cubic bezier easing control points `[x1, y1, x2, y2]`, length `count * 4`. */
+    bezier: Float32Array;
+    /** Number of Newton-Raphson refinement steps used when evaluating the easing curves. */
+    easingSteps: number;
+};
+
+/**
+ * Animated 2D-vector keyframe data packed into parallel typed arrays. Same layout as
+ * {@link ScalarTrack} but with separate X/Y value arrays and separate X/Y easing curves
+ * (Lottie allows per-axis easing).
+ */
+export type Vector2Track = {
+    /** Number of keyframes in the track. */
+    count: number;
+    /** Keyframe times in frames, length `count`. */
+    times: Float32Array;
+    /** Keyframe X values, length `count`. */
+    valuesX: Float32Array;
+    /** Keyframe Y values, length `count`. */
+    valuesY: Float32Array;
+    /** Per-keyframe X-axis bezier easing control points `[x1, y1, x2, y2]`, length `count * 4`. */
+    bezierX: Float32Array;
+    /** Per-keyframe Y-axis bezier easing control points `[x1, y1, x2, y2]`, length `count * 4`. */
+    bezierY: Float32Array;
+    /** Number of Newton-Raphson refinement steps used when evaluating the easing curves. */
+    easingSteps: number;
+};
+
+/**
  * Represents a scalar that can be animated.
  */
 export type ScalarProperty = {
@@ -74,31 +114,13 @@ export type ScalarProperty = {
      */
     currentValue: number;
     /**
-     * An array of keyframes for the property.
+     * Typed-array keyframe data for the property, present only when the property is animated.
      */
-    keyframes?: ScalarKeyframe[];
+    track?: ScalarTrack;
     /**
      * The index of the current keyframe being processed in the animation.
      */
     currentKeyframeIndex: number;
-};
-
-/**
- * Represents a keyframe for a scalar property.
- */
-export type ScalarKeyframe = {
-    /**
-     * The value at this keyframe.
-     */
-    value: number;
-    /**
-     * The time at which this keyframe occurs in the animation, in frames.
-     */
-    time: number;
-    /**
-     * The easing function applied to the transition from this keyframe to the next one.
-     */
-    easeFunction: BezierCurve;
 };
 
 /**
@@ -114,35 +136,11 @@ export type Vector2Property = {
      */
     currentValue: IVector2Like;
     /**
-     * An array of keyframes for the property.
+     * Typed-array keyframe data for the property, present only when the property is animated.
      */
-    keyframes?: Vector2Keyframe[];
+    track?: Vector2Track;
     /**
      * The index of the current keyframe being processed in the animation.
      */
     currentKeyframeIndex: number;
-};
-
-/**
- * Represents a keyframe for a 2D vector property.
- */
-export type Vector2Keyframe = {
-    /**
-     * The value at this keyframe.
-     */
-    value: IVector2Like;
-    /**
-     * The time at which this keyframe occurs in the animation, in frames.
-     */
-    time: number;
-    /**
-     * The easing function applied to the transition from this keyframe to the next one.
-     * This is used for the first dimension of the vector.
-     */
-    easeFunction1: BezierCurve;
-    /**
-     * The easing function applied to the transition from this keyframe to the next one.
-     * This is used for the second dimension of the vector.
-     */
-    easeFunction2: BezierCurve;
 };
