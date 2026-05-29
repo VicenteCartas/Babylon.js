@@ -12,7 +12,7 @@ The plan combines:
 
 Implementation progress:
 
-- Phases 0-11 are implemented.
+- Phases 0-12 are implemented.
 - Phase 3 is implemented for the current wrapper architecture: `DetectLottieFeatures`, `LoadLottieFeatures`, and `ParseAnimationAsync` exist, and `Player`/`LocalPlayer` both route through the same dynamic feature-loading path before parsing.
 - Phase 3 worker dynamic-import spike is complete: Vite/devhost worker playback fetches only the required feature chunks, and a temporary webpack 5 `target: "webworker"` spike emitted and runtime-fetched a dynamic import chunk from inside a worker.
 - Phase 4 is implemented: `./local` and `./worker` sub-entries exist in the public/dev package export maps, the internal worker script moved to `workerEntry`, and the Phase 0 fetched-byte harness exercises the local and worker sub-entries.
@@ -378,11 +378,18 @@ Phase 11 is implemented in two parts:
 - **Part 1 - closures to numeric dispatch:** the per-node `animationFunctions` closure array is replaced by a numeric `animatedTracks` bitmask (`TrackPosition | TrackRotation | TrackScale`); `UpdateNode` dispatches directly to `UpdatePosition`/`UpdateRotation`/`UpdateScale` evaluators instead of invoking closures. This already makes the steady-state per-frame update path allocation-free.
 - **Part 2 - typed-array track storage:** the keyframe-object arrays (`ScalarKeyframe[]`/`Vector2Keyframe[]`) and the `BezierCurve` class are removed. Animated properties now hold a `ScalarTrack`/`Vector2Track` of parallel `Float32Array`s (`times`, `values`/`valuesX`/`valuesY`, packed per-keyframe bezier control points, plus `easingSteps`). `parsing/tracks.ts` builds the tracks (used by both `parsing/transform.ts` and the unit tests); `maths/bezier.ts` exposes a standalone `InterpolateBezierEase(x1,y1,x2,y2,easingSteps,t)` (NaN `x1` sentinel = hold/step segment). `startValue`/`currentValue` stay as plain numbers/`IVector2Like` objects so the matrix `compose` API path is unchanged. Since steady-state was already allocation-free after Part 1, the typed-array win is footprint, cache locality, and reduced parse-time GC rather than per-frame allocations; track values are stored at single (Float32) precision.
 
-### Phase 12 - Functional API alongside classes
+### Phase 12 - Functional API alongside classes (implemented)
 
 - Add functional public API beside `Player` and `LocalPlayer`.
 - Convert classes to thin wrappers around functional runtime state.
 - Do not deprecate classes in this phase.
+
+Phase 12 is implemented:
+
+- New `playerRuntime.ts` exposes a plain-data `PlayerState` plus standalone functions `CreatePlayer`, `PreWarmPlayerAsync`, `PlayAnimationAsync`, and `DisposePlayer`. The worker-URL side effect (`new URL("./workerEntry", import.meta.url)`) now lives here.
+- New `localPlayerRuntime.ts` exposes a plain-data `LocalPlayerState` plus standalone functions `CreateLocalPlayer`, `PlayLocalAnimationAsync`, and `DisposeLocalPlayer`.
+- `Player` and `LocalPlayer` are now thin wrappers that each hold a private `_state` and delegate to the functional runtime. Behavior is preserved verbatim.
+- The functional API is exported from `index.ts` (both player flavors), `worker.ts` (worker player), and `local.ts` (local player), alongside the existing class exports. Classes are not deprecated.
 
 ### Phase 13 - Build-time plugin
 

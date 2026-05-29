@@ -31,13 +31,13 @@ describe("Lottie package exports", () => {
     it("keeps the public worker sub-entry separate from the internal worker script", () => {
         const workerSubEntry = readFileSync(path.resolve(sourceRoot, "worker.ts"), "utf8");
         const localSubEntry = readFileSync(path.resolve(sourceRoot, "local.ts"), "utf8");
-        const playerSource = readFileSync(path.resolve(sourceRoot, "player.ts"), "utf8");
+        const playerRuntimeSource = readFileSync(path.resolve(sourceRoot, "playerRuntime.ts"), "utf8");
 
         expect(existsSync(path.resolve(sourceRoot, "workerEntry.ts"))).toBe(true);
         expect(workerSubEntry).toContain('export { Player } from "./player";');
         expect(workerSubEntry).not.toContain("onmessage");
         expect(localSubEntry).toContain('export { LocalPlayer } from "./localPlayer";');
         expect(localSubEntry).not.toContain("workerEntry");
-        expect(playerSource).toContain('new URL("./workerEntry", import.meta.url)');
+        expect(playerRuntimeSource).toContain('new URL("./workerEntry", import.meta.url)');
     });
 });
