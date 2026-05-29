@@ -3,10 +3,14 @@ import { type IVector2Like } from "core/Maths/math.like";
 import { GetShapesBoundingBox } from "../../maths/boundingBox";
 import { Node } from "../../nodes/node";
 import { SpriteNode } from "../../nodes/spriteNode";
+import { type ParseDiagnostics } from "../../parsing/diagnostics";
+import { ParseNullLayer } from "../../parsing/nullLayer";
 import { type Transform, type Vector2Property } from "../../parsing/parsedTypes";
-import { type RawElement, type RawLottieLayer, type RawShapeLayer, type RawTransform, type RawTransformShape } from "../../parsing/rawTypes";
+import { GetRasterizationFrame, GetRasterizationScale } from "../../parsing/rasterization";
+import { type RawElement, type RawShapeLayer, type RawTransformShape } from "../../parsing/rawTypes";
 import { type LottieSpriteRecord } from "../../parsing/spriteRecord";
 import { type SpriteAtlasInfo, type SpritePacker } from "../../parsing/spritePacker";
+import { ParseTransform } from "../../parsing/transform";
 import { DrawVectorShape } from "../shapes/drawShape";
 
 /**
@@ -27,18 +31,12 @@ export type LottieShapeLayerParseContext = {
     currentLayerOriginalIndex: number;
     /** Name of the layer currently being parsed, used in atlas oversize warnings. */
     currentLayerName: string | undefined;
-    /** Gets the frame used to choose rasterization scale for this layer. */
-    getRasterizationFrame(layer: RawLottieLayer): number;
-    /** Gets rasterization scale for the parent at a specific frame. */
-    getRasterizationScale(parent: Node, rasterizationFrame: number): IVector2Like;
-    /** Parses the layer's standard null/anchor node structure. */
-    parseNullLayer(layer: RawLottieLayer, transform: Transform, parent: Node): Node;
-    /** Parses a raw lottie transform (used for shape group transforms). */
-    parseTransform(transform: RawTransform): Transform;
-    /** Records an unsupported-feature diagnostic. */
-    pushUnsupported(message: string): void;
-    /** Records an unsupported-feature diagnostic only the first time the message is seen this parse. */
-    pushUnsupportedOnce(message: string): void;
+    /** Animation start frame, used to choose the rasterization scale for this layer. */
+    startFrame: number;
+    /** Number of subdivision steps used when sampling group transform easing curves. */
+    easingSteps: number;
+    /** Collector for unsupported-feature diagnostics. */
+    diagnostics: ParseDiagnostics;
 };
 
 /**
@@ -57,8 +55,8 @@ export const ShapeLayerFeature: LottieShapeLayerFeature = {
 };
 
 function ParseShapeLayer(context: LottieShapeLayerParseContext): Node {
-    const anchorNode = context.parseNullLayer(context.layer, context.transform, context.parent);
-    const rasterizationFrame = context.getRasterizationFrame(context.layer);
+    const anchorNode = ParseNullLayer(context.layer, context.transform, context.parent);
+    const rasterizationFrame = GetRasterizationFrame(context.layer, context.startFrame);
     ParseElements(context, context.layer.shapes, anchorNode, rasterizationFrame);
 
     return anchorNode;
@@ -108,7 +106,7 @@ function ParseElements(context: LottieShapeLayerParseContext, elements: RawEleme
             // Already absorbed into the preceding sibling groups via `ParseGroup` above.
             continue;
         } else {
-            context.pushUnsupported(`Only groups or shapes are supported as children of layers - Name: ${elements[i].nm} Type: ${elements[i].ty}`);
+            context.diagnostics.push(`Only groups or shapes are supported as children of layers - Name: ${elements[i].nm} Type: ${elements[i].ty}`);
             continue;
         }
     }
@@ -116,13 +114,13 @@ function ParseElements(context: LottieShapeLayerParseContext, elements: RawEleme
 
 function ParseGroup(context: LottieShapeLayerParseContext, group: RawElement, parent: Node, rasterizationFrame: number, inheritedDecorators?: RawElement[]): void {
     if (group.it === undefined || group.it.length === 0) {
-        context.pushUnsupported(`Unexpected empty group: ${group.nm}`);
+        context.diagnostics.push(`Unexpected empty group: ${group.nm}`);
         return;
     }
 
     const transform: Transform | undefined = GetShapeTransform(context, group.it);
     if (transform === undefined) {
-        context.pushUnsupported(`Group ${group.nm} does not have a transform which is not supported`);
+        context.diagnostics.push(`Group ${group.nm} does not have a transform which is not supported`);
         return;
     }
 
@@ -153,7 +151,7 @@ function ParseGroup(context: LottieShapeLayerParseContext, group: RawElement, pa
 
 function ParseShapes(context: LottieShapeLayerParseContext, elements: RawElement[], parent: Node, rasterizationFrame: number): void {
     // Get the rasterization scale at the frame when the layer first becomes visible
-    const currentScale = context.getRasterizationScale(parent, rasterizationFrame);
+    const currentScale = GetRasterizationScale(parent, rasterizationFrame);
     const spriteInfo = AddLottieShapeToAtlas(context, elements, currentScale);
 
     const positionProperty: Vector2Property = {
@@ -202,7 +200,7 @@ function AddLottieShapeToAtlas(context: LottieShapeLayerParseContext, rawElement
         boundingBox,
         scalingFactor,
         (rasterizationContext) =>
-            DrawVectorShape(rawElements, boundingBox, scalingFactor, rasterizationContext, (ty) => context.pushUnsupportedOnce(`Unsupported shape type in vector shape: ${ty}`)),
+            DrawVectorShape(rawElements, boundingBox, scalingFactor, rasterizationContext, (ty) => context.diagnostics.pushOnce(`Unsupported shape type in vector shape: ${ty}`)),
         context.currentLayerName
     );
 }
@@ -217,5 +215,10 @@ function GetShapeTransform(context: LottieShapeLayerParseContext, elements: RawE
         return undefined;
     }
 
-    return context.parseTransform(elements[elements.length - 1] as RawTransformShape);
+    return ParseTransform(elements[elements.length - 1] as RawTransformShape, {
+        easingSteps: context.easingSteps,
+        layerName: context.currentLayerName,
+        layerOriginalIndex: context.currentLayerOriginalIndex,
+        diagnostics: context.diagnostics,
+    });
 }

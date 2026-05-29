@@ -1,4 +1,5 @@
 import { type LottieFeatureId } from "../features/feature";
+import { LayerTypeFeatureTable } from "../features/layerTypes";
 import { type LottieFeatureConfig } from "../animationConfiguration";
 import { type RawLottieAnimation } from "../parsing/rawTypes";
 
@@ -24,14 +25,16 @@ function HasVisibleLayerOfType(raw: RawLottieAnimation, layerType: number): bool
 export function DetectLottieFeatures(raw: RawLottieAnimation, featureConfig: LottieFeatureConfig): LottieFeatureId[] {
     const features: LottieFeatureId[] = [];
 
-    if (featureConfig.compatibility.solidLayerRendering === "spec" && HasVisibleLayerOfType(raw, 1)) {
-        features.push("solid");
-    }
-    if (HasVisibleLayerOfType(raw, 4)) {
-        features.push("shape");
-    }
-    if (HasVisibleLayerOfType(raw, 5)) {
-        features.push("text");
+    for (let i = 0; i < LayerTypeFeatureTable.length; i++) {
+        const { layerType, featureId } = LayerTypeFeatureTable[i];
+        if (!HasVisibleLayerOfType(raw, layerType)) {
+            continue;
+        }
+        // Solid layers only render through the spec-mode feature; babylon8 compat leaves them to legacy handling.
+        if (featureId === "solid" && featureConfig.compatibility.solidLayerRendering !== "spec") {
+            continue;
+        }
+        features.push(featureId);
     }
 
     return features;

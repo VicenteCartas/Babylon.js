@@ -3,7 +3,7 @@ import { type LottieFeatureSet } from "../features/feature";
 import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
 import { type RawLottieAnimation } from "../parsing/rawTypes";
 import { type RenderingManager } from "../rendering/renderingManager";
-import { Parser } from "../parsing/parser";
+import { BuildAnimation } from "../parsing/buildAnimation";
 import { type SpritePacker } from "../parsing/spritePacker";
 import { MaterializeSpriteRecords } from "../rendering/babylonSpriteAdapter";
 
@@ -45,15 +45,18 @@ export function ParseAnimation(
 ): AnimationInfo {
     ValidateFeatureSet(features);
 
-    const parser = new Parser(context.packer, raw, featureConfig, rendererConfig, features);
+    const built = BuildAnimation(raw, context.packer, featureConfig, rendererConfig, features);
     if (featureConfig.debug) {
-        parser.debug();
+        for (let i = 0; i < built.diagnostics.length; i++) {
+            // eslint-disable-next-line no-console
+            console.log(built.diagnostics[i]);
+        }
     }
 
     // Materialize the renderer-agnostic sprite records into Babylon sprites and finalize the renderer.
-    MaterializeSpriteRecords(parser.spriteRecords, context.packer, context.renderingManager);
+    MaterializeSpriteRecords(built.spriteRecords, context.packer, context.renderingManager);
 
-    return parser.animationInfo;
+    return built.animationInfo;
 }
 
 /**

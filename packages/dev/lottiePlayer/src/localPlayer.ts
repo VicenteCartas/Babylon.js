@@ -3,7 +3,7 @@ import { type AnimationInput } from "./types";
 import { type RawLottieAnimation } from "./parsing/rawTypes";
 import { type ScaleFactors, CalculateScaleFactors } from "./rendering/calculateScaleFactor";
 
-import { GetRawAnimationDataAsync } from "./parsing/parser";
+import { GetRawAnimationDataAsync } from "./parsing/rawAnimation";
 import { AnimationController } from "./rendering/animationController";
 
 /**

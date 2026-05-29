@@ -32,7 +32,7 @@ onmessage = async function (evt) {
             let errorString = undefined;
             try {
                 // Load modules and store their exports
-                const parserModule = await import("./parsing/parser");
+                const parserModule = await import("./parsing/rawAnimation");
                 const controllerModule = await import("./rendering/animationController");
 
                 // Store the actual exports we'll need
@@ -64,7 +64,7 @@ onmessage = async function (evt) {
 
             // Use pre-warmed parser if available, otherwise load it
             if (GetRawAnimationDataAsync === null) {
-                const parserModule = await import("./parsing/parser");
+                const parserModule = await import("./parsing/rawAnimation");
                 // We are ok having a race condition here, as both should resolve to the same function
                 GetRawAnimationDataAsync = parserModule.GetRawAnimationDataAsync;
             }

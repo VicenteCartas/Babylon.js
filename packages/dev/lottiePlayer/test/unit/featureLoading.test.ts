@@ -131,8 +131,8 @@ describe("text feature extraction boundaries", () => {
 });
 
 describe("solid feature extraction boundaries", () => {
-    it("keeps the parser free of solid color parsing and atlas-cell generation", () => {
-        const sourceText = readFileSync(path.join(sourceRoot, "parsing/parser.ts"), "utf8");
+    it("keeps the layer dispatcher free of solid color parsing and atlas-cell generation", () => {
+        const sourceText = readFileSync(path.join(sourceRoot, "parsing/buildAnimation.ts"), "utf8");
         const forbiddenSolidReferences = [/ParseCssColorString/, /Solid Rect \(atlas\)/, /Unsupported CSS color string/];
         const violations = forbiddenSolidReferences.filter((pattern) => pattern.test(sourceText)).map((pattern) => pattern.source);
 

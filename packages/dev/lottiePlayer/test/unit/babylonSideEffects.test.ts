@@ -66,7 +66,7 @@ describe("Lottie Babylon rendering side effects", () => {
 
         for (const sourceFile of collectTypeScriptFiles(sourceRoot)) {
             const relativePath = toSourceRelativePath(sourceFile);
-            const isRendererAgnosticModule = relativePath.startsWith("features/") || relativePath === "parsing/parser.ts";
+            const isRendererAgnosticModule = relativePath.startsWith("features/") || relativePath === "parsing/buildAnimation.ts";
             if (!isRendererAgnosticModule) {
                 continue;
             }

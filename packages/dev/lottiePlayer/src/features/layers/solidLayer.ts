@@ -2,6 +2,8 @@ import { type LottieRendererConfig } from "../../animationConfiguration";
 import { type BoundingBox } from "../../maths/boundingBox";
 import { type Node } from "../../nodes/node";
 import { SpriteNode } from "../../nodes/spriteNode";
+import { type ParseDiagnostics } from "../../parsing/diagnostics";
+import { ParseNullLayer } from "../../parsing/nullLayer";
 import { type Vector2Property, type Transform } from "../../parsing/parsedTypes";
 import { type RawSolidLayer } from "../../parsing/rawTypes";
 import { type LottieSpriteRecord } from "../../parsing/spriteRecord";
@@ -35,10 +37,8 @@ export type LottieSolidLayerParseContext = {
     emitSpriteRecord(record: LottieSpriteRecord): void;
     /** Original Lottie layer index used for render ordering. */
     currentLayerOriginalIndex: number;
-    /** Parses the layer's standard null/anchor node structure. */
-    parseNullLayer(layer: RawSolidLayer, transform: Transform, parent: Node): Node;
-    /** Records an unsupported-feature diagnostic. */
-    pushUnsupported(message: string): void;
+    /** Collector for unsupported-feature diagnostics. */
+    diagnostics: ParseDiagnostics;
 };
 
 /**
@@ -57,14 +57,14 @@ export const SolidLayerFeature: LottieSolidLayerFeature = {
 };
 
 function ParseSolidLayer(context: LottieSolidLayerParseContext): Node {
-    const anchorNode = context.parseNullLayer(context.layer, context.transform, context.parent);
+    const anchorNode = ParseNullLayer(context.layer, context.transform, context.parent);
 
     if (!(context.layer.sw > 0) || !(context.layer.sh > 0)) {
-        context.pushUnsupported(`Solid layer ${context.layer.nm} has invalid sw/sh and will not render`);
+        context.diagnostics.push(`Solid layer ${context.layer.nm} has invalid sw/sh and will not render`);
         return anchorNode;
     }
 
-    const color = ParseCssColorString(context.layer.sc, context.layer.nm, context.pushUnsupported);
+    const color = ParseCssColorString(context.layer.sc, context.layer.nm, (message) => context.diagnostics.push(message));
     const spriteInfo = AddSolidToAtlas(context.packer, color, context.layer.nm);
 
     // Center-UV sampling preserves the solid-layer fix from 89da7c8994 (after #18402): sample the

@@ -4,8 +4,10 @@ import { type LottieFeatureConfig, type LottieCompatibilityMode } from "../../an
 import { type BoundingBox } from "../../maths/boundingBox";
 import { type Node } from "../../nodes/node";
 import { SpriteNode } from "../../nodes/spriteNode";
+import { ParseNullLayer } from "../../parsing/nullLayer";
 import { type Transform, type Vector2Property } from "../../parsing/parsedTypes";
-import { type RawFont, type RawLottieLayer, type RawTextData, type RawTextLayer } from "../../parsing/rawTypes";
+import { GetRasterizationFrame, GetRasterizationScale } from "../../parsing/rasterization";
+import { type RawFont, type RawTextData, type RawTextLayer } from "../../parsing/rawTypes";
 import { type LottieSpriteRecord } from "../../parsing/spriteRecord";
 import { type SpriteAtlasInfo, type SpritePacker, type SpritePackerDrawingContext, type SpritePackerRasterizationContext } from "../../parsing/spritePacker";
 import { ApplyLottieTextContext, DrawLottieText, MeasureLottieText, ResolveLottieText } from "./textLayout";
@@ -40,12 +42,8 @@ export type LottieTextLayerParseContext = {
     emitSpriteRecord(record: LottieSpriteRecord): void;
     /** Original Lottie layer index used for render ordering. */
     currentLayerOriginalIndex: number;
-    /** Gets the frame used to choose rasterization scale for this layer. */
-    getRasterizationFrame(layer: RawLottieLayer): number;
-    /** Gets rasterization scale for the layer's parent at a specific frame. */
-    getRasterizationScale(parent: Node, rasterizationFrame: number): IVector2Like;
-    /** Parses the layer's standard null/anchor node structure. */
-    parseNullLayer(layer: RawLottieLayer, transform: Transform, parent: Node): Node;
+    /** Animation start frame, used to choose the rasterization scale for this layer. */
+    startFrame: number;
 };
 
 /**
@@ -64,8 +62,8 @@ export const TextLayerFeature: LottieTextLayerFeature = {
 };
 
 function ParseTextLayer(context: LottieTextLayerParseContext): Node | undefined {
-    const rasterizationFrame = context.getRasterizationFrame(context.layer);
-    const currentScale = context.getRasterizationScale(context.parent, rasterizationFrame);
+    const rasterizationFrame = GetRasterizationFrame(context.layer, context.startFrame);
+    const currentScale = GetRasterizationScale(context.parent, rasterizationFrame);
     const spriteInfo = AddLottieTextToAtlas(context.packer, context.layer.t, context.rawFonts, context.featureConfiguration, currentScale, context.layer.nm);
 
     if (spriteInfo === undefined) {
@@ -73,7 +71,7 @@ function ParseTextLayer(context: LottieTextLayerParseContext): Node | undefined 
     }
 
     const useBabylon8TextPlacement = context.featureConfiguration.compatibility.textLayerPlacement === "babylon8";
-    const spriteParent = useBabylon8TextPlacement ? context.parent : context.parseNullLayer(context.layer, context.transform, context.parent);
+    const spriteParent = useBabylon8TextPlacement ? context.parent : ParseNullLayer(context.layer, context.transform, context.parent);
 
     const positionProperty = useBabylon8TextPlacement ? GetBabylon8TextPosition(context.layer, context.transform, spriteInfo) : GetTextPosition(spriteInfo);
 

@@ -1,16 +1,27 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { Parser } from "../../src/parsing/parser";
+import { BuildAnimation, type BuildAnimationResult } from "../../src/parsing/buildAnimation";
 import { type SpritePacker, type SpriteAtlasInfo, type SpritePackerRasterizationContext } from "../../src/parsing/spritePacker";
 import { SpriteNode } from "../../src/nodes/spriteNode";
 import { ControlNode } from "../../src/nodes/controlNode";
 import { Node } from "../../src/nodes/node";
+import { ParseNullLayer } from "../../src/parsing/nullLayer";
 import { type RawLottieAnimation, type RawShapeLayer, type RawTextJustify, type RawTextLayer, type RawTransform } from "../../src/parsing/rawTypes";
 import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../../src/animationConfiguration";
 import { type LottieFeatureSet } from "../../src/features/feature";
 import { SolidLayerFeature } from "../../src/features/layers/solidLayer";
 import { ShapeLayerFeature } from "../../src/features/layers/shapeLayer";
 import { type LottieTextLayerFeature } from "../../src/features/layers/textLayer";
+
+/**
+ * Thin wrapper over a {@link BuildAnimationResult} mirroring the surface the tests previously used on the
+ * retired Parser class (animation info, sprite records, and a console-logging debug method).
+ */
+type ParserLike = {
+    animationInfo: BuildAnimationResult["animationInfo"];
+    spriteRecords: BuildAnimationResult["spriteRecords"];
+    debug(): void;
+};
 
 const BaseSpriteInfo: SpriteAtlasInfo = {
     uOffset: 0,
@@ -28,7 +39,7 @@ const MockTextLayerFeature: LottieTextLayerFeature = {
     parseTextLayer: (context) => {
         const spriteInfo = BaseSpriteInfo;
         const useBabylon8TextPlacement = context.featureConfiguration.compatibility.textLayerPlacement === "babylon8";
-        const spriteParent = useBabylon8TextPlacement ? context.parent : context.parseNullLayer(context.layer, context.transform, context.parent);
+        const spriteParent = useBabylon8TextPlacement ? context.parent : ParseNullLayer(context.layer, context.transform, context.parent);
 
         const babylon8X = context.layer.t.d.k[0].s.j === 0 ? spriteInfo.widthPx / 2 : context.layer.t.d.k[0].s.j === 1 ? -spriteInfo.widthPx / 2 : 0;
         const babylon8Y = spriteInfo.heightPx / 2;
@@ -137,8 +148,18 @@ function makeParser(
     animation: RawLottieAnimation,
     configuration: ResolvedAnimationConfiguration = makeConfiguration(),
     features: LottieFeatureSet | undefined = MockFeatureSet
-): Parser {
-    return new Parser(packer, animation, configuration, configuration, features);
+): ParserLike {
+    const result = BuildAnimation(animation, packer, configuration, configuration, features);
+    return {
+        animationInfo: result.animationInfo,
+        spriteRecords: result.spriteRecords,
+        debug: () => {
+            for (const message of result.diagnostics) {
+                // eslint-disable-next-line no-console
+                console.log(message);
+            }
+        },
+    };
 }
 
 // Recursively finds the first descendant node whose id starts with the given prefix.
@@ -368,7 +389,7 @@ describe("Parser vector property validation (I-05)", () => {
         };
     }
 
-    function captureDebugMessages(parser: Parser): string[] {
+    function captureDebugMessages(parser: ParserLike): string[] {
         const messages: string[] = [];
         const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
             messages.push(args.map((a) => String(a)).join(" "));
@@ -821,7 +842,7 @@ describe("Parser solid layer (ty:1)", () => {
     // dimensions that will be handed to the sprite renderer. Solid layers stretch a 1x1 atlas cell
     // to full sw*sh, so the on-screen size is the meaningful surface — distinct from `widthPx`
     // reported by the packer.
-    function readSpriteRecords(parser: Parser): { width: number; height: number; xOffset: number; yOffset: number; xSize: number; ySize: number }[] {
+    function readSpriteRecords(parser: ParserLike): { width: number; height: number; xOffset: number; yOffset: number; xSize: number; ySize: number }[] {
         return parser.spriteRecords.map((record) => ({
             width: record.width,
             height: record.height,
@@ -832,7 +853,7 @@ describe("Parser solid layer (ty:1)", () => {
         }));
     }
 
-    function captureDebugMessages(parser: Parser): string[] {
+    function captureDebugMessages(parser: ParserLike): string[] {
         const messages: string[] = [];
         const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
             messages.push(args.map((a) => String(a)).join(" "));
