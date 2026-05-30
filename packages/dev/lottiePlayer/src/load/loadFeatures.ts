@@ -1,29 +1,10 @@
-import { type LottieFeature, type LottieFeatureId, type LottieFeatureSet } from "../features/feature";
+import { type LottieFeature, type LottieFeatureSet } from "../features/feature";
 import { type LottieFeatureConfig } from "../animationConfiguration";
 import { type RawLottieAnimation } from "../parsing/rawTypes";
 import { DetectLottieFeatures } from "./detectFeatures";
+import { GetFeatureDescriptor } from "./featureRegistry";
 
 type LottieFeatureModule = { default: LottieFeature };
-type LottieFeatureLoader = {
-    id: LottieFeatureId;
-    loadAsync: () => Promise<LottieFeatureModule>;
-};
-
-const FeatureLoaders: readonly LottieFeatureLoader[] = [
-    { id: "solid", loadAsync: async () => await import("../features/solid") },
-    { id: "shape", loadAsync: async () => await import("../features/shape") },
-    { id: "text", loadAsync: async () => await import("../features/text") },
-];
-
-function GetFeatureLoader(id: LottieFeatureId): LottieFeatureLoader {
-    for (let i = 0; i < FeatureLoaders.length; i++) {
-        const loader = FeatureLoaders[i];
-        if (loader.id === id) {
-            return loader;
-        }
-    }
-    throw new Error(`No Lottie feature loader registered for ${id}`);
-}
 
 /**
  * Loads the feature modules required by one animation using explicit runtime detection.
@@ -36,7 +17,7 @@ export async function LoadLottieFeatures(raw: RawLottieAnimation, featureConfig:
     const featurePromises: Promise<LottieFeatureModule>[] = [];
 
     for (let i = 0; i < ids.length; i++) {
-        featurePromises.push(GetFeatureLoader(ids[i]).loadAsync());
+        featurePromises.push(GetFeatureDescriptor(ids[i]).loadAsync());
     }
 
     const modules = await Promise.all(featurePromises);

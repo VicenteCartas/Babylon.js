@@ -11,6 +11,7 @@ import { type LottieSpriteRecord } from "../../parsing/spriteRecord";
 import { type SpriteAtlasInfo, type SpritePacker } from "../../parsing/spritePacker";
 import { ParseTransform } from "../../parsing/transform";
 import { DrawVectorShape } from "../shapes/drawShape";
+import { type ShapeDrawFn } from "../shapes/shapeDrawer";
 
 /**
  * Parser dependencies needed by the shape layer feature.
@@ -36,6 +37,8 @@ export type LottieShapeLayerParseContext = {
     easingSteps: number;
     /** Collector for unsupported-feature diagnostics. */
     diagnostics: ParseDiagnostics;
+    /** Injected drawers for sub-feature shape items (e.g. gradients), keyed by shape `ty`. */
+    drawers?: ReadonlyMap<string, ShapeDrawFn>;
 };
 
 /**
@@ -199,7 +202,14 @@ function AddLottieShapeToAtlas(context: LottieShapeLayerParseContext, rawElement
         boundingBox,
         scalingFactor,
         (rasterizationContext) =>
-            DrawVectorShape(rawElements, boundingBox, scalingFactor, rasterizationContext, (ty) => context.diagnostics.pushOnce(`Unsupported shape type in vector shape: ${ty}`)),
+            DrawVectorShape(
+                rawElements,
+                boundingBox,
+                scalingFactor,
+                rasterizationContext,
+                (ty) => context.diagnostics.pushOnce(`Unsupported shape type in vector shape: ${ty}`),
+                context.drawers
+            ),
         context.currentLayerName
     );
 }

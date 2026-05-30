@@ -391,19 +391,109 @@ Phase 12 is implemented:
 - `Player` and `LocalPlayer` are now thin wrappers that each hold a private `_state` and delegate to the functional runtime. Behavior is preserved verbatim.
 - The functional API is exported from `index.ts` (both player flavors), `worker.ts` (worker player), and `local.ts` (local player), alongside the existing class exports. Classes are not deprecated.
 
-### Phase 13 - Build-time plugin
+### Phase 13 - Fine-grained feature detection + sub-feature splitting (Phase A)
 
-- Add a single `@babylonjs/lottie-build` package (using `unplugin` for Vite/Rollup/webpack/esbuild/Rspack).
-- **No third package.** The build plugin depends directly on `@babylonjs/lottie`'s runtime detectors (`load/detectFeatures.ts`) — the same code the runtime auto-loader uses. The plugin only adds analyzer glue, code generation, and the bundler shim. This guarantees the runtime and the build-time analyzer can never drift apart.
-- Support syntax such as:
+#### Goal: download and parse only the feature JS an animation actually uses
 
-```ts
-import { play } from "./hero.json?lottie";
+The dominant win of this whole effort is **not** shipping or running JavaScript an animation never needs. Two facts frame the work:
+
+- **Ship vs. download are different.** The CDN holding every feature chunk is fine. What matters is that the browser only **downloads and parses** the chunks an animation uses. The existing dynamic `import()` in `load/loadFeatures.ts` already achieves this at the **current granularity** (`solid` / `shape` / `text`): a text-free animation never fetches the text chunk.
+- **Granularity is the real lever.** Detection today is **layer-type only** (`LayerTypeFeatureTable` maps `ty` -> feature). All shape drawing — rectangles, ellipses, paths, fills, strokes, **gradients** — lives in one `shape` chunk (`features/shapes/drawShape.ts`'s `DrawVectorShape` switch). A rectangle-only animation still downloads gradient and ellipse code. The unused code an app actually pays for is **inside** a feature, not a whole missing feature.
+
+So Phase A deepens detection to **shape-item granularity** and splits the monolithic shape rasterizer into per-item sub-feature chunks, reusing the existing dynamic-`import()` mechanism.
+
+#### Approaches considered and rejected (record so we don't relitigate)
+
+The original Phase 13 idea was a **prebaked data artifact** (serialize the parsed `AnimationInfo` to JSON). Investigation killed every variant **as a payload-size play**:
+
+- **Bake atlas pixels** — self-contained but *larger*: real animations need multi-page 4K atlases, so the rasterized form dwarfs the vector JSON. Dead.
+- **Bake vector data only** — smaller, but **additive**: the worker still needs the original Lottie to rasterize sprites (the rasterizers consume raw layer data: paths, fonts, colors). You'd download both. Strictly worse.
+- **Bake vector data + raster inputs** (self-contained without pixels) — re-encodes the paths/fonts that *are* the bulk of the original JSON, so payload barely shrinks.
+
+Conclusion: the raw Lottie vector JSON is already near-minimal as a sprite source, so the artifact's value is **not** bytes. Its real value is build-time detection/coalescing (Phase B), layered on top of Phase A. The `load/prebake.ts` serializer already written is retained as the data-stripping half for Phase B, not as a size win.
+
+#### Design principle: one self-describing feature registry, two consumers
+
+Everything keys off a single registry of feature descriptors (`load/featureRegistry.ts`), each declaring:
+
+- `id` — stable name and detection/loading order key.
+- `matches(signals, featureConfig)` — a pure predicate over the precomputed signal set (does this animation use me?).
+- `loadAsync` — `() => import("...")` for the dynamic chunk.
+
+The **runtime** path computes the signal set once (`DetectLottieSignals`), iterates the registry -> `matches` -> `import()` only the matches. The **build** path (Phase B) iterates the *same* registry -> `matches` at build time -> emits static imports / a coalesced chunk. Same source of truth, two consumers — the structural guarantee that runtime granularity and the build artifact can never drift.
+
+> **No-breaking-changes note:** none of this is shipped/consumed externally, so the registry was redesigned cleanly (the old `LayerTypeFeatureTable`-based detection and the separate `FeatureLoaders` array were replaced by the unified descriptor) rather than bolted on alongside legacy shapes.
+
+#### A1 - Deep shape-item detector — **DONE**
+
+`load/detectShapeItems.ts`: `DetectShapeDrawItems(raw)` recursively walks shape layers' `shapes[]` (groups `ty:"gr"` nest via `it`), skips hidden layers/items, and returns the drawer-relevant shape-item `ty`s (`rc`/`el`/`sh`/`fl`/`st`/`gf`/`gs`) in canonical order. Pure and Node-safe. The recursive collector `CollectShapeDrawItems` is exported for reuse by the single-pass detector. 10 unit tests.
+
+#### A2 - Single detection pass + descriptor registry — **DONE**
+
+Instead of a richer signal->featureId *table*, detection was unified around a **single pass** + **descriptor registry**:
+
+- `load/detectSignals.ts`: `DetectLottieSignals(raw)` walks the animation **once**, returning `{ layerTypes: Set<number>, shapeItems: Set<ShapeDrawItemType> }`. One walk regardless of feature count.
+- `load/featureRegistry.ts`: `LottieFeatureRegistry` is the single source of truth — `{ id, matches(signals, config), loadAsync }` descriptors for `solid`/`shape`/`text`/`shape-gradient`.
+- `load/detectFeatures.ts`: `DetectLottieFeatures` now computes signals once, then matches each descriptor. `load/loadFeatures.ts` loads via `GetFeatureDescriptor(id).loadAsync()`.
+
+#### A3 - Split the shape rasterizer into injected drawers — **DONE (gradient first)**
+
+`DrawVectorShape` now takes an optional `drawers: ReadonlyMap<ty, ShapeDrawFn>` and dispatches matching shape items to injected drawers before its built-in switch. Gradient drawing (`gf`/`gs`, `DrawGradientFill`/`DrawGradientStroke`, color-stop machinery, `GradientStop`) was extracted to `features/shapes/gradient.ts`, which default-exports a `LottieFeature` carrying a `ShapeDrawer` (`features/shapes/shapeDrawer.ts`). Shared helpers `LottieColorToCSSColor` and `ApplyStrokeStyle` stay in the always-loaded base `drawShape.ts` and are imported by the gradient chunk (cross-chunk, base is always present when gradient is). `rc`/`el`/`sh`/`fl`/`st` remain inline in the base shape chunk; they are universally common and lightweight, so further splitting waits for Phase B coalescing to avoid request fan-out.
+
+#### A4 - Sub-feature loading + drawer assembly — **DONE**
+
+`shape-gradient` is a registry descriptor loaded by the same `LoadLottieFeatures` path when `gf`/`gs` is detected. `buildAnimation.ts` assembles a `ty -> ShapeDrawFn` map (`BuildShapeDrawers`) from the loaded features' `shapeDrawer`s once per animation and threads it through the shape layer context into `DrawVectorShape`.
+
+#### A5 - Bundle harness with positive *and* negative teeth — **DONE**
+
+`test/unit/bundleSplitting.test.ts` bundles `load/featureRegistry.ts` with esbuild (`bundle`, `splitting`, `format: "esm"`, `write: false`), externalizing bare specifiers so chunk sizes reflect only feature code. Each descriptor's `loadAsync: () => import(...)` becomes a real code-split chunk (`solid-*`, `shape-*`, `text-*`, `gradient-*`, plus shared `chunk-*`). The harness asserts:
+
+- **Positive:** gradient drawing markers (`createLinearGradient`/`createRadialGradient`/`addColorStop`) appear in exactly one chunk — the dedicated `gradient-*` chunk — and that chunk exceeds a byte floor (proves the gradient code is real, not an empty husk; it measures ~3.7 KB).
+- **Negative:** every chunk a gradient-free animation downloads (entry registry + `shape-*` + shared chunks, i.e. everything except `gradient-*`) contains **zero** gradient markers — a gradient-free animation fetches zero gradient bytes.
+
+Also retained as a cheap source-level guard: a `featureLoading.test.ts` boundary test asserts `drawShape.ts` contains no gradient drawing references; detection/loading tests assert the gradient chunk is only requested when a gradient item is present.
+
+#### Outcome of Phase A
+
+Downloaded/parsed feature JS scales with what the animation actually draws — the gradient case is solved with **pure runtime changes and no build artifact**. Gradient-free animations never download the gradient chunk.
+
+### Phase 14 - Build-time detection artifact (Phase B)
+
+Phase B is a purely additive layer over Phase A that delivers **faster startup** without giving back Phase A's download savings. It targets a *different* part of the startup chain than Phase A:
+
+```
+download JSON -> JSON.parse -> detect -> import() chunks -> build -> pack -> rasterize -> first frame
+                               \____ Phase B precomputes ____/        \__ stays at runtime __/
+                 \__________ Phase A shrinks the import() bytes __________/
 ```
 
-- Generated code imports exactly the needed features.
+These goals are **complementary, not at odds** — Phase A shrinks the `import()` segment; Phase B removes the serial `JSON.parse -> detect` hop and enables earlier/parallel fetch. The one tension (fine splitting -> more HTTP requests) is resolved by B4's coalescing.
 
-### Phase 14 - Optional class deprecation/removal
+#### B1 - Precomputed feature manifest
+
+The build runs the *same* deep `DetectLottieFeatures` from A1 and emits the resolved feature-id list alongside the stripped data (`load/prebake.ts` is the data half). Runtime skips the download-parse-then-detect serial hop. Because detection now runs at build time, it can afford an arbitrarily deep/expensive scan that would be too costly on the runtime hot path.
+
+#### B2 - Registry-free static entry
+
+A parse/create entry that accepts a **pre-bound feature set** and never references the dynamic registry, so the precomputed path can `import` features statically. The `AnimationController.CreateAsync` `loadedFeatures` injection seam already exists; this is wiring, not redesign.
+
+#### B3 - Parallel / early fetch
+
+With the manifest known before the data is parsed, kick off the exact sub-feature chunk fetches concurrently with the data download instead of serially after parsing.
+
+#### B4 - Optional coalescing (resolves the fine-splitting request tax)
+
+Because the build knows the exact sub-feature set, emit a **single per-animation chunk** containing just those drawers — converting Phase A's fine-grained splits into one request, eliminating the multi-request fan-out tax on a cold connection.
+
+#### B5 - `unplugin` codegen
+
+Wrap B1-B4 behind `import anim from "./hero.json?lottie"`. **No third package** — the plugin depends directly on the runtime's deep detector (A1) and `prebake.ts`, so build-time and runtime detection can never disagree.
+
+#### Measurement gate
+
+Prove (a) Phase A actually drops feature chunks from the fetched set (A5 teeth), and (b) Phase B reduces time-to-first-frame (skipped detect + earlier fetch) without increasing fetched bytes. Pause if either fails.
+
+### Phase 15 - Optional class deprecation/removal
 
 - Decide separately whether to deprecate or remove class wrappers.
 - Only consider this after functional API, sub-entries, tests, docs, and monorepo consumers are migrated.

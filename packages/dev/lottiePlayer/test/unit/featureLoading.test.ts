@@ -140,6 +140,43 @@ describe("solid feature extraction boundaries", () => {
     });
 });
 
+describe("gradient draw sub-feature", () => {
+    function makeShapeLayerWith(shapeTypes: string[]): RawLottieAnimation {
+        const shapes = shapeTypes.map((ty) => ({ ty }));
+        return makeAnimation([{ ty: 4, shapes } as unknown as RawLottieLayer]);
+    }
+
+    it("detects the gradient sub-feature only when a gradient item is present", () => {
+        const featureConfig = ResolveFeatureConfiguration({});
+
+        expect(DetectLottieFeatures(makeShapeLayerWith(["rc", "fl"]), featureConfig)).toEqual(["shape"]);
+        expect(DetectLottieFeatures(makeShapeLayerWith(["rc", "gf"]), featureConfig)).toEqual(["shape", "shape-gradient"]);
+        expect(DetectLottieFeatures(makeShapeLayerWith(["sh", "gs"]), featureConfig)).toEqual(["shape", "shape-gradient"]);
+    });
+
+    it("loads the gradient drawer module only when detected", async () => {
+        const featureConfig = ResolveFeatureConfiguration({});
+
+        const withoutGradient = await LoadLottieFeatures(makeShapeLayerWith(["rc", "fl"]), featureConfig);
+        expect(withoutGradient.ids).toEqual(["shape"]);
+        expect(withoutGradient.features.some((feature) => feature.shapeDrawer !== undefined)).toBe(false);
+
+        const withGradient = await LoadLottieFeatures(makeShapeLayerWith(["rc", "gf"]), featureConfig);
+        expect(withGradient.ids).toEqual(["shape", "shape-gradient"]);
+        const gradientFeature = withGradient.features.find((feature) => feature.id === "shape-gradient");
+        expect(gradientFeature?.shapeDrawer?.types).toEqual(["gf", "gs"]);
+        expect(gradientFeature?.shapeDrawer?.draw).toEqual(expect.any(Function));
+    });
+
+    it("keeps the base shape rasterizer free of gradient drawing code", () => {
+        const sourceText = readFileSync(path.join(sourceRoot, "features/shapes/drawShape.ts"), "utf8");
+        const forbiddenGradientReferences = [/DrawGradientFill/, /DrawGradientStroke/, /createLinearGradient/, /createRadialGradient/, /addColorStop/];
+        const violations = forbiddenGradientReferences.filter((pattern) => pattern.test(sourceText)).map((pattern) => pattern.source);
+
+        expect(violations).toEqual([]);
+    });
+});
+
 describe("parseAnimationAsync", () => {
     it("validates loaded feature metadata before delegating to the current parser", async () => {
         const mismatchedFeatureSet: LottieFeatureSet = {

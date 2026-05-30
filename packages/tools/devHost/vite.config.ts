@@ -6,7 +6,7 @@ import { commonDevViteConfiguration } from "../../public/viteToolsHelper.mjs";
 const OptionalPeerDependencies = ["draco3dgltf", "ammo.js", "cannon", "oimo", "recast", "havok", "basis_transcoder"];
 const OptionalPeerDependencyPattern = OptionalPeerDependencies.map((p) => p.replace(".", "\\.")).join("|");
 const LottieWorkerEntry = path.resolve("../../dev/lottiePlayer/src/workerEntry.ts");
-const LottiePlayerEntry = normalizePath(path.resolve("../../dev/lottiePlayer/src/player.ts"));
+const LottiePlayerSrc = normalizePath(path.resolve("../../dev/lottiePlayer/src"));
 const LottieWorkerDevUrl = "/__lottie-worker.js";
 const LottieWorkerUrlExpression = /new URL\(["']\.\/workerEntry(?:\.[jt]s)?["'],\s*import\.meta\.url\)/g;
 
@@ -85,7 +85,9 @@ function lottieClassicWorkerPlugin(aliases: Record<string, string>): Plugin {
             sourcemap = command === "serve" ? "inline" : config.build.sourcemap === "inline" ? "inline" : Boolean(config.build.sourcemap);
         },
         async transform(code, id) {
-            if (normalizePath(id.split("?")[0]) !== LottiePlayerEntry || !code.includes("./workerEntry")) {
+            // Rewrite the worker URL in whichever lottie-player source module declares it
+            // (it currently lives in playerRuntime.ts, but may move between sub-entries).
+            if (!normalizePath(id.split("?")[0]).startsWith(LottiePlayerSrc) || !code.includes("./workerEntry")) {
                 return null;
             }
 

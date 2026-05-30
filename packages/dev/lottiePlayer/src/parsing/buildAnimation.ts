@@ -1,6 +1,7 @@
 import { type LottieFeatureConfig, type LottieRendererConfig } from "../animationConfiguration";
 import { type LottieFeature, type LottieFeatureId, type LottieFeatureSet } from "../features/feature";
 import { GetFeatureIdForLayerType } from "../features/layerTypes";
+import { type ShapeDrawFn } from "../features/shapes/shapeDrawer";
 import { CreateControlNode, type AnimationNode } from "../nodes/node";
 import { ParseDiagnostics } from "./diagnostics";
 import { ParseNullLayer } from "./nullLayer";
@@ -38,6 +39,7 @@ type BuildState = {
     featureConfig: LottieFeatureConfig;
     rendererConfig: LottieRendererConfig;
     features: LottieFeatureSet | undefined;
+    shapeDrawers: ReadonlyMap<string, ShapeDrawFn> | undefined;
     diagnostics: ParseDiagnostics;
     spriteRecords: LottieSpriteRecord[];
     rawFonts: Map<string, RawFont>;
@@ -61,6 +63,33 @@ function GetFeature(features: LottieFeatureSet | undefined, id: LottieFeatureId)
     }
 
     return undefined;
+}
+
+/**
+ * Assembles the shape-item drawer lookup for one animation from the loaded draw sub-features.
+ * Maps each shape `ty` a feature can draw (for example `gf`/`gs` for gradients) to its drawer so the
+ * shape rasterizer can dispatch optional items without statically importing their code.
+ * @param features The loaded feature set, or undefined.
+ * @returns A map from shape `ty` to drawer, or undefined when no draw sub-features were loaded.
+ */
+function BuildShapeDrawers(features: LottieFeatureSet | undefined): ReadonlyMap<string, ShapeDrawFn> | undefined {
+    if (features === undefined) {
+        return undefined;
+    }
+
+    let drawers: Map<string, ShapeDrawFn> | undefined;
+    for (let i = 0; i < features.features.length; i++) {
+        const shapeDrawer = features.features[i].shapeDrawer;
+        if (shapeDrawer === undefined) {
+            continue;
+        }
+        drawers ??= new Map<string, ShapeDrawFn>();
+        for (let t = 0; t < shapeDrawer.types.length; t++) {
+            drawers.set(shapeDrawer.types[t], shapeDrawer.draw);
+        }
+    }
+
+    return drawers;
 }
 
 /**
@@ -88,6 +117,7 @@ export function BuildAnimation(
         featureConfig,
         rendererConfig,
         features,
+        shapeDrawers: BuildShapeDrawers(features),
         diagnostics: new ParseDiagnostics(),
         spriteRecords: [],
         rawFonts: new Map<string, RawFont>(),
@@ -356,6 +386,7 @@ function DispatchShapeLayer(state: BuildState, layer: RawShapeLayer, transform: 
         startFrame: state.startFrame,
         easingSteps: state.featureConfig.easingSteps,
         diagnostics: state.diagnostics,
+        drawers: state.shapeDrawers,
     });
 }
 

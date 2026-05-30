@@ -12,7 +12,11 @@ import {
 } from "./messageTypes";
 import { type RawLottieAnimation } from "./parsing/rawTypes";
 import { CalculateScaleFactors, type ScaleFactors } from "./rendering/calculateScaleFactor";
-import { BlobWorkerWrapper } from "./blobWorkerWrapper";
+// Imported as `Worker` so bundlers (webpack, Vite, Rollup, ...) statically detect the
+// `new Worker(new URL("./workerEntry", import.meta.url))` form used in GetOrCreateWorker, emit the
+// worker as its own chunk, and rewrite the URL. BlobWorkerWrapper then wraps that rewritten URL in a
+// CSP-friendly blob.
+import { BlobWorkerWrapper as Worker } from "./blobWorkerWrapper";
 
 /**
  * Plain-data state for a worker-backed Lottie player.
@@ -233,7 +237,7 @@ export function DisposePlayer(state: PlayerState): void {
 
 function GetOrCreateWorker(state: PlayerState): globalThis.Worker {
     if (!state.worker) {
-        const wrapperWorker = new BlobWorkerWrapper(new URL("./workerEntry", import.meta.url));
+        const wrapperWorker = new Worker(new URL("./workerEntry", import.meta.url));
         state.worker = wrapperWorker.getWorker();
         state.worker.onmessage = (evt: MessageEvent) => {
             HandleWorkerMessage(state, evt);

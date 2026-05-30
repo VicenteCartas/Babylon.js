@@ -6,39 +6,35 @@ import {
     type RawElement,
     type RawEllipseShape,
     type RawFillShape,
-    type RawGradientFillShape,
     type RawGradientStrokeShape,
     type RawPathShape,
     type RawRectangleShape,
     type RawStrokeShape,
 } from "../../parsing/rawTypes";
 import { type SpritePackerDrawingContext, type SpritePackerRasterizationContext } from "../../parsing/spritePacker";
+import { type ShapeDrawFn } from "./shapeDrawer";
 
 type DrawingContext = SpritePackerDrawingContext;
 
 /**
- * Information about a gradient stop.
- * Used for gradient fills when drawing vector shapes into the sprite atlas.
- */
-type GradientStop = {
-    offset: number;
-    color: string;
-};
-
-/**
  * Rasterizes a Lottie vector shape into an allocated atlas cell using the Canvas2D API.
+ * Shape items whose `ty` is present in `drawers` are dispatched to the injected drawer (loaded as a
+ * sub-feature, e.g. gradients); the remaining built-in items are drawn inline. This keeps drawing
+ * code for optional items (gradients) out of the base shape chunk so it is only downloaded when used.
  * @param rawElements The raw elements (paths, shapes, fills, strokes) that make up the shape.
  * @param boundingBox The shape bounding box in lottie coordinates.
  * @param scalingFactor The effective atlas scale to apply while drawing.
  * @param rasterizationContext The atlas page drawing context and allocated cell placement.
  * @param reportUnsupported Callback invoked once per unsupported shape `ty` encountered while drawing.
+ * @param drawers Optional injected drawers for sub-feature shape items, keyed by shape `ty`.
  */
 export function DrawVectorShape(
     rawElements: RawElement[],
     boundingBox: BoundingBox,
     scalingFactor: IVector2Like,
     rasterizationContext: SpritePackerRasterizationContext,
-    reportUnsupported: (ty: string) => void
+    reportUnsupported: (ty: string) => void,
+    drawers?: ReadonlyMap<string, ShapeDrawFn>
 ): void {
     const ctx = rasterizationContext.context;
 
@@ -55,6 +51,14 @@ export function DrawVectorShape(
 
     for (let i = 0; i < rawElements.length; i++) {
         const shape = rawElements[i];
+
+        // Sub-feature shape items (e.g. gradients) are handled by drawers loaded only when detected.
+        const injected = drawers?.get(shape.ty);
+        if (injected !== undefined) {
+            injected(shape, boundingBox, ctx);
+            continue;
+        }
+
         switch (shape.ty) {
             case "rc":
                 DrawRectangle(shape as RawRectangleShape, boundingBox, ctx);
@@ -71,18 +75,12 @@ export function DrawVectorShape(
             case "st":
                 DrawStroke(shape as RawStrokeShape, ctx);
                 break;
-            case "gf":
-                DrawGradientFill(shape as RawGradientFillShape, boundingBox, ctx);
-                break;
-            case "gs":
-                DrawGradientStroke(shape as RawGradientStrokeShape, boundingBox, ctx);
-                break;
             case "tr":
                 break; // Nothing needed with transforms
             default:
                 // Record once per unknown `ty` so we get observability into shape types that fall
-                // through the rasterizer (e.g. `gs`, modifiers like `tm`/`rp`, etc.) instead of
-                // silently producing an empty sprite.
+                // through the rasterizer (e.g. an unloaded gradient drawer, modifiers like `tm`/`rp`,
+                // etc.) instead of silently producing an empty sprite.
                 reportUnsupported(shape.ty);
                 break;
         }
@@ -200,13 +198,13 @@ function DrawStroke(stroke: RawStrokeShape, ctx: DrawingContext): void {
 
 /**
  * Apply the geometric stroke styling (width, line cap, line join, miter limit, dash pattern) to the
- * drawing context. Shared by `DrawStroke` (solid-color strokes, `ty:"st"`) and `DrawGradientStroke`
- * (gradient strokes, `ty:"gs"`) — both have identical width/cap/join/miter/dash semantics; they only
- * differ in how `strokeStyle` is built (CSS color vs CanvasGradient).
+ * drawing context. Shared by `DrawStroke` here (solid-color strokes, `ty:"st"`) and the gradient
+ * stroke drawer in the gradient sub-feature (`ty:"gs"`) — both have identical width/cap/join/miter/dash
+ * semantics; they only differ in how `strokeStyle` is built (CSS color vs CanvasGradient).
  * @param stroke The raw solid or gradient stroke shape to read styling from.
  * @param ctx The drawing context to mutate (`lineWidth`, `lineCap`, `lineJoin`, `miterLimit`, dash).
  */
-function ApplyStrokeStyle(stroke: RawStrokeShape | RawGradientStrokeShape, ctx: DrawingContext): void {
+export function ApplyStrokeStyle(stroke: RawStrokeShape | RawGradientStrokeShape, ctx: DrawingContext): void {
     // Width
     const width = stroke.w ? GetInitialScalarValue(stroke.w, 1) : 1;
     ctx.lineWidth = width;
@@ -269,131 +267,14 @@ function ApplyStrokeStyle(stroke: RawStrokeShape | RawGradientStrokeShape, ctx: 
     }
 }
 
-function DrawGradientStroke(stroke: RawGradientStrokeShape, boundingBox: BoundingBox, ctx: DrawingContext): void {
-    // Build the gradient that will be used as `strokeStyle`. Mirrors `DrawGradientFill` dispatch on `t`
-    // (1 = linear, 2 = radial) and reuses the same translation into the bounding box's local space.
-    const xTranslate = boundingBox.centerX;
-    const yTranslate = boundingBox.centerY;
-    // Read initial-frame endpoints so animated gradient endpoints (a===1) build a valid gradient instead
-    // of feeding a keyframe array through `as number[]` casts.
-    const startPoint = GetInitialVectorValues(stroke.s);
-    const endPoint = GetInitialVectorValues(stroke.e);
-
-    let gradient: CanvasGradient | undefined;
-    switch (stroke.t) {
-        case 1:
-            gradient = ctx.createLinearGradient(startPoint[0] + xTranslate, startPoint[1] + yTranslate, endPoint[0] + xTranslate, endPoint[1] + yTranslate);
-            break;
-        case 2: {
-            const centerX = startPoint[0] + xTranslate;
-            const centerY = startPoint[1] + yTranslate;
-            const outerRadius = Math.hypot(endPoint[0] - startPoint[0], endPoint[1] - startPoint[1]);
-            gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, outerRadius);
-            break;
-        }
-    }
-
-    if (gradient === undefined) {
-        return;
-    }
-
-    // Reuse the existing color-stop builder. `AddColorStops` only reads `g`, which is shared between
-    // gradient fills and gradient strokes. Stroke `o` (overall opacity) is intentionally not applied
-    // here to match the existing `DrawGradientFill` behavior; if that ever gains opacity support, this
-    // method should follow.
-    AddColorStops(gradient, stroke);
-
-    ctx.strokeStyle = gradient;
-    ApplyStrokeStyle(stroke, ctx);
-
-    ctx.stroke();
-}
-
-function DrawGradientFill(fill: RawGradientFillShape, boundingBox: BoundingBox, ctx: DrawingContext): void {
-    switch (fill.t) {
-        case 1: {
-            DrawLinearGradientFill(fill, boundingBox, ctx);
-            break;
-        }
-        case 2: {
-            DrawRadialGradientFill(fill, boundingBox, ctx);
-            break;
-        }
-    }
-}
-
-function DrawLinearGradientFill(fill: RawGradientFillShape, boundingBox: BoundingBox, ctx: DrawingContext): void {
-    // We need to translate the gradient to the center of the bounding box
-    const xTranslate = boundingBox.centerX;
-    const yTranslate = boundingBox.centerY;
-
-    // Create the gradient. Use initial-value helpers so animated endpoints (a===1) render their
-    // first-frame value into the atlas instead of feeding a keyframe array through `as number[]`.
-    const startPoint = GetInitialVectorValues(fill.s);
-    const endPoint = GetInitialVectorValues(fill.e);
-    const gradient = ctx.createLinearGradient(startPoint[0] + xTranslate, startPoint[1] + yTranslate, endPoint[0] + xTranslate, endPoint[1] + yTranslate);
-
-    AddColorStops(gradient, fill);
-
-    ctx.fillStyle = gradient;
-    ctx.fill();
-}
-
-function DrawRadialGradientFill(fill: RawGradientFillShape, boundingBox: BoundingBox, ctx: DrawingContext): void {
-    // We need to translate the gradient to the center of the bounding box
-    const xTranslate = boundingBox.centerX;
-    const yTranslate = boundingBox.centerY;
-
-    // Create the gradient. Use initial-value helpers so animated endpoints (a===1) render their
-    // first-frame value into the atlas instead of feeding a keyframe array through `as number[]`.
-    const startPoint = GetInitialVectorValues(fill.s);
-    const endPoint = GetInitialVectorValues(fill.e);
-
-    const centerX = startPoint[0] + xTranslate;
-    const centerY = startPoint[1] + yTranslate;
-    const outerRadius = Math.hypot(endPoint[0] - startPoint[0], endPoint[1] - startPoint[1]);
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, outerRadius);
-
-    AddColorStops(gradient, fill);
-
-    ctx.fillStyle = gradient;
-    ctx.fill();
-}
-
-function AddColorStops(gradient: CanvasGradient, fill: RawGradientFillShape | RawGradientStrokeShape): void {
-    const stops = fill.g.p;
-    const rawColors = fill.g.k.k;
-
-    let stopsData: GradientStop[] | undefined;
-    if (rawColors.length / stops === 4) {
-        // Offset + RGB
-        stopsData = GradientColorsToCssColor(rawColors, stops, false);
-    } else if (rawColors.length / stops === 6) {
-        // Offset + RGB + Offset + Alpha
-        stopsData = GradientColorsToCssColor(rawColors, stops, true);
-    } else {
-        return;
-    }
-
-    for (let i = 0; i < stops; i++) {
-        gradient.addColorStop(stopsData[i].offset, stopsData[i].color);
-    }
-}
-
-function GradientColorsToCssColor(colors: number[], stops: number, hasAlpha: boolean): GradientStop[] {
-    const result: GradientStop[] = [];
-    for (let i = 0; i < stops; i++) {
-        const index = i * 4;
-        result.push({
-            offset: colors[index],
-            color: LottieColorToCSSColor(colors.slice(index + 1, index + 4), hasAlpha ? colors[stops * 4 + i * 2 + 1] : 1),
-        });
-    }
-
-    return result;
-}
-
-function LottieColorToCSSColor(color: number[], opacity: number): string {
+/**
+ * Converts a Lottie color (normalized 0..1 RGB, optional alpha) and an extra opacity multiplier into
+ * a CSS `rgba(...)` string. Shared by solid fills/strokes and the gradient drawer's color stops.
+ * @param color The Lottie color as `[r, g, b]` or `[r, g, b, a]` with components in the 0..1 range.
+ * @param opacity An additional opacity multiplier in the 0..1 range applied to the color's alpha.
+ * @returns The equivalent CSS `rgba(...)` color string.
+ */
+export function LottieColorToCSSColor(color: number[], opacity: number): string {
     if (color.length !== 3 && color.length !== 4) {
         return "rgba(0, 0, 0, 1)"; // Default to black if invalid
     }
