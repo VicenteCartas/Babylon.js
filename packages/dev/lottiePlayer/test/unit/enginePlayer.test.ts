@@ -8,7 +8,6 @@ import { type ILottieFile } from "../../src/animation/lottieRaw";
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { type ThinNativeEngine } from "core/Engines/thinNativeEngine";
 import { type NativeEngine } from "core/Engines/nativeEngine";
-import { type LottieEngine } from "../../src/types";
 import { AnimationController } from "../../src/rendering/animationController";
 
 function EmptyAnimation(): ILottieFile {
@@ -17,8 +16,8 @@ function EmptyAnimation(): ILottieFile {
 
 describe("EnginePlayer", () => {
     it("accepts Babylon Native engine types through ThinEngine inheritance", () => {
-        expectTypeOf<ThinNativeEngine>().toMatchTypeOf<LottieEngine>();
-        expectTypeOf<NativeEngine>().toMatchTypeOf<LottieEngine>();
+        expectTypeOf<ThinNativeEngine>().toMatchTypeOf<ThinEngine>();
+        expectTypeOf<NativeEngine>().toMatchTypeOf<ThinEngine>();
         expect(true).toBe(true);
     });
 

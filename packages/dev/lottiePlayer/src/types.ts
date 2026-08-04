@@ -1,7 +1,6 @@
 import { type Nullable } from "core/types";
 import { type ILottieFile as RawLottieAnimation } from "./animation/lottieRaw";
 import { type AnimationConfiguration } from "./animationConfiguration";
-import { type ThinEngine } from "core/Engines/thinEngine";
 
 /**
  * Input parameters required to load and play an animation
@@ -44,6 +43,3 @@ export interface IEnginePlayerOptions {
 
 /** Input for a caller-owned-engine player. Rendering targets the engine's current backbuffer. */
 export type EngineAnimationInput = Omit<AnimationInput, "container">;
-
-/** Engine type accepted by {@link EnginePlayer}. NativeEngine and ThinNativeEngine inherit from it. */
-export type LottieEngine = ThinEngine;

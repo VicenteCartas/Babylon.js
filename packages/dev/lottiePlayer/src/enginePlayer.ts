@@ -1,5 +1,6 @@
 import { type Nullable } from "core/types";
-import { type LottieEngine, type EngineAnimationInput, type IEnginePlayerOptions } from "./types";
+import { type ThinEngine } from "core/Engines/thinEngine";
+import { type EngineAnimationInput, type IEnginePlayerOptions } from "./types";
 import { type ILottieFile } from "./animation/lottieRaw";
 import { GetRawAnimationDataAsync } from "./animation/loadAnimation";
 import { AnimationController } from "./rendering/animationController";
@@ -12,7 +13,7 @@ import { AnimationController } from "./rendering/animationController";
  * Each instance plays at most one animation; create another instance to play a different animation.
  */
 export class EnginePlayer {
-    private readonly _engine: LottieEngine;
+    private readonly _engine: ThinEngine;
     private readonly _options: IEnginePlayerOptions;
     private _controller: Nullable<AnimationController> = null;
     private _starting = false;
@@ -26,7 +27,7 @@ export class EnginePlayer {
      * Browser ThinEngine instances must have been created with a stencil buffer.
      * @param options Runtime integration options, such as a Native Canvas2D factory for text layers.
      */
-    public constructor(engine: LottieEngine, options: IEnginePlayerOptions = {}) {
+    public constructor(engine: ThinEngine, options: IEnginePlayerOptions = {}) {
         this._engine = engine;
         this._options = options;
     }

@@ -56,7 +56,7 @@ Masks and track mattes are not currently supported on Babylon Native because its
 
 ## Important Notes
 
-The public API of this package is formed by `Player`, `LocalPlayer`, `EnginePlayer`, `AnimationConfiguration`, `EngineAnimationInput`, `IEnginePlayerOptions`, `ILottieTextCanvas`, `LottieEngine`, and the `RawLottieAnimation` type. All other files are internal implementation details.
+The public API of this package is formed by `Player`, `LocalPlayer`, `EnginePlayer`, `AnimationConfiguration`, `EngineAnimationInput`, `IEnginePlayerOptions`, `ILottieTextCanvas`, and the `RawLottieAnimation` type. All other files are internal implementation details.
 
 Future updates could move or rename files and require you to update your references if you take dependencies on those files. Do not depend on the paths of those files either as they could be moved or renamed as part of the internal implementation.
 
