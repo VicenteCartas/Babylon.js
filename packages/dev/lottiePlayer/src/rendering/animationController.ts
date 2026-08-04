@@ -2,7 +2,6 @@ import { type ILottieFile } from "../animation/lottieRaw";
 import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../animationConfiguration";
 import { CreateVectorEngine, DisposeVectorPlayer, IsPlayerReady, RenderLottieFrame, type ILottiePlayer } from "../player/playerCore";
 import { CreateLottiePlayerAsync } from "../player/playerFactory";
-import { type ILottieTextCanvas } from "../types";
 
 import { type ThinEngine } from "core/Engines/thinEngine";
 
@@ -126,7 +125,6 @@ export class AnimationController {
      * @param animationData The raw Lottie animation as a JSON object.
      * @param variables Map of variables to replace in the animation file.
      * @param configuration The partial animation configuration.
-     * @param createTextCanvas Optional Canvas2D factory for non-DOM runtimes.
      * @param onFirstRender Optional callback invoked after the first frame renders.
      * @returns The initialized animation controller.
      */
@@ -135,7 +133,6 @@ export class AnimationController {
         animationData: ILottieFile,
         variables: Map<string, string>,
         configuration: Partial<AnimationConfiguration>,
-        createTextCanvas?: () => ILottieTextCanvas,
         onFirstRender?: () => void
     ): Promise<AnimationController> {
         const resolvedConfiguration = UpdateConfiguration(configuration, engine.getCaps().maxTextureSize);
@@ -146,7 +143,6 @@ export class AnimationController {
         const player = await CreateLottiePlayerAsync(engine, animationData, {
             variables: variableRecord,
             backgroundColor: resolvedConfiguration.backgroundColor,
-            createTextCanvas,
         });
         return new AnimationController(animationData, 1, resolvedConfiguration, engine, player, false, false, true, onFirstRender);
     }

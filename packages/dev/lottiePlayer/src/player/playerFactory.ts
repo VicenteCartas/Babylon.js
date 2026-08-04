@@ -8,12 +8,7 @@ import { type ILayerRenderer } from "../rendering/vector/layerRenderer";
 import { ParseAnimation, type ILottiePlayerOptions, type IParsedAnimation } from "../animation/parse";
 import { CreateFillRenderer } from "../rendering/vector/fillRenderer";
 import { BuildPlayer, type ILottiePlayer } from "./playerCore";
-import { type ILottieTextCanvas } from "../types";
 import { IsNativeEngine } from "../rendering/vector/nativeEngineAdapter";
-
-interface ILottiePlayerFactoryOptions extends ILottiePlayerOptions {
-    createTextCanvas?: () => ILottieTextCanvas;
-}
 
 /**
  * Validates renderer features that differ across engine backends.
@@ -43,7 +38,7 @@ export function ValidateEngineFeatures(engine: ThinEngine, animation: IParsedAni
  * localization (whole-string key match); `backgroundColor` sets the per-frame clear color.
  * @returns The player handle once all required renderer chunks have loaded.
  */
-export async function CreateLottiePlayerAsync(engine: ThinEngine, file: ILottieFile, options?: ILottiePlayerFactoryOptions): Promise<ILottiePlayer> {
+export async function CreateLottiePlayerAsync(engine: ThinEngine, file: ILottieFile, options?: ILottiePlayerOptions): Promise<ILottiePlayer> {
     const anim = ParseAnimation(file, options?.variables);
     ValidateEngineFeatures(engine, anim);
     const renderers = new Map<number, ILayerRenderer>();
@@ -66,8 +61,7 @@ export async function CreateLottiePlayerAsync(engine: ThinEngine, file: ILottieF
                 5,
                 textModule.CreateTextRenderer(
                     engine,
-                    anim.layers.filter((l) => l.kind === 5),
-                    options?.createTextCanvas
+                    anim.layers.filter((l) => l.kind === 5)
                 )
             );
         }

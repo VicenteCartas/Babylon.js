@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { CreateTextRenderer } from "../../src/rendering/vector/textRenderer";
 import { type IParsedLayer } from "../../src/animation/parse";
-import { type ILottieTextCanvas } from "../../src/types";
 
 function CreateTextLayer(ind = 1): IParsedLayer {
     return {
@@ -30,40 +29,6 @@ function CreateTextLayer(ind = 1): IParsedLayer {
 }
 
 describe("CreateTextRenderer", () => {
-    it("uses a caller-provided Canvas2D override", () => {
-        const context = {
-            font: "",
-            letterSpacing: "",
-            textBaseline: "alphabetic",
-            fillStyle: "",
-            scale: vi.fn(),
-            measureText: vi.fn((text: string) => ({ width: text.length * 10, fontBoundingBoxAscent: 16, fontBoundingBoxDescent: 4 })),
-            fillText: vi.fn(),
-        };
-        const canvas: ILottieTextCanvas = {
-            width: 1,
-            height: 1,
-            getContext: vi.fn(() => context),
-        };
-        const factory = vi.fn(() => canvas);
-        const effect = { isReady: () => true, dispose: vi.fn() };
-        let engine: ThinEngine;
-        const internalTexture = { getEngine: () => engine };
-        const mockEngine = {
-            createEffect: vi.fn(() => effect),
-            createDynamicTexture: vi.fn(() => internalTexture),
-            updateDynamicTexture: vi.fn(),
-        };
-        engine = mockEngine as unknown as ThinEngine;
-
-        CreateTextRenderer(engine, [CreateTextLayer()], factory);
-
-        expect(factory).toHaveBeenCalledOnce();
-        expect(canvas.getContext).toHaveBeenCalledWith("2d");
-        expect(mockEngine.updateDynamicTexture).toHaveBeenCalledWith(internalTexture, canvas, false, false);
-        expect(context.fillText).toHaveBeenCalled();
-    });
-
     it("uses the engine Canvas2D implementation by default", () => {
         const context = {
             font: "",
@@ -74,7 +39,7 @@ describe("CreateTextRenderer", () => {
             measureText: vi.fn((text: string) => ({ width: text.length * 10, fontBoundingBoxAscent: 16, fontBoundingBoxDescent: 4 })),
             fillText: vi.fn(),
         };
-        const canvas: ILottieTextCanvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
+        const canvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
         const effect = { isReady: () => true, dispose: vi.fn() };
         let engine: ThinEngine;
         const internalTexture = { getEngine: () => engine };
@@ -102,7 +67,7 @@ describe("CreateTextRenderer", () => {
             measureText: vi.fn((text: string) => ({ width: text.length * 10, fontBoundingBoxAscent: 16, fontBoundingBoxDescent: 4 })),
             fillText: vi.fn(),
         };
-        const canvas: ILottieTextCanvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
+        const canvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
         const effect = { isReady: () => true, setFloat2: vi.fn(), setInt: vi.fn(), setTexture: vi.fn(), dispose: vi.fn() };
         let engine: ThinEngine;
         const internalTexture = { getEngine: () => engine, dispose: vi.fn() };
@@ -110,6 +75,7 @@ describe("CreateTextRenderer", () => {
             name: "WebGL",
             shaderPlatformName: "NATIVE",
             stencilState: {},
+            createCanvas: vi.fn(() => canvas),
             createEffect: vi.fn(() => effect),
             createDynamicTexture: vi.fn(() => internalTexture),
             updateDynamicTexture: vi.fn(),
@@ -127,7 +93,7 @@ describe("CreateTextRenderer", () => {
         };
         engine = mockEngine as unknown as ThinEngine;
         const layer = CreateTextLayer();
-        const renderer = CreateTextRenderer(engine, [layer], () => canvas);
+        const renderer = CreateTextRenderer(engine, [layer]);
         const frame = { frame: 0, screenW: 100, screenH: 100 };
 
         renderer.beginFrame(frame);
@@ -149,13 +115,14 @@ describe("CreateTextRenderer", () => {
             measureText: vi.fn((text: string) => ({ width: text.length * 10, fontBoundingBoxAscent: 16, fontBoundingBoxDescent: 4 })),
             fillText: vi.fn(),
         };
-        const canvas: ILottieTextCanvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
+        const canvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
         let engine: ThinEngine;
         const textures = [
             { getEngine: () => engine, dispose: vi.fn() },
             { getEngine: () => engine, dispose: vi.fn() },
         ];
         const mockEngine = {
+            createCanvas: vi.fn(() => canvas),
             createDynamicTexture: vi.fn().mockReturnValueOnce(textures[0]).mockReturnValueOnce(textures[1]),
             updateDynamicTexture: vi
                 .fn()
@@ -166,7 +133,7 @@ describe("CreateTextRenderer", () => {
         };
         engine = mockEngine as unknown as ThinEngine;
 
-        expect(() => CreateTextRenderer(engine, [CreateTextLayer(1), CreateTextLayer(2)], () => canvas)).toThrow("upload failed");
+        expect(() => CreateTextRenderer(engine, [CreateTextLayer(1), CreateTextLayer(2)])).toThrow("upload failed");
         expect(textures[0].dispose).toHaveBeenCalledOnce();
         expect(textures[1].dispose).toHaveBeenCalledOnce();
     });
@@ -179,7 +146,7 @@ describe("CreateTextRenderer", () => {
         // Vitest's node environment has neither API, but preserve them in case the environment changes.
         Object.assign(globalThis, { OffscreenCanvas: undefined, document: undefined });
         try {
-            expect(() => CreateTextRenderer(engine, [CreateTextLayer()])).toThrow(/createTextCanvas/);
+            expect(() => CreateTextRenderer(engine, [CreateTextLayer()])).toThrow(/engine\.createCanvas/);
         } finally {
             Object.assign(globalThis, { OffscreenCanvas: originalOffscreenCanvas, document: originalDocument });
         }

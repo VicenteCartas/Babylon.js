@@ -13,11 +13,11 @@ import { Constants } from "core/Engines/constants";
 import { ThinTexture } from "core/Materials/Textures/thinTexture";
 import { type Nullable } from "core/types";
 import { type ThinEngine } from "core/Engines/thinEngine";
+import { type ICanvas } from "core/Engines/ICanvas";
 
 import { type ILayerRenderer } from "./layerRenderer";
 import { type IParsedLayer, type IParsedText } from "../../animation/parse";
 import { CreateTexturedQuadRenderer, type IQuadRect } from "./texturedQuad";
-import { type ILottieTextCanvas } from "../../types";
 import { IsNativeEngine } from "./nativeEngineAdapter";
 
 const Supersample = 3; // rasterize at 3x for crisp downscaling
@@ -32,7 +32,6 @@ interface ITextBlock {
     height: number;
 }
 
-type RasterCanvas = ILottieTextCanvas;
 type RasterContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 function DisposeTextBlocks(blocks: Map<number, ITextBlock>): void {
@@ -42,12 +41,9 @@ function DisposeTextBlocks(blocks: Map<number, ITextBlock>): void {
     blocks.clear();
 }
 
-function CreateRasterCanvas(engine: ThinEngine, factory?: () => ILottieTextCanvas): Nullable<RasterCanvas> {
-    if (factory) {
-        return factory();
-    }
+function CreateRasterCanvas(engine: ThinEngine): Nullable<ICanvas> {
     try {
-        return engine.createCanvas(1, 1) as unknown as ILottieTextCanvas;
+        return engine.createCanvas(1, 1);
     } catch {
         return null;
     }
@@ -91,12 +87,8 @@ function WrapParagraph(ctx: RasterContext, text: string, maxW: number): string[]
 
 // Rasterize one text document into a canvas plus the layer-local rect it maps to. Returns null when
 // the block has no area.
-function RasterizeText(
-    engine: ThinEngine,
-    t: IParsedText,
-    createCanvas?: () => ILottieTextCanvas
-): Nullable<{ canvas: RasterCanvas; left: number; top: number; width: number; height: number }> {
-    const canvas = CreateRasterCanvas(engine, createCanvas);
+function RasterizeText(engine: ThinEngine, t: IParsedText): Nullable<{ canvas: ICanvas; left: number; top: number; width: number; height: number }> {
+    const canvas = CreateRasterCanvas(engine);
     if (!canvas) {
         return null;
     }
@@ -189,10 +181,9 @@ function RasterizeText(
  * Creates the text-layer renderer. Rasterizes every text document up front.
  * @param engine The engine to render with.
  * @param textLayers The animation's text layers.
- * @param createCanvas Optional Canvas2D factory for non-DOM runtimes.
  * @returns A layer renderer for Lottie text layers (`ty === 5`).
  */
-export function CreateTextRenderer(engine: ThinEngine, textLayers: readonly IParsedLayer[], createCanvas?: () => ILottieTextCanvas): ILayerRenderer {
+export function CreateTextRenderer(engine: ThinEngine, textLayers: readonly IParsedLayer[]): ILayerRenderer {
     const blocks = new Map<number, ITextBlock>();
     let hasCanvas = false;
     try {
@@ -200,7 +191,7 @@ export function CreateTextRenderer(engine: ThinEngine, textLayers: readonly IPar
             if (!layer.text || layer.text.text.length === 0) {
                 continue;
             }
-            const raster = RasterizeText(engine, layer.text, createCanvas);
+            const raster = RasterizeText(engine, layer.text);
             if (!raster) {
                 continue;
             }
@@ -215,7 +206,7 @@ export function CreateTextRenderer(engine: ThinEngine, textLayers: readonly IPar
             }
         }
         if (textLayers.length > 0 && !hasCanvas) {
-            throw new Error("Lottie text layers require engine.createCanvas() support or IEnginePlayerOptions.createTextCanvas.");
+            throw new Error("Lottie text layers require engine.createCanvas() support.");
         }
     } catch (error) {
         DisposeTextBlocks(blocks);
