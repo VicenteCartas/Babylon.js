@@ -5,16 +5,19 @@
 // Stencil-then-cover therefore renders directly to the canvas with no offscreen resolve; this
 // module owns viewport setup, the clear, and the composition-bounds scissor.
 
-import "core/Engines/thinEngine.scissor";
-
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { type IColor4Like, type IViewportLike } from "core/Maths/math.like";
+import { DisableEngineScissor, EnableEngineScissor, GetNativeStencilEngine, IsNativeEngine } from "./nativeEngineAdapter";
 
 /** A clip rectangle in WebGL (lower-left origin) drawing-buffer pixels. */
 export interface IVectorScissorRect {
+    /** Left edge in drawing-buffer pixels. */
     x: number;
+    /** Bottom edge in drawing-buffer pixels. */
     y: number;
+    /** Width in drawing-buffer pixels. */
     width: number;
+    /** Height in drawing-buffer pixels. */
     height: number;
 }
 
@@ -34,14 +37,20 @@ const FullViewport: IViewportLike = { x: 0, y: 0, width: 1, height: 1 };
  */
 export function BeginVectorFrame(engine: ThinEngine, scissor: IVectorScissorRect, clearColor: IColor4Like): void {
     engine.setViewport(FullViewport);
-    engine.disableScissor();
+    DisableEngineScissor(engine);
+    engine.depthCullingState.depthTest = false;
+    engine.depthCullingState.depthMask = false;
 
     // A clear respects the stencil write mask; force it open so stencil actually resets to 0.
-    engine.stencilState.stencilTest = true;
-    engine.stencilState.stencilMask = 0xff;
+    if (IsNativeEngine(engine)) {
+        GetNativeStencilEngine(engine).setStencilMask(0xff);
+    } else {
+        engine.stencilState.stencilTest = true;
+        engine.stencilState.stencilMask = 0xff;
+    }
     engine.clear(clearColor, true, false, true);
 
-    engine.enableScissor(scissor.x, scissor.y, scissor.width, scissor.height);
+    EnableEngineScissor(engine, scissor.x, scissor.y, scissor.width, scissor.height);
 }
 
 /**
@@ -49,5 +58,5 @@ export function BeginVectorFrame(engine: ThinEngine, scissor: IVectorScissorRect
  * @param engine The engine that rendered the frame.
  */
 export function EndVectorFrame(engine: ThinEngine): void {
-    engine.disableScissor();
+    DisableEngineScissor(engine);
 }

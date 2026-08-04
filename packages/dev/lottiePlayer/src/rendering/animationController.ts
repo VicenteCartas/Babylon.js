@@ -2,6 +2,7 @@ import { type ILottieFile } from "../animation/lottieRaw";
 import { type AnimationConfiguration, type ResolvedAnimationConfiguration, UpdateConfiguration } from "../animationConfiguration";
 import { CreateVectorEngine, DisposeVectorPlayer, IsPlayerReady, RenderLottieFrame, type ILottiePlayer } from "../player/playerCore";
 import { CreateLottiePlayerAsync } from "../player/playerFactory";
+import { type ILottieTextCanvas } from "../types";
 
 import { type ThinEngine } from "core/Engines/thinEngine";
 
@@ -51,6 +52,9 @@ export class AnimationController {
     private _accumulatedTime: number;
     private readonly _loop: boolean;
     private _hasRendered: boolean;
+    private readonly _ownsEngine: boolean;
+    private readonly _managesEngineSize: boolean;
+    private readonly _usesEngineRenderLoop: boolean;
 
     private readonly _onFirstRender?: () => void;
 
@@ -109,11 +113,42 @@ export class AnimationController {
                 variables: variableRecord,
                 backgroundColor: resolvedConfiguration.backgroundColor,
             });
-            return new AnimationController(animationData, canvasScale, resolvedConfiguration, engine, player, onFirstRender);
+            return new AnimationController(animationData, canvasScale, resolvedConfiguration, engine, player, true, true, false, onFirstRender);
         } catch (error) {
             engine.dispose();
             throw error;
         }
+    }
+
+    /**
+     * Creates a controller that renders into a caller-owned engine and backbuffer.
+     * @param engine The caller-owned engine. It is never resized or disposed by the controller.
+     * @param animationData The raw Lottie animation as a JSON object.
+     * @param variables Map of variables to replace in the animation file.
+     * @param configuration The partial animation configuration.
+     * @param createTextCanvas Optional Canvas2D factory for non-DOM runtimes.
+     * @param onFirstRender Optional callback invoked after the first frame renders.
+     * @returns The initialized animation controller.
+     */
+    public static async CreateWithEngineAsync(
+        engine: ThinEngine,
+        animationData: ILottieFile,
+        variables: Map<string, string>,
+        configuration: Partial<AnimationConfiguration>,
+        createTextCanvas?: () => ILottieTextCanvas,
+        onFirstRender?: () => void
+    ): Promise<AnimationController> {
+        const resolvedConfiguration = UpdateConfiguration(configuration, engine.getCaps().maxTextureSize);
+        const variableRecord: Record<string, string> = {};
+        for (const [key, value] of variables) {
+            variableRecord[key] = value;
+        }
+        const player = await CreateLottiePlayerAsync(engine, animationData, {
+            variables: variableRecord,
+            backgroundColor: resolvedConfiguration.backgroundColor,
+            createTextCanvas,
+        });
+        return new AnimationController(animationData, 1, resolvedConfiguration, engine, player, false, false, true, onFirstRender);
     }
 
     private constructor(
@@ -122,6 +157,9 @@ export class AnimationController {
         configuration: ResolvedAnimationConfiguration,
         engine: ThinEngine,
         player: ILottiePlayer,
+        ownsEngine: boolean,
+        managesEngineSize: boolean,
+        usesEngineRenderLoop: boolean,
         onFirstRender?: () => void
     ) {
         this._canvasScale = canvasScale;
@@ -138,6 +176,9 @@ export class AnimationController {
         this._configuration = configuration;
         this._loop = this._configuration.loopAnimation;
         this._player = player;
+        this._ownsEngine = ownsEngine;
+        this._managesEngineSize = managesEngineSize;
+        this._usesEngineRenderLoop = usesEngineRenderLoop;
 
         this._width = animationData.w;
         this._height = animationData.h;
@@ -145,7 +186,9 @@ export class AnimationController {
         this._endFrame = animationData.op;
         this._frameDuration = 1000 / GetSafeFrameRate(animationData.fr);
 
-        this._setSize();
+        if (this._managesEngineSize) {
+            this._setSize();
+        }
     }
 
     /**
@@ -157,7 +200,11 @@ export class AnimationController {
         this._isPlaying = true;
         this._lastFrameTime = 0;
 
-        this._startRenderLoop();
+        if (this._usesEngineRenderLoop) {
+            this._engine.runRenderLoop(this._engineRenderLoop);
+        } else {
+            this._startRenderLoop();
+        }
     }
 
     /**
@@ -166,6 +213,9 @@ export class AnimationController {
     public stopAnimation(): void {
         this._accumulatedTime = 0;
         this._isPlaying = false;
+        if (this._usesEngineRenderLoop) {
+            this._engine.stopRenderLoop(this._engineRenderLoop);
+        }
         if (this._animationFrameId !== null) {
             cancelAnimationFrame(this._animationFrameId);
             this._animationFrameId = null;
@@ -177,7 +227,7 @@ export class AnimationController {
      * @param canvasScale The new canvas scale factor to apply to the animation.
      */
     public setScale(canvasScale: number): void {
-        if (canvasScale <= 0) {
+        if (!this._managesEngineSize || canvasScale <= 0) {
             return;
         }
 
@@ -191,14 +241,18 @@ export class AnimationController {
     public dispose(): void {
         this.stopAnimation();
 
-        // Offscreen canvas do not have .remove() as it doesn't inherit from Element
-        const canvas = this._engine.getRenderingCanvas();
-        if (canvas && canvas.remove) {
-            canvas.remove();
+        if (this._ownsEngine) {
+            // Offscreen canvas do not have .remove() as it doesn't inherit from Element
+            const canvas = this._engine.getRenderingCanvas();
+            if (canvas && canvas.remove) {
+                canvas.remove();
+            }
         }
 
         DisposeVectorPlayer(this._player);
-        this._engine.dispose();
+        if (this._ownsEngine) {
+            this._engine.dispose();
+        }
     }
 
     private _setSize(): void {
@@ -217,23 +271,30 @@ export class AnimationController {
         }
 
         this._animationFrameId = requestAnimationFrame((currentTime) => {
-            // The first time we render, we set the last frame time
-            // to the current time to sync with the page startup time
-            if (this._firstRun) {
-                this._lastFrameTime = currentTime;
-                this._firstRun = false;
-            }
-
-            this._deltaTime = currentTime - this._lastFrameTime;
-            this._lastFrameTime = currentTime;
-
-            this._render();
-            this._lastFrameTime = performance.now();
+            this._tick(currentTime);
 
             if (this._isPlaying) {
                 this._startRenderLoop();
             }
         });
+    }
+
+    private readonly _engineRenderLoop = (): void => {
+        this._tick(performance.now());
+    };
+
+    private _tick(currentTime: number): void {
+        // The first time we render, we set the last frame time to the current time to sync with the
+        // render-loop startup time.
+        if (this._firstRun) {
+            this._lastFrameTime = currentTime;
+            this._firstRun = false;
+        }
+
+        this._deltaTime = currentTime - this._lastFrameTime;
+        this._lastFrameTime = currentTime;
+        this._render();
+        this._lastFrameTime = performance.now();
     }
 
     private _render(): void {
@@ -283,6 +344,9 @@ export class AnimationController {
 
         if (stoppingAfterThisFrame && this._configuration.stopAtFrame === undefined) {
             this._isPlaying = false;
+            if (this._usesEngineRenderLoop) {
+                this._engine.stopRenderLoop(this._engineRenderLoop);
+            }
         }
         // When stopAtFrame is set, the render loop stays alive to prevent
         // preserveDrawingBuffer:false from clearing the canvas.

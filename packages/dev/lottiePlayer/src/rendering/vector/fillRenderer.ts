@@ -9,15 +9,15 @@
 //      the next path starts clean.
 //
 // STROKES share this renderer. A stroke is expanded (stroke-geometry.ts) into self-overlapping
-// segment quads + round-join fans; those are stencilled as a winding-INDEPENDENT union
-// (increment-clamp, no culling) and covered once, so a semi-transparent stroke paints at a
-// single uniform alpha instead of accumulating where the expanded triangles overlap.
+// segment quads + round-join fans; those are stencilled as a winding-independent union and covered
+// once, so a semi-transparent stroke paints at a single uniform alpha instead of accumulating where
+// the expanded triangles overlap. WebGL uses increment-clamp; Native writes a binary value.
 //
-// NONZERO WINDING VIA TWO-SIDED STENCIL. The fan is drawn ONCE with face culling disabled,
-// incrementing the stencil on front faces (INCR_WRAP) and decrementing it on back faces
-// (DECR_WRAP) in the same draw — Babylon's StencilStateComposer emits stencilOpSeparate, so the
-// front/back ops are independent. The shader's Y-flip inverts facing consistently, and the cover
-// test is the sign-agnostic `!= 0`, so winding direction does not affect fill coverage.
+// NONZERO WINDING. WebGL draws the fan once with two-sided stencil operations. Babylon Native's
+// command protocol has one stencil operation per draw, so it draws the same fan twice with opposite
+// culling. The cover test is the sign-agnostic `!= 0`, so winding direction does not affect fill.
+// Babylon Native exposes single-sided stencil state, so it draws the fan twice with opposite cull
+// modes and increment/decrement operations instead.
 //
 // Rendering targets the default framebuffer (MSAA + stencil via engine creation options), so this
 // renderer only issues imperative draws — there is no render pass object.
@@ -37,6 +37,7 @@ import { TransformPoint, BuildLottieMatrixInto, MultiplyMat2DInto, type Mat2D } 
 import { SampleEllipse, SampleMulti, SampleRect, SampleScalar, SampleShape } from "../../animation/sample";
 import { BuildContourPoints } from "../../animation/geometry";
 import { BuildDashedStrokePoints, BuildStrokePoints } from "./strokeGeometry";
+import { GetNativeStencilEngine, IsNativeEngine } from "./nativeEngineAdapter";
 
 const MaxGradientStops = 16; // Max gradient stops
 const WindingMask = 0x3f;
@@ -206,6 +207,8 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
         []
     );
     const stencil = engine.stencilState;
+    const usesNativeStencil = IsNativeEngine(engine);
+    const nativeStencil = usesNativeStencil ? GetNativeStencilEngine(engine) : null;
 
     // Per-frame accumulation + scratch (reused across frames to avoid GC churn).
     const verts: number[] = [];
@@ -495,6 +498,18 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
 
     // Apply a stencil configuration. The composer defers the GL calls until the next draw.
     function setStencil(func: number, ref: number, funcMask: number, writeMask: number, opPass: number, backOpPass: number): void {
+        if (usesNativeStencil) {
+            // Native currently supports only full-byte read/write masks. Native masks/mattes are
+            // rejected before renderer creation, so the whole stencil byte is available for winding.
+            nativeStencil!.setStencilBuffer(true);
+            nativeStencil!.setStencilMask(writeMask === 0 ? 0 : 0xff);
+            nativeStencil!.setStencilFunction(func);
+            nativeStencil!.setStencilFunctionReference(ref);
+            nativeStencil!.setStencilOperationFail(Constants.KEEP);
+            nativeStencil!.setStencilOperationDepthFail(Constants.KEEP);
+            nativeStencil!.setStencilOperationPass(opPass);
+            return;
+        }
         stencil.stencilTest = true;
         stencil.stencilMask = writeMask;
         stencil.stencilFunc = func;
@@ -512,16 +527,31 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
     function stencilGeometry(stroke: boolean, fanFirst: number, fanCount: number, func: number, ref: number, funcMask: number): void {
         engine.enableEffect(stencilEffect);
         engine.setColorWrite(false);
-        engine.setState(false);
         if (stroke) {
+            engine.setState(false);
             // Strokes are a winding-INDEPENDENT union: the expanded segment quads self-overlap, so
             // increment-with-clamp on both faces keeps coverage binary and paints one flat alpha.
-            setStencil(func, ref, funcMask, WindingMask, Constants.INCR, Constants.INCR);
+            if (usesNativeStencil) {
+                setStencil(func, 1, funcMask, 0xff, Constants.REPLACE, Constants.REPLACE);
+            } else {
+                setStencil(func, ref, funcMask, WindingMask, Constants.INCR, Constants.INCR);
+            }
+            engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, fanFirst, fanCount);
+        } else if (usesNativeStencil) {
+            // Cull back faces to increment fronts, then cull front faces to decrement backs.
+            engine.setState(true, 0, true, false, true);
+            setStencil(func, ref, funcMask, 0xff, Constants.INCR, Constants.INCR);
+            engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, fanFirst, fanCount);
+            engine.setState(true, 0, true, true, true);
+            setStencil(func, ref, funcMask, 0xff, Constants.DECR, Constants.DECR);
+            engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, fanFirst, fanCount);
+            engine.setState(false);
         } else {
+            engine.setState(false);
             // Nonzero winding in a single draw: front faces wind up, back faces wind down.
             setStencil(func, ref, funcMask, WindingMask, Constants.INCR_WRAP, Constants.DECR_WRAP);
+            engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, fanFirst, fanCount);
         }
-        engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, fanFirst, fanCount);
     }
 
     function resolveClip(coverFirst: number, bit: number): void {

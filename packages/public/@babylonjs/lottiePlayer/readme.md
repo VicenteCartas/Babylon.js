@@ -19,9 +19,44 @@ await player.playAnimationAsync({
 });
 ```
 
+### Caller-Owned Engine
+
+`EnginePlayer` is a lower-level local API for environments that already own a Babylon engine, including Babylon Native. It renders into the engine's current backbuffer and does not create, resize, or dispose the engine.
+
+```ts
+import { EnginePlayer } from "@babylonjs/lottie-player";
+import { NativeEngine } from "@babylonjs/core/Engines/nativeEngine";
+
+const engine = new NativeEngine();
+const player = new EnginePlayer(engine);
+
+await player.playAnimationAsync({
+    animationSource: animationJson,
+    variables: null,
+    configuration: { loopAnimation: true },
+});
+
+player.dispose(); // The NativeEngine remains owned by the caller.
+```
+
+The player clears the active backbuffer every frame, so use an engine dedicated to the Lottie animation rather than one concurrently rendering a scene.
+Each `EnginePlayer` instance plays one animation. Create a new instance to play a different animation on the same engine after disposing the previous player.
+
+Browser `ThinEngine` instances must be created with stencil enabled. `NativeEngine` supplies its stencil-backed render surface automatically.
+
+Babylon Native text layers use the Canvas2D plugin exposed through `engine.createCanvas()`. No DOM or additional option is required. Applications with a custom Canvas2D integration can override it:
+
+```ts
+const player = new EnginePlayer(engine, {
+    createTextCanvas: () => createMyCanvas2D(),
+});
+```
+
+Masks and track mattes are not currently supported on Babylon Native because its stencil protocol does not expose the independent read/write masks used by the renderer. They remain supported by the browser `Player`, `LocalPlayer`, and `EnginePlayer` paths.
+
 ## Important Notes
 
-The public API of this package is formed by `Player`, `LocalPlayer`, `AnimationConfiguration` and the `RawLottieAnimation` type. All other files are internal implementation details.
+The public API of this package is formed by `Player`, `LocalPlayer`, `EnginePlayer`, `AnimationConfiguration`, `EngineAnimationInput`, `IEnginePlayerOptions`, `ILottieTextCanvas`, `LottieEngine`, and the `RawLottieAnimation` type. All other files are internal implementation details.
 
 Future updates could move or rename files and require you to update your references if you take dependencies on those files. Do not depend on the paths of those files either as they could be moved or renamed as part of the internal implementation.
 
@@ -40,17 +75,19 @@ You can use `AnimationConfiguration` to change certain parameters of the player.
 - `supportDeviceLost`: enable WebGL context-lost recovery.
 - `stopAtFrame`: stop playback at a specific frame number (useful for visual testing).
 
+`EnginePlayer` uses the caller's existing engine size and device-loss behavior, so `devicePixelRatio` and `supportDeviceLost` do not apply to that path.
+
 The following options are deprecated. They belonged to the previous sprite-atlas renderer and are still accepted so existing code keeps compiling, but they no longer have any effect: `spriteAtlasWidth`, `spriteAtlasHeight`, `gapSize`, `spritesCapacity`, `scaleMultiplier`, `easingSteps`, `debug`, and `compatibility`.
 
 ## Renderer Loading
 
-`Player` and `LocalPlayer` select renderer chunks automatically after parsing the animation:
+`Player`, `LocalPlayer`, and `EnginePlayer` select renderer chunks automatically after parsing the animation:
 
 - The vector fill/stroke renderer is always part of the base player.
 - The text renderer loads only when the animation contains text layers.
 - The image renderer and its file-loading support load only when the animation contains image layers.
 
-No separate player class or configuration is required. Pre-warming `Player` loads the worker and base renderer code; animation-specific text or image chunks load after the animation data is known.
+No renderer profile configuration is required. Pre-warming `Player` loads the worker and base renderer code; animation-specific text or image chunks load after the animation data is known.
 
 ## Upgrading
 

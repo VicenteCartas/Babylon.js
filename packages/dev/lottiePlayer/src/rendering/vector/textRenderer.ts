@@ -17,6 +17,8 @@ import { type ThinEngine } from "core/Engines/thinEngine";
 import { type ILayerRenderer } from "./layerRenderer";
 import { type IParsedLayer, type IParsedText } from "../../animation/parse";
 import { CreateTexturedQuadRenderer, type IQuadRect } from "./texturedQuad";
+import { type ILottieTextCanvas } from "../../types";
+import { IsNativeEngine } from "./nativeEngineAdapter";
 
 const Supersample = 3; // rasterize at 3x for crisp downscaling
 
@@ -30,19 +32,25 @@ interface ITextBlock {
     height: number;
 }
 
-type RasterCanvas = HTMLCanvasElement | OffscreenCanvas;
+type RasterCanvas = ILottieTextCanvas;
 type RasterContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-// OffscreenCanvas keeps this working inside the worker; LocalPlayer exists for browsers without it,
-// so fall back to a DOM canvas there.
-function CreateRasterCanvas(): Nullable<RasterCanvas> {
-    if (typeof OffscreenCanvas !== "undefined") {
-        return new OffscreenCanvas(1, 1);
+function DisposeTextBlocks(blocks: Map<number, ITextBlock>): void {
+    for (const block of blocks.values()) {
+        block.texture.dispose();
     }
-    if (typeof document !== "undefined") {
-        return document.createElement("canvas");
+    blocks.clear();
+}
+
+function CreateRasterCanvas(engine: ThinEngine, factory?: () => ILottieTextCanvas): Nullable<RasterCanvas> {
+    if (factory) {
+        return factory();
     }
-    return null;
+    try {
+        return engine.createCanvas(1, 1) as unknown as ILottieTextCanvas;
+    } catch {
+        return null;
+    }
 }
 
 function GetCssFont(t: IParsedText): string {
@@ -83,8 +91,12 @@ function WrapParagraph(ctx: RasterContext, text: string, maxW: number): string[]
 
 // Rasterize one text document into a canvas plus the layer-local rect it maps to. Returns null when
 // the block has no area.
-function RasterizeText(t: IParsedText): Nullable<{ canvas: RasterCanvas; left: number; top: number; width: number; height: number }> {
-    const canvas = CreateRasterCanvas();
+function RasterizeText(
+    engine: ThinEngine,
+    t: IParsedText,
+    createCanvas?: () => ILottieTextCanvas
+): Nullable<{ canvas: RasterCanvas; left: number; top: number; width: number; height: number }> {
+    const canvas = CreateRasterCanvas(engine, createCanvas);
     if (!canvas) {
         return null;
     }
@@ -177,43 +189,59 @@ function RasterizeText(t: IParsedText): Nullable<{ canvas: RasterCanvas; left: n
  * Creates the text-layer renderer. Rasterizes every text document up front.
  * @param engine The engine to render with.
  * @param textLayers The animation's text layers.
+ * @param createCanvas Optional Canvas2D factory for non-DOM runtimes.
  * @returns A layer renderer for Lottie text layers (`ty === 5`).
  */
-export function CreateTextRenderer(engine: ThinEngine, textLayers: readonly IParsedLayer[]): ILayerRenderer {
+export function CreateTextRenderer(engine: ThinEngine, textLayers: readonly IParsedLayer[], createCanvas?: () => ILottieTextCanvas): ILayerRenderer {
     const blocks = new Map<number, ITextBlock>();
-    for (const layer of textLayers) {
-        if (!layer.text || layer.text.text.length === 0) {
-            continue;
+    let hasCanvas = false;
+    try {
+        for (const layer of textLayers) {
+            if (!layer.text || layer.text.text.length === 0) {
+                continue;
+            }
+            const raster = RasterizeText(engine, layer.text, createCanvas);
+            if (!raster) {
+                continue;
+            }
+            hasCanvas = true;
+            const internal = engine.createDynamicTexture(raster.canvas.width, raster.canvas.height, false, Constants.TEXTURE_BILINEAR_SAMPLINGMODE);
+            try {
+                engine.updateDynamicTexture(internal, raster.canvas as Parameters<ThinEngine["updateDynamicTexture"]>[1], false, false);
+                blocks.set(layer.ind, { texture: new ThinTexture(internal), left: raster.left, top: raster.top, width: raster.width, height: raster.height });
+            } catch (error) {
+                internal.dispose();
+                throw error;
+            }
         }
-        const raster = RasterizeText(layer.text);
-        if (!raster) {
-            continue;
+        if (textLayers.length > 0 && !hasCanvas) {
+            throw new Error("Lottie text layers require engine.createCanvas() support or IEnginePlayerOptions.createTextCanvas.");
         }
-        // Straight alpha (no premultiply) — the fragment shader premultiplies.
-        const internal = engine.createDynamicTexture(raster.canvas.width, raster.canvas.height, false, Constants.TEXTURE_BILINEAR_SAMPLINGMODE);
-        engine.updateDynamicTexture(internal, raster.canvas, false, false);
-        blocks.set(layer.ind, { texture: new ThinTexture(internal), left: raster.left, top: raster.top, width: raster.width, height: raster.height });
+    } catch (error) {
+        DisposeTextBlocks(blocks);
+        throw error;
     }
 
-    return CreateTexturedQuadRenderer(engine, {
-        kind: 5,
-        fillRect(layer: IParsedLayer, rect: IQuadRect): boolean {
-            const block = blocks.get(layer.ind);
-            if (!block) {
-                return false;
-            }
-            rect.left = block.left;
-            rect.top = block.top;
-            rect.width = block.width;
-            rect.height = block.height;
-            return true;
-        },
-        textureFor: (layer) => blocks.get(layer.ind)?.texture ?? null,
-        disposeTextures() {
-            for (const block of blocks.values()) {
-                block.texture.dispose();
-            }
-            blocks.clear();
-        },
-    });
+    try {
+        return CreateTexturedQuadRenderer(engine, {
+            kind: 5,
+            premultipliedAlpha: IsNativeEngine(engine),
+            fillRect(layer: IParsedLayer, rect: IQuadRect): boolean {
+                const block = blocks.get(layer.ind);
+                if (!block) {
+                    return false;
+                }
+                rect.left = block.left;
+                rect.top = block.top;
+                rect.width = block.width;
+                rect.height = block.height;
+                return true;
+            },
+            textureFor: (layer) => blocks.get(layer.ind)?.texture ?? null,
+            disposeTextures: () => DisposeTextBlocks(blocks),
+        });
+    } catch (error) {
+        DisposeTextBlocks(blocks);
+        throw error;
+    }
 }

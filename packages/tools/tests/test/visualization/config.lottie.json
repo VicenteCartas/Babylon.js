@@ -498,6 +498,20 @@
             "devHostQsps": "exp=lottie&file=gradient_stroke.json&useWorker=true&useUrl=true&frame=0",
             "referenceImage": "lottie-gradient-stroke-frame0.png",
             "readySelector": "#lottie-ready"
+        },
+        {
+            "title": "Lottie - Gradient Stroke Frame 0 (EnginePlayer)",
+            "devHostQsps": "exp=lottie&file=gradient_stroke.json&useEngine=true&useUrl=true&frame=0",
+            "referenceImage": "lottie-gradient-stroke-frame0.png",
+            "readySelector": "#lottie-ready",
+            "dependsOn": ["Engine", "Rendering", "Shaders"]
+        },
+        {
+            "title": "Lottie - Text and Shapes (EnginePlayer)",
+            "devHostQsps": "exp=lottie&file=trianglesAndText.json&useEngine=true&useUrl=false",
+            "referenceImage": "triangles-text.png",
+            "readySelector": "#lottie-ready",
+            "dependsOn": ["Engine", "Rendering", "Shaders", "Textures"]
         }
     ]
 }

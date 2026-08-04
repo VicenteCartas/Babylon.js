@@ -23,6 +23,7 @@ This experience allows you to test the Babylon lottie-player. It supports the fo
 
 - `file=string` Renders this file from the Babylon assets repo. For example, `file=triangles.json` uses `https://assets.babylonjs.com/lottie/triangles.json`. A path starting with `./` is served from the dev host's `public` folder instead.
 - `useWorker=boolean` Whether to use the webworker for rendering or not. Defaults to true if not used.
+- `useEngine=boolean` Creates a caller-owned web `ThinEngine` and exercises the lower-level `EnginePlayer` API. Defaults to false.
 - `useUrl=boolean` Whether to hand the player the file URL or a pre-parsed JSON object. Defaults to true.
 - `usePreWarm=boolean` Whether to pre-warm the worker before playing. Defaults to false.
 - `frame=number` Renders a single frame instead of playing (used by the visual tests).

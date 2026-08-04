@@ -1,7 +1,9 @@
 import { type AnimationConfiguration } from "lottie-player/animationConfiguration";
-import { type RawLottieAnimation } from "lottie-player/index";
+import { EnginePlayer } from "lottie-player/enginePlayer";
+import { type ILottieFile as RawLottieAnimation } from "lottie-player/animation/lottieRaw";
 import { Player } from "lottie-player/player";
 import { LocalPlayer } from "lottie-player/localPlayer";
+import { ThinEngine } from "core/Engines/thinEngine";
 import { DecodeQspStringToObject } from "./utils";
 
 /**
@@ -20,6 +22,7 @@ export async function Main(searchParams: URLSearchParams): Promise<void> {
     // Whether to use a web worker for rendering or not, defaults to true
     const useWorkerParam = searchParams.get("useworker");
     const useWorker = useWorkerParam !== "false"; // Default to true if not specified
+    const useEnginePlayer = searchParams.get("useengine") === "true";
 
     // Whether to use the file URL for the data or to parse the data in the devhost, defaults to true (use the file URL)
     const useUrlParam = searchParams.get("useurl");
@@ -45,7 +48,7 @@ export async function Main(searchParams: URLSearchParams): Promise<void> {
     }
 
     let animationData: RawLottieAnimation | undefined = undefined;
-    if (!useUrl) {
+    if (!useUrl || useEnginePlayer) {
         const data = await (await fetch(fileUrl)).text();
         animationData = JSON.parse(data) as RawLottieAnimation;
     }
@@ -70,7 +73,19 @@ export async function Main(searchParams: URLSearchParams): Promise<void> {
     // Create the player and play the animation
     const animationInput = { container: div, animationSource: useUrl ? fileUrl : (animationData as RawLottieAnimation), variables, configuration, onFirstRender };
 
-    if (useWorker) {
+    if (useEnginePlayer) {
+        const animation = animationData as RawLottieAnimation;
+        const canvas = document.createElement("canvas");
+        canvas.id = "babylon-canvas";
+        const canvasScale = Math.min(div.clientWidth / animation.w, div.clientHeight / animation.h);
+        canvas.style.width = `${animation.w * canvasScale}px`;
+        canvas.style.height = `${animation.h * canvasScale}px`;
+        div.appendChild(canvas);
+        const engine = new ThinEngine(canvas, true, { alpha: true, antialias: true, stencil: true, depth: false, audioEngine: false, preserveDrawingBuffer: false }, false);
+        engine.setSize(animation.w * canvasScale * window.devicePixelRatio, animation.h * canvasScale * window.devicePixelRatio);
+        const player = new EnginePlayer(engine);
+        await player.playAnimationAsync({ animationSource: useUrl ? fileUrl : animation, variables, configuration, onFirstRender });
+    } else if (useWorker) {
         const player = new Player();
 
         if (usePrewarm) {

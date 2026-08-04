@@ -18,6 +18,7 @@ import { type ThinTexture } from "core/Materials/Textures/thinTexture";
 import { type ILayerRenderContext, type ILayerRenderer } from "./layerRenderer";
 import { type IParsedLayer } from "../../animation/parse";
 import { TransformPoint, type Mat2D } from "../../animation/matrix2D";
+import { GetNativeStencilEngine, IsNativeEngine } from "./nativeEngineAdapter";
 
 const FloatsPerVert = 5; // pos.xy, uv.xy, alpha
 const VertsPerQuad = 6;
@@ -40,19 +41,24 @@ precision highp float;
 in vec2 vUv;
 in float vAlpha;
 uniform sampler2D uTex;
+uniform int uSourcePremultiplied;
 layout(location = 0) out vec4 fragColor;
 void main() {
-  // Source is straight alpha (Canvas2D text / decoded image); premultiply here for "over" compositing.
   vec4 c = texture(uTex, vUv);
   float a = c.a * vAlpha;
-  fragColor = vec4(c.rgb * a, a);
+    vec3 rgb = uSourcePremultiplied != 0 ? c.rgb * vAlpha : c.rgb * a;
+    fragColor = vec4(rgb, a);
 }`;
 
 /** The layer-local quad rect an {@link ITexturedQuadSource} fills for a layer. */
 export interface IQuadRect {
+    /** Left edge in layer-local coordinates. */
     left: number;
+    /** Top edge in layer-local coordinates. */
     top: number;
+    /** Width in layer-local coordinates. */
     width: number;
+    /** Height in layer-local coordinates. */
     height: number;
 }
 
@@ -66,6 +72,8 @@ export interface ITexturedQuadSource {
     fillRect(layer: IParsedLayer, rect: IQuadRect): boolean;
     /** The texture to bind for a layer at record time, or `null` to skip. */
     textureFor(layer: IParsedLayer): Nullable<ThinTexture>;
+    /** True when the texture's RGB channels already contain alpha. */
+    premultipliedAlpha?: boolean;
     /** Dispose the renderer-owned textures. */
     disposeTextures(): void;
 }
@@ -81,7 +89,12 @@ const QuadVertexDeclaration = [2, 2, 1];
  * @returns A layer renderer for the source's layer kind.
  */
 export function CreateTexturedQuadRenderer(engine: ThinEngine, source: ITexturedQuadSource): ILayerRenderer {
-    const effect = engine.createEffect({ vertexSource: QuadVertexShader, fragmentSource: QuadFragmentShader }, ["position", "uv", "alpha"], ["uScreen"], ["uTex"]);
+    const effect = engine.createEffect(
+        { vertexSource: QuadVertexShader, fragmentSource: QuadFragmentShader },
+        ["position", "uv", "alpha"],
+        ["uScreen", "uSourcePremultiplied"],
+        ["uTex"]
+    );
 
     const verts: number[] = [];
     const tokenLayer: IParsedLayer[] = [];
@@ -173,8 +186,13 @@ export function CreateTexturedQuadRenderer(engine: ThinEngine, source: ITextured
             // Textured quad: no stencil, no cull, premultiplied "over".
             engine.setColorWrite(true);
             engine.setState(false);
-            engine.stencilState.stencilTest = false;
+            if (IsNativeEngine(engine)) {
+                GetNativeStencilEngine(engine).setStencilBuffer(false);
+            } else {
+                engine.stencilState.stencilTest = false;
+            }
             engine.setAlphaMode(Constants.ALPHA_PREMULTIPLIED);
+            effect.setInt("uSourcePremultiplied", source.premultipliedAlpha ? 1 : 0);
             effect.setTexture("uTex", texture);
             engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, token * VertsPerQuad, VertsPerQuad);
         },
