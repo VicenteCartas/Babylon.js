@@ -10,7 +10,7 @@ import "core/Engines/Extensions/engine.alpha";
 import "core/Engines/Extensions/engine.dynamicBuffer";
 
 import { Constants } from "core/Engines/constants";
-import { type DataBuffer } from "core/Buffers/dataBuffer";
+import { Buffer, type VertexBuffer } from "core/Buffers/buffer";
 import { type Nullable } from "core/types";
 import { type ThinEngine } from "core/Engines/thinEngine";
 import { type ThinTexture } from "core/Materials/Textures/thinTexture";
@@ -27,13 +27,15 @@ const QuadVertexShader = `#version 300 es
 layout(location = 0) in vec2 position;
 layout(location = 1) in vec2 uv;
 layout(location = 2) in float alpha;
-uniform vec2 uScreen;
+uniform vec4 uScreen;
 out vec2 vUv;
 out float vAlpha;
 void main() {
   vUv = uv;
   vAlpha = alpha;
-  gl_Position = vec4(position.x / uScreen.x * 2.0 - 1.0, 1.0 - position.y / uScreen.y * 2.0, 0.0, 1.0);
+    vec4 screen = uScreen;
+    vec2 clipPosition = position / screen.xy * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
+    gl_Position = vec4(clipPosition, 0.0, 1.0);
 }`;
 
 const QuadFragmentShader = `#version 300 es
@@ -41,12 +43,13 @@ precision highp float;
 in vec2 vUv;
 in float vAlpha;
 uniform sampler2D uTex;
-uniform int uSourcePremultiplied;
+uniform vec4 uSourcePremultiplied;
 layout(location = 0) out vec4 fragColor;
 void main() {
   vec4 c = texture(uTex, vUv);
   float a = c.a * vAlpha;
-    vec3 rgb = uSourcePremultiplied != 0 ? c.rgb * vAlpha : c.rgb * a;
+    vec4 sourcePremultiplied = uSourcePremultiplied;
+    vec3 rgb = sourcePremultiplied.x != 0.0 ? c.rgb * vAlpha : c.rgb * a;
     fragColor = vec4(rgb, a);
 }`;
 
@@ -78,10 +81,6 @@ export interface ITexturedQuadSource {
     disposeTextures(): void;
 }
 
-// Interleaved pos.xy / uv.xy / alpha. bindBuffersDirectly derives each attribute's byte offset by
-// accumulating these sizes, which yields 0 / 8 / 16 for this layout.
-const QuadVertexDeclaration = [2, 2, 1];
-
 /**
  * Creates a textured-quad renderer for one layer kind (text or image) from a variant source.
  * @param engine The engine to render with.
@@ -101,12 +100,10 @@ export function CreateTexturedQuadRenderer(engine: ThinEngine, source: ITextured
     const corner: [number, number] = [0, 0];
     const rect: IQuadRect = { left: 0, top: 0, width: 0, height: 0 };
 
-    let vbo: Nullable<DataBuffer> = null;
+    let vertexBuffer: Nullable<Buffer> = null;
+    const vertexBuffers: Record<string, VertexBuffer> = {};
     let vertData = new Float32Array(0);
     let vertCapacity = 0; // in floats
-    // See fillRenderer: bindBuffersDirectly wants an index buffer even though every draw is a
-    // drawArraysType over a tightly packed stream.
-    let unusedIb: Nullable<DataBuffer> = null;
 
     function pushVert(x: number, y: number, u: number, v: number, alpha: number): void {
         verts.push(x, y, u, v, alpha);
@@ -114,16 +111,18 @@ export function CreateTexturedQuadRenderer(engine: ThinEngine, source: ITextured
 
     function ensureBuffers(quads: number): void {
         const neededFloats = Math.max(quads * VertsPerQuad * FloatsPerVert, FloatsPerVert);
-        if (!vbo || vertCapacity < neededFloats) {
-            if (vbo) {
-                engine._releaseBuffer(vbo);
-            }
-            vertCapacity = Math.max(neededFloats, Math.ceil((vertCapacity || 1024) * 1.5));
+        if (!vertexBuffer || vertCapacity < neededFloats) {
+            vertexBuffers.position?.dispose();
+            vertexBuffers.uv?.dispose();
+            vertexBuffers.alpha?.dispose();
+            vertexBuffer?.dispose();
+            const grownCapacity = Math.ceil((vertCapacity || 1024) * 1.5);
+            vertCapacity = Math.ceil(Math.max(neededFloats, grownCapacity) / FloatsPerVert) * FloatsPerVert;
             vertData = new Float32Array(vertCapacity);
-            vbo = engine.createDynamicVertexBuffer(vertData);
-        }
-        if (!unusedIb) {
-            unusedIb = engine.createIndexBuffer(new Uint16Array([0, 1, 2]));
+            vertexBuffer = new Buffer(engine, vertData, true, FloatsPerVert);
+            vertexBuffers.position = vertexBuffer.createVertexBuffer("position", 0, 2, FloatsPerVert);
+            vertexBuffers.uv = vertexBuffer.createVertexBuffer("uv", 2, 2, FloatsPerVert);
+            vertexBuffers.alpha = vertexBuffer.createVertexBuffer("alpha", 4, 1, FloatsPerVert);
         }
     }
 
@@ -167,22 +166,22 @@ export function CreateTexturedQuadRenderer(engine: ThinEngine, source: ITextured
         flush(ctx: ILayerRenderContext) {
             const quads = tokenLayer.length;
             ensureBuffers(Math.max(quads, 1));
-            if (quads > 0 && vbo) {
+            if (quads > 0 && vertexBuffer) {
                 vertData.set(verts);
-                engine.updateDynamicVertexBuffer(vbo, vertData, 0, verts.length * Float32Array.BYTES_PER_ELEMENT);
+                vertexBuffer.updateDirectly(vertData, 0, quads * VertsPerQuad);
             }
             engine.enableEffect(effect);
-            effect.setFloat2("uScreen", ctx.screenW, ctx.screenH);
+            effect.setFloat4("uScreen", ctx.screenW, ctx.screenH, 0, 0);
         },
         recordLayer(token: number) {
             const texture = source.textureFor(tokenLayer[token]);
-            if (!texture || !vbo || !unusedIb || !effect.isReady()) {
+            if (!texture || !vertexBuffer || !effect.isReady()) {
                 return;
             }
             engine.enableEffect(effect);
             // (Re)bind the interleaved layout — the fill renderer binds its own single-attribute
             // layout between quads when layers interleave by z-order.
-            engine.bindBuffersDirectly(vbo, unusedIb, QuadVertexDeclaration, FloatsPerVert * Float32Array.BYTES_PER_ELEMENT, effect);
+            engine.bindBuffers(vertexBuffers, null, effect);
             // Textured quad: no stencil, no cull, premultiplied "over".
             engine.setColorWrite(true);
             engine.setState(false);
@@ -192,19 +191,16 @@ export function CreateTexturedQuadRenderer(engine: ThinEngine, source: ITextured
                 engine.stencilState.stencilTest = false;
             }
             engine.setAlphaMode(Constants.ALPHA_PREMULTIPLIED);
-            effect.setInt("uSourcePremultiplied", source.premultipliedAlpha ? 1 : 0);
+            effect.setFloat4("uSourcePremultiplied", source.premultipliedAlpha ? 1 : 0, 0, 0, 0);
             effect.setTexture("uTex", texture);
             engine.drawArraysType(Constants.MATERIAL_TriangleFillMode, token * VertsPerQuad, VertsPerQuad);
         },
         dispose() {
-            if (vbo) {
-                engine._releaseBuffer(vbo);
-                vbo = null;
-            }
-            if (unusedIb) {
-                engine._releaseBuffer(unusedIb);
-                unusedIb = null;
-            }
+            vertexBuffers.position?.dispose();
+            vertexBuffers.uv?.dispose();
+            vertexBuffers.alpha?.dispose();
+            vertexBuffer?.dispose();
+            vertexBuffer = null;
             source.disposeTextures();
             effect.dispose();
         },

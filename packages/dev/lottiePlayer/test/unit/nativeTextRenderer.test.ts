@@ -29,7 +29,7 @@ function CreateTextLayer(ind = 1): IParsedLayer {
 }
 
 describe("CreateTextRenderer", () => {
-    it("uses the engine Canvas2D implementation by default", () => {
+    it("uses the engine Canvas2D implementation and preserves CSS fill colors", () => {
         const context = {
             font: "",
             letterSpacing: "",
@@ -51,10 +51,13 @@ describe("CreateTextRenderer", () => {
         };
         engine = mockEngine as unknown as ThinEngine;
 
-        CreateTextRenderer(engine, [CreateTextLayer()]);
+        const layer = CreateTextLayer();
+        layer.text!.color = "rgba(255, 255, 255, 0.8)";
+        CreateTextRenderer(engine, [layer]);
 
         expect(mockEngine.createCanvas).toHaveBeenCalledWith(1, 1);
         expect(mockEngine.updateDynamicTexture).toHaveBeenCalledWith(internalTexture, canvas, false, false);
+        expect(context.fillStyle).toBe("rgba(255, 255, 255, 0.8)");
     });
 
     it("treats Babylon Native Canvas textures as premultiplied", () => {
@@ -68,7 +71,7 @@ describe("CreateTextRenderer", () => {
             fillText: vi.fn(),
         };
         const canvas = { width: 1, height: 1, getContext: vi.fn(() => context) };
-        const effect = { isReady: () => true, setFloat2: vi.fn(), setInt: vi.fn(), setTexture: vi.fn(), dispose: vi.fn() };
+        const effect = { isReady: () => true, setFloat4: vi.fn(), setTexture: vi.fn(), dispose: vi.fn() };
         let engine: ThinEngine;
         const internalTexture = { getEngine: () => engine, dispose: vi.fn() };
         const mockEngine = {
@@ -80,10 +83,9 @@ describe("CreateTextRenderer", () => {
             createDynamicTexture: vi.fn(() => internalTexture),
             updateDynamicTexture: vi.fn(),
             createDynamicVertexBuffer: vi.fn(() => ({})),
-            createIndexBuffer: vi.fn(() => ({})),
             updateDynamicVertexBuffer: vi.fn(),
             enableEffect: vi.fn(),
-            bindBuffersDirectly: vi.fn(),
+            bindBuffers: vi.fn(),
             setColorWrite: vi.fn(),
             setState: vi.fn(),
             setStencilBuffer: vi.fn(),
@@ -101,7 +103,14 @@ describe("CreateTextRenderer", () => {
         renderer.flush(frame);
         renderer.recordLayer(token);
 
-        expect(effect.setInt).toHaveBeenCalledWith("uSourcePremultiplied", 1);
+        expect(effect.setFloat4).toHaveBeenCalledWith("uSourcePremultiplied", 1, 0, 0, 0);
+        expect(mockEngine.bindBuffers).toHaveBeenCalledWith(
+            expect.objectContaining({ position: expect.anything(), uv: expect.anything(), alpha: expect.anything() }),
+            null,
+            effect
+        );
+        const vertexData = mockEngine.createDynamicVertexBuffer.mock.calls[0][0] as Float32Array;
+        expect(vertexData.length % 5).toBe(0);
         renderer.dispose();
     });
 

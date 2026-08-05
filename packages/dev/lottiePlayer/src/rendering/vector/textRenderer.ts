@@ -142,7 +142,7 @@ function RasterizeText(engine: ThinEngine, t: IParsedText): Nullable<{ canvas: I
     ctx.font = font;
     (ctx as unknown as { letterSpacing: string }).letterSpacing = `${t.letterSpacing}px`;
     ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = `rgb(${Math.round(t.color[0] * 255)}, ${Math.round(t.color[1] * 255)}, ${Math.round(t.color[2] * 255)})`;
+    ctx.fillStyle = typeof t.color === "string" ? t.color : `rgb(${Math.round(t.color[0] * 255)}, ${Math.round(t.color[1] * 255)}, ${Math.round(t.color[2] * 255)})`;
 
     for (let i = 0; i < lines.length; i++) {
         const lineW = ctx.measureText(lines[i]).width;

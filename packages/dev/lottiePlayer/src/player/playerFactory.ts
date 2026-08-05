@@ -34,8 +34,8 @@ export function ValidateEngineFeatures(engine: ThinEngine, animation: IParsedAni
  * renderer chunks load only when those layer kinds are present.
  * @param engine The engine to render with, from `CreateVectorEngine`.
  * @param file The raw Lottie document.
- * @param options Player options. `variables` substitutes text-layer content at load time for
- * localization (whole-string key match); `backgroundColor` sets the per-frame clear color.
+ * @param options Player options. `variables` substitutes text-layer content and CSS fill colors at
+ * load time; `backgroundColor` sets the per-frame clear color.
  * @returns The player handle once all required renderer chunks have loaded.
  */
 export async function CreateLottiePlayerAsync(engine: ThinEngine, file: ILottieFile, options?: ILottiePlayerOptions): Promise<ILottiePlayer> {

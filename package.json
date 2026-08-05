@@ -60,7 +60,7 @@
         "build:source": "tsc -b ./tsconfig.devpackages.json",
         "build:source:smart-filters": "npm run build:assets:smart-filters && tsc -b ./tsconfig.smartFilters.json",
         "build:umd": "npm run build:umd:libs && npm run build:umd:tools",
-        "build:umd:libs": "nx run-many --outputStyle=static --target=build --parallel --maxParallel=6 --projects=babylonjs,babylonjs-gui,babylonjs-loaders,babylonjs-materials,babylonjs-serializers,babylonjs-post-process,babylonjs-procedural-textures,babylonjs-ktx2decoder,babylonjs-accessibility,babylonjs-addons",
+        "build:umd:libs": "nx run-many --outputStyle=static --target=build --parallel --maxParallel=6 --projects=babylonjs,babylonjs-gui,babylonjs-loaders,babylonjs-materials,babylonjs-serializers,babylonjs-post-process,babylonjs-procedural-textures,babylonjs-ktx2decoder,babylonjs-accessibility,babylonjs-addons,babylonjs-lottie-player",
         "build:umd:tools": "nx run-many --outputStyle=static --target=build --parallel --maxParallel=2 --projects=babylonjs-inspector-legacy,babylonjs-node-editor,babylonjs-node-geometry-editor,babylonjs-node-render-graph-editor,babylonjs-node-particle-editor,babylonjs-gui-editor,babylonjs-inspector,create-babylonjs",
         "downlevel:native-scripts": "node ./scripts/downlevelNativeScripts.mjs",
         "build:es6": "npm run build:assets:smart-filters && npm run build:es6:libs && npm run build:es6:tools && npm run check:treeshaking-all",

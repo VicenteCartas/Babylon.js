@@ -141,6 +141,34 @@ describe("ParseAnimation - layers and solids", () => {
         expect(anim.layers[0].text?.text).toBe("Hello");
     });
 
+    it("substitutes CSS text fill colors from variables", () => {
+        const textLayer = {
+            ty: 5,
+            ind: 1,
+            ks: Transform,
+            ip: 0,
+            op: 60,
+            st: 0,
+            t: { d: { k: [{ s: { t: "Title", f: "Segoe UI", s: 12, fc: "textFill" } }] } },
+        };
+        const anim = ParseAnimation(File([textLayer]), { textFill: "rgba(255, 255, 255, 0.8)" });
+        expect(anim.layers[0].text?.color).toBe("rgba(255, 255, 255, 0.8)");
+    });
+
+    it("defaults unresolved text fill color variables to black", () => {
+        const textLayer = {
+            ty: 5,
+            ind: 1,
+            ks: Transform,
+            ip: 0,
+            op: 60,
+            st: 0,
+            t: { d: { k: [{ s: { t: "Title", f: "Segoe UI", s: 12, fc: "textFill" } }] } },
+        };
+        const anim = ParseAnimation(File([textLayer]));
+        expect(anim.layers[0].text?.color).toEqual([0, 0, 0, 1]);
+    });
+
     it("defaults a missing in/out point to the full timeline", () => {
         const anim = ParseAnimation(File([ShapeLayer({ ind: 1, ip: undefined, op: undefined }, [Path, Fill])]));
         expect(anim.layers[0].ip).toBe(0);

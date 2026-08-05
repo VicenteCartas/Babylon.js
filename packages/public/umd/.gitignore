@@ -1,1 +1,2 @@
 babylon*.*
+!babylonjs-lottie-player/babylon.lottiePlayer.module.d.ts

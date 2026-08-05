@@ -1,0 +1,48 @@
+{
+    "name": "babylonjs-lottie-player",
+    "version": "9.19.0",
+    "main": "babylon.lottiePlayer.min.js",
+    "types": "babylon.lottiePlayer.module.d.ts",
+    "files": [
+        "babylon.lottiePlayer.js",
+        "babylon.lottiePlayer.js.map",
+        "babylon.lottiePlayer.min.js",
+        "babylon.lottiePlayer.min.js.map",
+        "babylon.lottiePlayer.module.d.ts",
+        "license.md",
+        "readme.md"
+    ],
+    "scripts": {
+        "build": "npm run clean && npm run build:prod",
+        "build:dev": "rollup -c rollup.config.umd.mjs",
+        "build:dev:fast": "rollup -c rollup.config.umd.mjs --environment ROLLUP_DEVMODE:true",
+        "build:prod": "rollup -c rollup.config.umd.mjs --environment ROLLUP_MODE:production",
+        "clean": "rimraf babylon.lottiePlayer*.js babylon.lottiePlayer*.js.map -g",
+        "test:escheck": "es-check es6 ./babylon.lottiePlayer.js"
+    },
+    "dependencies": {
+        "@babylonjs/lottie-player": "9.19.0",
+        "babylonjs": "9.19.0"
+    },
+    "devDependencies": {
+        "@dev/build-tools": "1.0.0",
+        "@dev/core": "1.0.0",
+        "@dev/lottie-player": "1.0.0"
+    },
+    "keywords": [
+        "animation",
+        "lottie",
+        "babylon",
+        "babylon.js"
+    ],
+    "license": "MIT",
+    "sideEffects": true,
+    "homepage": "https://www.babylonjs.com",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/BabylonJS/Babylon.js.git"
+    },
+    "bugs": {
+        "url": "https://github.com/BabylonJS/Babylon.js/issues"
+    }
+}

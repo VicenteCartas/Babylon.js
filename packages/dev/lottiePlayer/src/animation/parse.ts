@@ -5,14 +5,13 @@
 import { type IColor4Like } from "core/Maths/math.like";
 import { type IAsset, type IFontDef, type ILayer, type ILottieFile, type IProp, type IShapeItem, type IStrokeDashEntry } from "./lottieRaw";
 
-/** A map of placeholder text → replacement string, applied at parse time to text-layer content for
- *  runtime localization. A text layer whose raw content EXACTLY matches a key is rendered with the
- *  mapped value instead (whole-string match, mirroring the original Babylon.js Lottie player). */
+/** A map of placeholder → replacement strings, applied at parse time to text content and variable
+ *  text fill colors. Text content uses whole-string matching; fill-color values are CSS colors. */
 export type LottieVariables = Readonly<Record<string, string>>;
 
 /** Options for the Lottie player factory. */
 export interface ILottiePlayerOptions {
-    /** Runtime text substitutions for localization — see {@link LottieVariables}. */
+    /** Runtime text content and fill-color substitutions — see {@link LottieVariables}. */
     variables?: LottieVariables;
     /** Color the canvas is cleared to before each frame. Defaults to opaque black, matching
      *  the sprite renderer's `AnimationConfiguration.backgroundColor`. Use an alpha of 0 for a
@@ -132,8 +131,8 @@ export interface IParsedText {
     style: string;
     /** Font size in px. */
     size: number;
-    /** Fill color [r,g,b,a] in 0–1. */
-    color: [number, number, number, number];
+    /** Fill color as [r,g,b,a] in 0–1 or a CSS color supplied through the variables map. */
+    color: [number, number, number, number] | string;
     /** Justify: 0 left, 1 right, 2 center. */
     justify: number;
     /** Letter spacing in px. */
@@ -369,7 +368,13 @@ function ParseText(layer: ILayer, fonts: Map<string, IFontDef>, variables?: Lott
     const def = fonts.get(doc.f);
     const { weight, style } = GetFontWeightStyle(def, doc.f);
     const family = def?.fFamily?.split(",")[0]?.replace(/['"]/g, "").trim() || "sans-serif";
-    const fc = doc.fc ?? [0, 0, 0];
+    const rawFillColor = doc.fc;
+    let color: IParsedText["color"] = [0, 0, 0, 1];
+    if (Array.isArray(rawFillColor) && rawFillColor.length >= 3) {
+        color = [rawFillColor[0], rawFillColor[1], rawFillColor[2], 1];
+    } else if (typeof rawFillColor === "string" && variables && Object.prototype.hasOwnProperty.call(variables, rawFillColor)) {
+        color = variables[rawFillColor];
+    }
     const size = doc.s ?? 16;
     const boxed = Array.isArray(doc.sz) && doc.sz[0] > 0;
     // Runtime localization: if the raw text EXACTLY matches a variable key, substitute its value
@@ -383,7 +388,7 @@ function ParseText(layer: ILayer, fonts: Map<string, IFontDef>, variables?: Lott
         weight,
         style,
         size,
-        color: [fc[0], fc[1], fc[2], 1],
+        color,
         justify: doc.j ?? 0,
         // Lottie tracking is 1/1000 em; convert to px letter spacing.
         letterSpacing: ((doc.tr ?? 0) / 1000) * size,
@@ -493,8 +498,8 @@ function ParseAssets(raw: IAsset[] | undefined): IParsedAsset[] {
  * Parses a Lottie document into a flat draw list. Keeps shape (`ty 4`), image (`ty 2`),
  * text (`ty 5`), and null (`ty 3`, transform-only) layers.
  * @param file The raw Lottie document.
- * @param variables Runtime text substitutions applied to text layers, matched on the whole
- * string — see {@link LottieVariables}.
+ * @param variables Runtime text and fill-color substitutions applied to text layers — see
+ * {@link LottieVariables}.
  * @returns The parsed animation.
  */
 export function ParseAnimation(file: ILottieFile, variables?: LottieVariables): IParsedAnimation {

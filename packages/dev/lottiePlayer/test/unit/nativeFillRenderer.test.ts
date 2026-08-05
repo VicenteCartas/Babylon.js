@@ -26,9 +26,8 @@ function CreateMockEngine(shaderPlatformName: "NATIVE" | "WEBGL2") {
         stencilState: {},
         createEffect: vi.fn(() => effect),
         createDynamicVertexBuffer: vi.fn(() => ({})),
-        createIndexBuffer: vi.fn(() => ({})),
         updateDynamicVertexBuffer: vi.fn(),
-        bindBuffersDirectly: vi.fn(),
+        bindBuffers: vi.fn(),
         enableEffect: vi.fn(),
         setColorWrite: vi.fn(),
         setState: vi.fn(),
@@ -89,6 +88,7 @@ describe("CreateFillRenderer stencil strategy", () => {
         expect(mock.setStencilOperationPass).toHaveBeenCalledWith(Constants.INCR);
         expect(mock.setStencilOperationPass).toHaveBeenCalledWith(Constants.DECR);
         expect(mock.setStencilOperationPass).toHaveBeenCalledWith(Constants.ZERO);
+        expect(mock.bindBuffers).toHaveBeenCalledWith(expect.objectContaining({ position: expect.anything() }), null, expect.anything());
         renderer.dispose();
     });
 

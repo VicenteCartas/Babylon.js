@@ -26,7 +26,7 @@ import "core/Engines/Extensions/engine.alpha";
 import "core/Engines/Extensions/engine.dynamicBuffer";
 
 import { Constants } from "core/Engines/constants";
-import { type DataBuffer } from "core/Buffers/dataBuffer";
+import { Buffer, type VertexBuffer } from "core/Buffers/buffer";
 import { type Nullable } from "core/types";
 import { type ThinEngine } from "core/Engines/thinEngine";
 
@@ -46,9 +46,11 @@ const MaskBit = 0x80;
 
 const StencilVertexShader = `#version 300 es
 layout(location = 0) in vec2 position;
-uniform vec2 uScreen;
+uniform vec4 uScreen;
 void main() {
-  gl_Position = vec4(position.x / uScreen.x * 2.0 - 1.0, 1.0 - position.y / uScreen.y * 2.0, 0.0, 1.0);
+    vec4 screen = uScreen;
+    vec2 clipPosition = position / screen.xy * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
+    gl_Position = vec4(clipPosition, 0.0, 1.0);
 }`;
 
 const StencilFragmentShader = `#version 300 es
@@ -58,30 +60,33 @@ void main() { fragColor = vec4(0.0); }`;
 
 const CoverVertexShader = `#version 300 es
 layout(location = 0) in vec2 position;
-uniform vec2 uScreen;
+uniform vec4 uScreen;
 out vec2 vScr;
 void main() {
   vScr = position;
-  gl_Position = vec4(position.x / uScreen.x * 2.0 - 1.0, 1.0 - position.y / uScreen.y * 2.0, 0.0, 1.0);
+    vec4 screen = uScreen;
+    vec2 clipPosition = position / screen.xy * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
+    gl_Position = vec4(clipPosition, 0.0, 1.0);
 }`;
 
 const CoverFragmentShader = `#version 300 es
 precision highp float;
 in vec2 vScr;
 layout(location = 0) out vec4 fragColor;
-uniform int uKind;        // 0 solid, 1 linear, 2 radial
-uniform float uAlpha;
+uniform vec4 uKind;       // x: 0 solid, 1 linear, 2 radial
+uniform vec4 uAlpha;      // x: layer alpha
 uniform vec4 uSolid;
 uniform vec4 uGrad;       // start.xy, end.xy (screen space)
-uniform int uStopCount;
-uniform float uOffsets[${MaxGradientStops}];
+uniform vec4 uStopCount;  // x: active gradient stop count
+uniform vec4 uOffsets[${MaxGradientStops}];
 uniform vec4 uColors[${MaxGradientStops}];
 vec4 ramp(float t) {
-  int n = uStopCount;
-  if (t <= uOffsets[0]) { return uColors[0]; }
+    vec4 stopCount = uStopCount;
+    int n = int(stopCount.x);
+    if (t <= uOffsets[0].x) { return uColors[0]; }
   for (int i = 0; i + 1 < n; i++) {
-    float a = uOffsets[i];
-    float b = uOffsets[i + 1];
+        float a = uOffsets[i].x;
+        float b = uOffsets[i + 1].x;
     if (t >= a && t <= b) {
       float f = (t - a) / max(b - a, 1e-6);
       return mix(uColors[i], uColors[i + 1], f);
@@ -91,13 +96,16 @@ vec4 ramp(float t) {
 }
 void main() {
   vec4 rgba;
-  if (uKind == 0) {
+    vec4 kindValue = uKind;
+    int kind = int(kindValue.x);
+    if (kind == 0) {
     rgba = uSolid;
   } else {
-    vec2 s = uGrad.xy;
-    vec2 e = uGrad.zw;
+        vec4 gradient = uGrad;
+        vec2 s = gradient.xy;
+        vec2 e = gradient.zw;
     float t;
-    if (uKind == 1) {
+    if (kind == 1) {
       vec2 d = e - s;
       t = clamp(dot(vScr - s, d) / max(dot(d, d), 1e-6), 0.0, 1.0);
     } else {
@@ -105,7 +113,8 @@ void main() {
     }
     rgba = ramp(t);
   }
-  float a = rgba.a * uAlpha;
+    vec4 alphaValue = uAlpha;
+    float a = rgba.a * alphaValue.x;
   fragColor = vec4(rgba.rgb * a, a);
 }`;
 
@@ -237,7 +246,7 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
     const pCol: number[] = []; // MAX_GRADIENT_STOPS * 4 per draw
 
     // Uniform upload scratch (avoid per-draw allocation).
-    const offScratch = new Float32Array(MaxGradientStops);
+    const offScratch = new Float32Array(MaxGradientStops * 4);
     const colScratch = new Float32Array(MaxGradientStops * 4);
 
     // Per-token mask geometry (parallel to `ranges`, indexed by token). maskHas gates the masked
@@ -248,13 +257,10 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
     const maskFanCount: number[] = [];
     const maskBboxFirst: number[] = [];
 
-    let vbo: Nullable<DataBuffer> = null;
+    let vertexBuffer: Nullable<Buffer> = null;
+    const vertexBuffers: Record<string, VertexBuffer> = {};
     let vertData = new Float32Array(0);
     let vertCapacity = 0; // in floats
-    // `bindBuffersDirectly` binds an index buffer alongside the attributes, but every draw here is
-    // a `drawArraysType` over a tightly packed vertex stream. One tiny throwaway index buffer
-    // satisfies the binding API without paying for a per-vertex identity index array.
-    let unusedIb: Nullable<DataBuffer> = null;
 
     // Scratch union bounds [minx, miny, maxx, maxy] for the current emit, reset at each emit's start.
     const bnds = [0, 0, 0, 0];
@@ -473,16 +479,14 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
 
     function ensureBuffers(vec2Count: number): void {
         const neededFloats = Math.max(vec2Count * 2, 2);
-        if (!vbo || vertCapacity < neededFloats) {
-            if (vbo) {
-                engine._releaseBuffer(vbo);
-            }
-            vertCapacity = Math.max(neededFloats, Math.ceil((vertCapacity || 8192) * 1.5));
+        if (!vertexBuffer || vertCapacity < neededFloats) {
+            vertexBuffers.position?.dispose();
+            vertexBuffer?.dispose();
+            const grownCapacity = Math.ceil((vertCapacity || 8192) * 1.5);
+            vertCapacity = Math.ceil(Math.max(neededFloats, grownCapacity) / 2) * 2;
             vertData = new Float32Array(vertCapacity);
-            vbo = engine.createDynamicVertexBuffer(vertData);
-        }
-        if (!unusedIb) {
-            unusedIb = engine.createIndexBuffer(new Uint16Array([0, 1, 2]));
+            vertexBuffer = new Buffer(engine, vertData, true, 2);
+            vertexBuffers.position = vertexBuffer.createVertexBuffer("position", 0, 2, 2);
         }
     }
 
@@ -491,8 +495,8 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
     // Bind the shared single-vec2 attribute layout. Both programs pin `position` to location 0,
     // so one binding serves the stencil and cover passes alike.
     function bindGeometry(): void {
-        if (vbo && unusedIb) {
-            engine.bindBuffersDirectly(vbo, unusedIb, [2], 2 * Float32Array.BYTES_PER_ELEMENT, stencilEffect);
+        if (vertexBuffer) {
+            engine.bindBuffers(vertexBuffers, null, stencilEffect);
         }
     }
 
@@ -651,20 +655,19 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
         flush(ctx: ILayerRenderContext) {
             const vertexCount = verts.length / 2;
             ensureBuffers(Math.max(vertexCount, 1));
-            if (vertexCount > 0 && vbo) {
+            if (vertexCount > 0 && vertexBuffer) {
                 vertData.set(verts);
-                engine.updateDynamicVertexBuffer(vbo, vertData, 0, verts.length * Float32Array.BYTES_PER_ELEMENT);
+                vertexBuffer.updateDirectly(vertData, 0, vertexCount);
             }
-            // uScreen is constant per frame; Effect caches uniform values, so set on both programs.
             engine.enableEffect(stencilEffect);
-            stencilEffect.setFloat2("uScreen", ctx.screenW, ctx.screenH);
+            stencilEffect.setFloat4("uScreen", ctx.screenW, ctx.screenH, 0, 0);
             engine.enableEffect(coverEffect);
-            coverEffect.setFloat2("uScreen", ctx.screenW, ctx.screenH);
+            coverEffect.setFloat4("uScreen", ctx.screenW, ctx.screenH, 0, 0);
         },
         recordLayer(token: number, matteToken?: number) {
             const drawStart = ranges[token * 2];
             const drawCount = ranges[token * 2 + 1];
-            if (drawCount === 0 || !vbo || !unusedIb) {
+            if (drawCount === 0 || !vertexBuffer) {
                 return;
             }
             // (Re)bind our single position attribute. Sibling renderers (text / image) bind their
@@ -693,18 +696,18 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
                 //    preserving the mask/matte bits, blend premultiplied.
                 engine.enableEffect(coverEffect);
                 const pi = d.paintIndex;
-                coverEffect.setInt("uKind", pKind[pi]);
-                coverEffect.setFloat("uAlpha", pAlpha[pi]);
+                coverEffect.setFloat4("uKind", pKind[pi], 0, 0, 0);
+                coverEffect.setFloat4("uAlpha", pAlpha[pi], 0, 0, 0);
                 coverEffect.setFloat4("uSolid", pSolid[pi * 4], pSolid[pi * 4 + 1], pSolid[pi * 4 + 2], pSolid[pi * 4 + 3]);
                 coverEffect.setFloat4("uGrad", pGrad[pi * 4], pGrad[pi * 4 + 1], pGrad[pi * 4 + 2], pGrad[pi * 4 + 3]);
-                coverEffect.setInt("uStopCount", pStopCount[pi]);
+                coverEffect.setFloat4("uStopCount", pStopCount[pi], 0, 0, 0);
                 for (let k = 0; k < MaxGradientStops; k++) {
-                    offScratch[k] = pOff[pi * MaxGradientStops + k];
+                    offScratch[k * 4] = pOff[pi * MaxGradientStops + k];
                 }
                 for (let k = 0; k < MaxGradientStops * 4; k++) {
                     colScratch[k] = pCol[pi * MaxGradientStops * 4 + k];
                 }
-                coverEffect.setFloatArray("uOffsets", offScratch);
+                coverEffect.setFloatArray4("uOffsets", offScratch);
                 coverEffect.setFloatArray4("uColors", colScratch);
                 engine.setColorWrite(true);
                 engine.setState(false);
@@ -721,14 +724,9 @@ export function CreateFillRenderer(engine: ThinEngine): ILayerRenderer {
             }
         },
         dispose() {
-            if (vbo) {
-                engine._releaseBuffer(vbo);
-                vbo = null;
-            }
-            if (unusedIb) {
-                engine._releaseBuffer(unusedIb);
-                unusedIb = null;
-            }
+            vertexBuffers.position?.dispose();
+            vertexBuffer?.dispose();
+            vertexBuffer = null;
             stencilEffect.dispose();
             coverEffect.dispose();
         },

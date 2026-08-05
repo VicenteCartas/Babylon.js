@@ -172,8 +172,8 @@ export interface ITextDocument {
     f: string;
     /** Font size (px). */
     s: number;
-    /** Fill color [r,g,b] in 0–1. */
-    fc?: number[];
+    /** Fill color [r,g,b] in 0–1, or a key resolved through the player's variables map. */
+    fc?: number[] | string;
     /** Justify: 0 left, 1 right, 2 center. */
     j?: number;
     /** Tracking (letter spacing, 1/1000 em). */
